@@ -1,183 +1,208 @@
 # AI Agent Marketplace
 
-Internal marketplace for sharing Claude Code plugins, project skills, and MCP (Model Context Protocol) configurations.
+Claude Codeプラグイン、プロジェクトスキル、MCP（Model Context Protocol）設定を共有するための内部マーケットプレイスです。
 
-## Overview
+## 概要
 
-This marketplace provides pre-configured plugins to accelerate Claude Code adoption across teams, including:
+このマーケットプレイスは、チーム全体でClaude Codeの導入を加速するための事前設定されたプラグインを提供します：
 
-- **MCP Integration Skills**: Automated setup for GitHub, Serena, BigQuery, and Notion MCPs
-- **Custom Commands**: Reusable slash commands for common tasks
-- **Sub-Agents**: Specialized AI agents for different domains
-- **Hooks**: Automated workflows triggered by events
+- **MCPインテグレーションスキル**: GitHub、Serena、BigQuery、Notion MCPの自動セットアップ
+- **カスタムコマンド**: 共通タスク用の再利用可能なスラッシュコマンド
+- **サブエージェント**: 異なるドメイン向けの専門AIエージェント
+- **フック**: イベントによってトリガーされる自動ワークフロー
 
-## Available Plugins
+## 利用可能なプラグイン
 
 ### MCP Integration (`mcp-integration`)
 
-Project skill for setting up MCP servers in Claude Code projects.
+Claude CodeプロジェクトでMCPサーバーをセットアップするためのプロジェクトスキル。
 
-**Features:**
-- Complete `.mcp.json` template with 5 MCP servers
-- Authentication setup guides
-- Usage examples and best practices
-- Troubleshooting documentation
+**機能:**
+- 5つのMCPサーバーを含む完全な `.mcp.json` テンプレート
+- 認証セットアップガイド
+- 使用例とベストプラクティス
+- トラブルシューティングドキュメント
 
-**Included MCPs:**
-1. **GitHub MCP**: Repository operations, PR management, issue tracking
-2. **Notion MCP**: Document management, database operations
-3. **Serena MCP**: Semantic code understanding and editing
-4. **AWS Documentation MCP**: AWS service documentation access
-5. **BigQuery MCP**: Database queries and schema management
+**含まれるMCP:**
+1. **GitHub MCP**: リポジトリ操作、PR管理、イシュートラッキング
+2. **Notion MCP**: ドキュメント管理、データベース操作
+3. **Serena MCP**: セマンティックコード理解と編集
+4. **AWS Documentation MCP**: AWSサービスドキュメントアクセス
+5. **BigQuery MCP**: データベースクエリとスキーマ管理
 
-**Documentation:**
-- [SKILL.md](./plugins/mcp-integration/skills/mcp-integration/SKILL.md) - Overview
-- [Setup Guide](./plugins/mcp-integration/skills/mcp-integration/mcp-setup-guide.md) - Installation steps
-- [Config Template](./plugins/mcp-integration/skills/mcp-integration/mcp-config-template.md) - `.mcp.json` template
-- [Authentication Guide](./plugins/mcp-integration/skills/mcp-integration/mcp-authentication-guide.md) - Token setup
+**ドキュメント:**
+- [SKILL.md](./plugins/mcp-integration/skills/mcp-integration/SKILL.md) - 概要
+- [セットアップガイド](./plugins/mcp-integration/skills/mcp-integration/mcp-setup-guide.md) - インストール手順
+- [設定テンプレート](./plugins/mcp-integration/skills/mcp-integration/mcp-config-template.md) - `.mcp.json` テンプレート
+- [認証ガイド](./plugins/mcp-integration/skills/mcp-integration/mcp-authentication-guide.md) - トークンセットアップ
 
-## Installation
+### Slack Notification (`slack-notification`)
 
-### Add Marketplace to Claude Code
+Claude Codeの作業完了時に自動的にSlack通知を送信するプラグイン。
 
-1. Open Claude Code
-2. Run command: `/plugin marketplace add`
-3. Enter this repository URL: `https://github.com/takemi-ohama/ai-agent-marketplace`
+**機能:**
+- 🔔 **スマート通知**: メンション付き投稿→削除→メンションなし再投稿で通知音を鳴らしながらチャンネルをクリーンに保つ
+- 📝 **日本語要約**: git変更から日本語で作業要約を自動生成
+- 🏷️ **リポジトリコンテキスト**: 通知にリポジトリ名を含める
+- ⚙️ **ポータブル設定**: プロジェクト内のどのサブディレクトリからでも動作
 
-### Install a Plugin
+**通知メッセージ例:**
+```
+[carmo-ai] Claude Codeの作業が完了しました (2025-11-12 00:17:58)
+作業内容: slack-notify.shを更新
+```
+
+**必要な環境変数:**
+- `SLACK_BOT_TOKEN`: Slackボットトークン（必須）
+- `SLACK_CHANNEL_ID`: 通知先チャンネルID（必須）
+- `SLACK_USER_MENTION`: メンションするユーザー（オプション、例: `<@USER_ID>`）
+
+**ドキュメント:**
+- [インストールガイド](https://github.com/volareinc/carmo-ai/blob/main/predict_contract/plugins/slack-notification/README.md)
+- [詳細ドキュメント](https://github.com/volareinc/carmo-ai/blob/main/predict_contract/plugins/slack-notification/skills/slack-notification/SKILL.md)
+
+## インストール
+
+### マーケットプレイスをClaude Codeに追加
+
+1. Claude Codeを開く
+2. コマンドを実行: `/plugin marketplace add`
+3. このリポジトリURLを入力: `https://github.com/takemi-ohama/ai-agent-marketplace`
+
+### プラグインのインストール
 
 ```bash
 /plugin install mcp-integration@ai-agent-marketplace
 ```
 
-Claude Code will:
-1. Download the plugin
-2. Copy files to your project's `.claude/` directory
-3. Make the skill available for autonomous invocation
+Claude Codeが自動的に：
+1. プラグインをダウンロード
+2. ファイルをプロジェクトの `.claude/` ディレクトリにコピー
+3. スキルを自動起動可能にする
 
-### Verify Installation
+### インストールの確認
 
-Check that the skill appears in your project:
+スキルがプロジェクトに表示されることを確認：
 ```bash
 ls -la .claude/skills/mcp-integration/
 ```
 
-## Usage
+## 使い方
 
-### MCP Integration Skill
+### MCP Integrationスキル
 
-The skill activates automatically when you mention:
-- "Set up MCP servers"
-- "Integrate GitHub/BigQuery/Notion"
-- "Enable code analysis"
-- "Configure Serena"
+以下のキーワードを言及すると自動的に起動：
+- "MCPサーバーをセットアップ"
+- "GitHub/BigQuery/Notionをインテグレート"
+- "コード分析を有効化"
+- "Serenaを設定"
 
-Or invoke manually:
+または手動で起動：
 ```
-@mcp-integration-skill help me set up MCPs
+@mcp-integration-skill MCPのセットアップを手伝って
 ```
 
-## Plugin Development
+## プラグイン開発
 
-### Directory Structure
+### ディレクトリ構造
 
 ```
 ai-agent-marketplace/
 ├── .claude-plugin/
-│   └── marketplace.json          # Marketplace metadata
+│   └── marketplace.json          # マーケットプレイスメタデータ
 ├── plugins/
 │   └── {plugin-name}/
 │       ├── .claude-plugin/
-│       │   └── plugin.json       # Plugin metadata
-│       ├── commands/             # Slash commands (*.md)
-│       ├── agents/               # Sub-agents (*.md)
-│       └── skills/               # Project skills (SKILL.md)
+│       │   └── plugin.json       # プラグインメタデータ
+│       ├── commands/             # スラッシュコマンド (*.md)
+│       ├── agents/               # サブエージェント (*.md)
+│       └── skills/               # プロジェクトスキル (SKILL.md)
 └── README.md
 ```
 
-### Creating a New Plugin
+### 新しいプラグインの作成
 
-1. Create plugin directory:
+1. プラグインディレクトリを作成:
    ```bash
    mkdir -p plugins/my-plugin/{.claude-plugin,commands,agents,skills}
    ```
 
-2. Create `plugin.json`:
+2. `plugin.json` を作成:
    ```json
    {
      "name": "my-plugin",
      "version": "1.0.0",
-     "description": "Plugin description",
+     "description": "プラグインの説明",
      "author": {
-       "name": "Your Name",
+       "name": "あなたの名前",
        "url": "https://github.com/username"
      }
    }
    ```
 
-3. Add skills, commands, or agents
+3. スキル、コマンド、またはエージェントを追加
 
-4. Register in `marketplace.json`:
+4. `marketplace.json` に登録:
    ```json
    {
      "plugins": [
        {
          "name": "my-plugin",
          "path": "plugins/my-plugin",
-         "description": "Short description"
+         "description": "簡単な説明"
        }
      ]
    }
    ```
 
-### Project Skills
+### プロジェクトスキル
 
-Skills are automatically invoked by Claude Code when relevant. See [Claude Code Skills Documentation](https://docs.claude.com/en/docs/claude-code/skills) for details.
+スキルは関連性がある時にClaude Codeによって自動的に起動されます。詳細は[Claude Codeスキルドキュメント](https://docs.claude.com/en/docs/claude-code/skills)を参照してください。
 
-**Key Requirements:**
-- Entry point must be named `SKILL.md`
-- Include YAML frontmatter with `name` and `description`
-- Description should contain keywords for autonomous invocation
+**重要な要件:**
+- エントリポイントは `SKILL.md` という名前でなければならない
+- `name` と `description` を含むYAML frontmatterを含める
+- 自動起動のためのキーワードをdescriptionに含める
 
-## Contributing
+## コントリビューション
 
-1. Fork this repository
-2. Create a new plugin or improve existing ones
-3. Submit a pull request
-4. Update marketplace.json if adding new plugins
+1. このリポジトリをフォーク
+2. 新しいプラグインを作成または既存のものを改善
+3. プルリクエストを送信
+4. 新しいプラグインを追加する場合は marketplace.json を更新
 
-## Marketplace Management
+## マーケットプレイス管理
 
-### Updating Plugins
+### プラグインの更新
 
-Plugins are version-controlled. To update:
+プラグインはバージョン管理されています。更新するには：
 
-1. Modify plugin files
-2. Increment version in `plugin.json`
-3. Commit and push changes
-4. Users refresh via Claude Code UI
+1. プラグインファイルを修正
+2. `plugin.json` のバージョンをインクリメント
+3. 変更をコミットしてプッシュ
+4. ユーザーはClaude Code UIから更新
 
-### Removing Plugins
+### プラグインの削除
 
-1. Remove from `marketplace.json`
-2. Optionally delete plugin directory
-3. Commit changes
+1. `marketplace.json` から削除
+2. オプションでプラグインディレクトリを削除
+3. 変更をコミット
 
-## References
+## リファレンス
 
-- [Claude Code Documentation](https://docs.claude.com/en/docs/claude-code)
-- [MCP Specification](https://modelcontextprotocol.io)
-- [GitHub MCP Server](https://github.com/github/github-mcp-server)
+- [Claude Codeドキュメント](https://docs.claude.com/en/docs/claude-code)
+- [MCP仕様](https://modelcontextprotocol.io)
+- [GitHub MCPサーバー](https://github.com/github/github-mcp-server)
 - [Serena MCP](https://github.com/oraios/serena)
 - [BigQuery MCP](https://github.com/ergut/mcp-server-bigquery)
 - [Notion MCP](https://mcp.notion.com)
 
-## License
+## ライセンス
 
-MIT License - See LICENSE file for details
+MITライセンス - 詳細はLICENSEファイルを参照
 
-## Support
+## サポート
 
-For issues or questions:
-- Open an issue in this repository
-- Contact the plugin author (see plugin.json)
+問題や質問がある場合:
+- このリポジトリにイシューを開く
+- プラグイン作者に連絡（plugin.jsonを参照）
