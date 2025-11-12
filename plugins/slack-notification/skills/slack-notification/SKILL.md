@@ -57,10 +57,10 @@ Copy `.claude/settings.json` and `.claude/slack-notify.sh` to your project's `.c
 Add to your `.env` or shell profile:
 
 ```bash
-export SLACK_BOT_TOKEN="xoxb-your-token-here"
-export SLACK_CHANNEL_ID="C09SPLRQ5Q9"
-export SLACK_USER_MENTION="<@U05MS4DBF9V>"  # Optional
-```
+```bash
+export SLACK_BOT_TOKEN="xoxb-your-bot-token-here"
+export SLACK_CHANNEL_ID="YOUR_CHANNEL_ID"
+export SLACK_USER_MENTION="<@YOUR_USER_ID>"  # Optional
 
 ### 3. Configure Slack App
 
