@@ -7,7 +7,8 @@ CHANNEL_ID="${SLACK_CHANNEL_ID}"
 USER_MENTION="${SLACK_USER_MENTION}"
 
 # Exit silently if SLACK_CHANNEL_ID is not set
-if [ -z "$CHANNEL_ID" ]; then
+# Exit silently if required environment variables are not set
+if [ -z "$CHANNEL_ID" ] || [ -z "$SLACK_BOT_TOKEN" ]; then
   exit 0
 fi
 
