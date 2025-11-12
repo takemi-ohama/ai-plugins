@@ -103,7 +103,7 @@ Automatically generates Japanese summaries from git diff:
 ## Notification Message Format
 
 ```
-[carmo-ai] Claude Codeの作業が完了しました (2025-11-12 00:17:58)
+[repository-name] Claude Codeの作業が完了しました (2025-11-12 00:17:58)
 作業内容: slack-notify.shを更新
 ```
 
