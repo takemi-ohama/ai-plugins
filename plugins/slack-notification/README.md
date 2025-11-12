@@ -62,7 +62,7 @@ export SLACK_USER_MENTION="<@YOUR_USER_ID>"  # Optional
 Once configured, notifications are sent automatically when you exit Claude Code:
 
 ```
-[carmo-ai] Claude Codeの作業が完了しました (2025-11-12 00:17:58)
+[repository-name] Claude Codeの作業が完了しました (2025-11-12 00:17:58)
 作業内容: slack-notify.shを更新
 ```
 
