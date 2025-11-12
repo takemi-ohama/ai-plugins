@@ -38,13 +38,18 @@ else
   MENTION_MESSAGE="${MESSAGE}"
 fi
 
-RESPONSE=$(curl -s -X POST https://slack.com/api/chat.postMessage \
+RESPONSE=$(curl -s -X POST  \
   -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{
     \"channel\": \"${CHANNEL_ID}\",
     \"text\": \"${MENTION_MESSAGE}\"
   }")
+
+# Check if the API call was successful
+if [ $? -ne 0 ] || echo "$RESPONSE" | grep -q '"ok":false'; then
+  exit 1
+fi
 
 # Extract timestamp from response
 MESSAGE_TS=$(echo $RESPONSE | grep -o '"ts":"[^"]*"' | head -1 | cut -d'"' -f4)
