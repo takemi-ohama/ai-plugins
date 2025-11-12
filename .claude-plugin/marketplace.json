@@ -8,6 +8,11 @@
       "name": "mcp-integration",
       "source": "./plugins/mcp-integration",
       "description": "Project skill for integrating GitHub, Serena, BigQuery, and Notion MCPs"
+    },
+    {
+      "name": "slack-notification",
+      "source": "./plugins/slack-notification",
+      "description": "Automatic Slack notifications when Claude Code work is completed with Japanese work summary"
     }
   ]
 }
