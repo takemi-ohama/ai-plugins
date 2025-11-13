@@ -1,7 +1,8 @@
 {
   "name": "ai-agent-marketplace",
   "owner": {
-    "name": "takemi-ohama"
+    "name": "takemi-ohama",
+    "email": "takemi.ohama+ai-agent-marketplace@gmail.com"
   },
   "plugins": [
     {

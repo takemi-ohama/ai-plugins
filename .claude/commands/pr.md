@@ -23,7 +23,11 @@
    - `git push -u origin <branch-name>`
 
 4. **PR作成**
-- タイトル・説明: 日本語、body: Summary+Test plan
+   - **ベースブランチ**:
+     - オプション引数が渡された場合: そのブランチ名をPRの向き先（base branch）に指定
+     - オプション引数がない場合: デフォルトブランチ（main/master）をPRの向き先に指定
+   - タイトル・説明: 日本語、body: Summary+Test plan
+   - **⚠️セキュリティ注意**: 機密情報（トークン、パスワード、API キー等）を含めないこと
    - body末尾に <!-- I want to review in Japanese. --> を入れる
 
 ## 命名規則

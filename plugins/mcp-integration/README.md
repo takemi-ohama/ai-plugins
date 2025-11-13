@@ -29,14 +29,23 @@ Claude CodeプロジェクトでMCP（Model Context Protocol）サーバーを**
 - `uvx` がインストール済み（`pip install uv`）
 - Node.js（DBHub、Chrome DevTools MCP用）
 
-### ステップ1: プラグインのインストール
+### ステップ1: マーケットプレイスの追加
+
+まず、このプラグインが含まれるマーケットプレイスをClaude Codeに追加します：
+
+```bash
+# Claude Codeで実行
+/plugin marketplace add https://github.com/takemi-ohama/ai-agent-marketplace
+```
+
+### ステップ2: プラグインのインストール
 
 ```bash
 # Claude Codeで実行
 /plugin install mcp-integration@ai-agent-marketplace
 ```
 
-### ステップ2: スキルを起動してセットアップ
+### ステップ3: スキルを起動してセットアップ
 
 プラグインをインストールしたら、スキルを起動して自動セットアップを実行します。
 
@@ -60,7 +69,7 @@ Claude CodeプロジェクトでMCP（Model Context Protocol）サーバーを**
 - ✅ 不足している設定だけを追加します
 - ✅ カスタムMCPサーバーや環境変数も保持されます
 
-### ステップ3: 必要なツールのインストール（まだの場合）
+### ステップ4: 必要なツールのインストール（まだの場合）
 
 スキルが確認しますが、手動でもインストール可能：
 
@@ -72,7 +81,7 @@ pip install uv
 uvx --version
 ```
 
-### ステップ4: .envファイルに値を入力
+### ステップ5: .envファイルに値を入力
 
 スキルが作成した `.env` テンプレートファイルを開き、必要な値を入力します。
 
@@ -160,11 +169,11 @@ DATABASE_DSN=postgres://myuser:mypassword@localhost:5432/mydb?sslmode=disable
 
 この設定により、`.env` ファイルは誤ってGitにコミットされません。
 
-### ステップ5: Claude Codeを再起動
+### ステップ6: Claude Codeを再起動
 
 `.env` ファイルに値を入力したら、Claude Codeを再起動してMCPサーバーをロードします。
 
-### ステップ6: 動作確認
+### ステップ7: 動作確認
 
 以下を確認してください：
 

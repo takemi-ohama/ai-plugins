@@ -4,107 +4,42 @@ Claude Codeプラグイン、プロジェクトスキル、MCP（Model Context P
 
 ## 概要
 
-このマーケットプレイスは、チーム全体でClaude Codeの導入を加速するための事前設定されたプラグインを提供します：
+このマーケットプレイスは、チーム全体でClaude Codeの導入を加速するための事前設定されたプラグインを提供します。MCPサーバーの自動セットアップ、開発ワークフローの効率化、作業完了通知など、開発体験を向上させる機能を提供します。
 
-- **MCPインテグレーションスキル**: GitHub、Serena、BigQuery、Notion MCPの自動セットアップ
-- **カスタムコマンド**: 共通タスク用の再利用可能なスラッシュコマンド
-- **サブエージェント**: 異なるドメイン向けの専門AIエージェント
-- **フック**: イベントによってトリガーされる自動ワークフロー
+## 利用方法
 
-## 利用可能なプラグイン
+### 1. マーケットプレイスの追加
 
-### MCP Integration (`mcp-integration`)
-
-Claude CodeプロジェクトでMCPサーバーをセットアップするためのプロジェクトスキル。
-
-**機能:**
-- 5つのMCPサーバーを含む完全な `.mcp.json` テンプレート
-- 認証セットアップガイド
-- 使用例とベストプラクティス
-- トラブルシューティングドキュメント
-
-**含まれるMCP:**
-1. **GitHub MCP**: リポジトリ操作、PR管理、イシュートラッキング
-2. **Notion MCP**: ドキュメント管理、データベース操作
-3. **Serena MCP**: セマンティックコード理解と編集
-4. **AWS Documentation MCP**: AWSサービスドキュメントアクセス
-5. **BigQuery MCP**: データベースクエリとスキーマ管理
-
-**ドキュメント:**
-- [SKILL.md](./plugins/mcp-integration/skills/mcp-integration/SKILL.md) - 概要
-- [セットアップガイド](./plugins/mcp-integration/skills/mcp-integration/mcp-setup-guide.md) - インストール手順
-- [設定テンプレート](./plugins/mcp-integration/skills/mcp-integration/mcp-config-template.md) - `.mcp.json` テンプレート
-- [認証ガイド](./plugins/mcp-integration/skills/mcp-integration/mcp-authentication-guide.md) - トークンセットアップ
-
-### Slack Notification (`slack-notification`)
-
-Claude Codeの作業完了時に自動的にSlack通知を送信するプラグイン。
-
-**機能:**
-- 🔔 **スマート通知**: メンション付き投稿→削除→メンションなし再投稿で通知音を鳴らしながらチャンネルをクリーンに保つ
-- 📝 **日本語要約**: git変更から日本語で作業要約を自動生成
-- 🏷️ **リポジトリコンテキスト**: 通知にリポジトリ名を含める
-- ⚙️ **ポータブル設定**: プロジェクト内のどのサブディレクトリからでも動作
-
-**通知メッセージ例:**
-```
-[carmo-ai] Claude Codeの作業が完了しました (2025-11-12 00:17:58)
-作業内容: slack-notify.shを更新
-```
-
-**必要な環境変数:**
-- `SLACK_BOT_TOKEN`: Slackボットトークン（必須）
-- `SLACK_CHANNEL_ID`: 通知先チャンネルID（必須）
-- `SLACK_USER_MENTION`: メンションするユーザー（オプション、例: `<@USER_ID>`）
-
-**ドキュメント:**
-- [インストールガイド](https://github.com/volareinc/carmo-ai/blob/main/predict_contract/plugins/slack-notification/README.md)
-- [詳細ドキュメント](https://github.com/volareinc/carmo-ai/blob/main/predict_contract/plugins/slack-notification/skills/slack-notification/SKILL.md)
-
-## インストール
-
-### マーケットプレイスをClaude Codeに追加
-
-1. Claude Codeを開く
-2. コマンドを実行: `/plugin marketplace add`
-3. このリポジトリURLを入力: `https://github.com/takemi-ohama/ai-agent-marketplace`
-
-### プラグインのインストール
+Claude Codeでマーケットプレイスを追加します：
 
 ```bash
+/plugin marketplace add https://github.com/takemi-ohama/ai-agent-marketplace
+```
+
+### 2. プラグインのインストール
+
+利用したいプラグインをインストールします：
+
+```bash
+# MCPサーバーの自動セットアップ
 /plugin install mcp-integration@ai-agent-marketplace
+
+# Slack通知の自動化
+/plugin install slack-notification@ai-agent-marketplace
 ```
 
-Claude Codeが自動的に：
-1. プラグインをダウンロード
-2. ファイルをプロジェクトの `.claude/` ディレクトリにコピー
-3. スキルを自動起動可能にする
+### 利用可能なプラグイン
 
-### インストールの確認
+| プラグイン名 | バージョン | 説明 | 詳細 |
+|------------|----------|------|------|
+| **mcp-integration** | 1.0.0 | GitHub、Serena、Notion、BigQuery、DBHub、Chrome DevTools、AWS DocumentationのMCPサーバーを自動セットアップ。開発ワークフロー用の6つのスラッシュコマンド（`/pr`, `/fix`, `/review`, `/merge`, `/clean`, `/serena`）を含む。 | [README](./plugins/mcp-integration/README.md) |
+| **slack-notification** | 1.0.0 | Claude Code作業完了時に自動的にSlack通知を送信。git変更から日本語要約を自動生成し、スマート通知で音を鳴らしながらチャンネルをクリーンに保つ。 | [README](./plugins/slack-notification/README.md) |
 
-スキルがプロジェクトに表示されることを確認：
-```bash
-ls -la .claude/skills/mcp-integration/
-```
+## 開発ガイドライン
 
-## 使い方
+### プラグイン開発
 
-### MCP Integrationスキル
-
-以下のキーワードを言及すると自動的に起動：
-- "MCPサーバーをセットアップ"
-- "GitHub/BigQuery/Notionをインテグレート"
-- "コード分析を有効化"
-- "Serenaを設定"
-
-または手動で起動：
-```
-@mcp-integration-skill MCPのセットアップを手伝って
-```
-
-## プラグイン開発
-
-### ディレクトリ構造
+#### ディレクトリ構造
 
 ```
 ai-agent-marketplace/
@@ -113,96 +48,207 @@ ai-agent-marketplace/
 ├── plugins/
 │   └── {plugin-name}/
 │       ├── .claude-plugin/
-│       │   └── plugin.json       # プラグインメタデータ
+│       │   └── plugin.json       # プラグインメタデータ（必須）
 │       ├── commands/             # スラッシュコマンド (*.md)
 │       ├── agents/               # サブエージェント (*.md)
-│       └── skills/               # プロジェクトスキル (SKILL.md)
-└── README.md
+│       └── skills/               # プロジェクトスキル
+│           └── {skill-name}/
+│               └── SKILL.md      # エントリポイント（必須）
+├── README.md
+└── CLAUDE.md                     # AIエージェント向けガイドライン
 ```
 
-### 新しいプラグインの作成
+#### 新しいプラグインの作成手順
 
-1. プラグインディレクトリを作成:
-   ```bash
-   mkdir -p plugins/my-plugin/{.claude-plugin,commands,agents,skills}
-   ```
+**1. プラグインディレクトリを作成:**
 
-2. `plugin.json` を作成:
-   ```json
-   {
-     "name": "my-plugin",
-     "version": "1.0.0",
-     "description": "プラグインの説明",
-     "author": {
-       "name": "あなたの名前",
-       "url": "https://github.com/username"
-     }
-   }
-   ```
+```bash
+mkdir -p plugins/{plugin-name}/{.claude-plugin,commands,agents,skills}
+```
 
-3. スキル、コマンド、またはエージェントを追加
+**2. `plugin.json` を作成:**
 
-4. `marketplace.json` に登録:
-   ```json
-   {
-     "plugins": [
-       {
-         "name": "my-plugin",
-         "path": "plugins/my-plugin",
-         "description": "簡単な説明"
-       }
-     ]
-   }
-   ```
+```json
+{
+  "name": "plugin-name",
+  "version": "1.0.0",
+  "description": "プラグインの説明",
+  "author": {
+    "name": "作者名",
+    "url": "https://github.com/username"
+  },
+  "skills": [
+    {
+      "path": "skills/skill-name/SKILL.md"
+    }
+  ]
+}
+```
 
-### プロジェクトスキル
+**3. プロジェクトスキルを作成（オプション）:**
 
-スキルは関連性がある時にClaude Codeによって自動的に起動されます。詳細は[Claude Codeスキルドキュメント](https://docs.claude.com/en/docs/claude-code/skills)を参照してください。
+`skills/{skill-name}/SKILL.md` を作成：
 
-**重要な要件:**
-- エントリポイントは `SKILL.md` という名前でなければならない
-- `name` と `description` を含むYAML frontmatterを含める
-- 自動起動のためのキーワードをdescriptionに含める
+```markdown
+---
+name: スキル名
+description: スキルの説明（自動起動のキーワードを含める）
+---
+
+# スキル名
+
+スキルの詳細説明とドキュメント...
+```
+
+**4. `marketplace.json` に登録:**
+
+`.claude-plugin/marketplace.json` に追加：
+
+```json
+{
+  "name": "ai-agent-marketplace",
+  "owner": {
+    "name": "takemi-ohama",
+    "email": "takemi.ohama@example.com"
+  },
+  "plugins": [
+    {
+      "name": "plugin-name",
+      "source": "./plugins/plugin-name",
+      "description": "プラグインの簡単な説明"
+    }
+  ]
+}
+```
+
+**5. README.md を作成:**
+
+`plugins/{plugin-name}/README.md` を作成し、以下を含める：
+- プラグインの概要
+- インストール手順（マーケットプレイス追加を含む）
+- 使用方法
+- トラブルシューティング
+
+**6. テストとコミット:**
+
+```bash
+# ローカルでテスト
+/plugin marketplace add file:///path/to/ai-agent-marketplace
+/plugin install plugin-name@ai-agent-marketplace
+
+# 動作確認後、コミット
+git add .
+git commit -m "Add plugin-name plugin"
+git push
+```
+
+#### 開発のベストプラクティス
+
+**実施すること:**
+- ✅ セマンティックバージョニング（MAJOR.MINOR.PATCH）に従う
+- ✅ `plugin.json` に完全なメタデータを含める
+- ✅ YAMLフロントマター付きの `SKILL.md` を作成
+- ✅ 包括的なドキュメント（README.md）を提供
+- ✅ 環境変数で認証情報を管理
+- ✅ `.env` を `.gitignore` に追加
+- ✅ インストール手順をテスト
+- ✅ プラグイン追加時は `marketplace.json` を更新
+
+**してはいけないこと:**
+- ❌ 機密トークンや認証情報をコミット
+- ❌ ドキュメントをスキップ
+- ❌ バージョンインクリメントを忘れる
+- ❌ 一貫性のない命名規則を使用
+
+### マーケットプレイス管理
+
+#### プラグインの更新
+
+```bash
+# 1. プラグインファイルを修正
+# 2. plugin.json のバージョンをインクリメント
+vim plugins/{plugin-name}/.claude-plugin/plugin.json
+
+# 3. 変更をコミット
+git add plugins/{plugin-name}
+git commit -m "Update plugin-name to v1.1.0"
+git push
+```
+
+ユーザーは Claude Code UI から更新を確認できます。
+
+#### プラグインの削除
+
+```bash
+# 1. marketplace.json から削除
+vim .claude-plugin/marketplace.json
+
+# 2. オプションでプラグインディレクトリを削除
+rm -rf plugins/{plugin-name}
+
+# 3. 変更をコミット
+git add .
+git commit -m "Remove plugin-name from marketplace"
+git push
+```
+
+#### バージョン管理ルール
+
+セマンティックバージョニング（`MAJOR.MINOR.PATCH`）に従います：
+
+- **MAJOR**: 破壊的変更（後方互換性なし）
+- **MINOR**: 後方互換性のある新機能追加
+- **PATCH**: バグフィックスのみ
+
+例：
+- `1.0.0 → 1.0.1`: バグ修正
+- `1.0.1 → 1.1.0`: 新機能追加
+- `1.1.0 → 2.0.0`: 破壊的変更
+
+### リファレンス
+
+#### 公式ドキュメント
+
+- [Claude Code ドキュメント](https://docs.claude.com/en/docs/claude-code)
+- [プラグインマーケットプレイス](https://code.claude.com/docs/ja/plugin-marketplaces)
+- [プラグイン開発ガイド](https://docs.claude.com/en/docs/claude-code/plugins)
+- [スキルドキュメント](https://docs.claude.com/en/docs/claude-code/skills)
+- [MCP仕様](https://modelcontextprotocol.io)
+
+#### MCPサーバー公式リポジトリ
+
+- [GitHub MCP](https://github.com/github/github-mcp-server)
+- [Serena MCP](https://github.com/oraios/serena)
+- [Notion MCP](https://mcp.notion.com)
+- [BigQuery MCP](https://github.com/ergut/mcp-server-bigquery)
+- [DBHub MCP](https://github.com/bytebase/dbhub)
+- [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp)
+- [AWS Documentation MCP](https://github.com/awslabs/aws-documentation-mcp-server)
+
+#### プロジェクト内ドキュメント
+
+- [CLAUDE.md](./CLAUDE.md) - AIエージェント向けガイドライン
+- [LICENSE](./LICENSE) - MITライセンス
 
 ## コントリビューション
 
 1. このリポジトリをフォーク
 2. 新しいプラグインを作成または既存のものを改善
 3. プルリクエストを送信
-4. 新しいプラグインを追加する場合は marketplace.json を更新
-
-## マーケットプレイス管理
-
-### プラグインの更新
-
-プラグインはバージョン管理されています。更新するには：
-
-1. プラグインファイルを修正
-2. `plugin.json` のバージョンをインクリメント
-3. 変更をコミットしてプッシュ
-4. ユーザーはClaude Code UIから更新
-
-### プラグインの削除
-
-1. `marketplace.json` から削除
-2. オプションでプラグインディレクトリを削除
-3. 変更をコミット
-
-## リファレンス
-
-- [Claude Codeドキュメント](https://docs.claude.com/en/docs/claude-code)
-- [MCP仕様](https://modelcontextprotocol.io)
-- [GitHub MCPサーバー](https://github.com/github/github-mcp-server)
-- [Serena MCP](https://github.com/oraios/serena)
-- [BigQuery MCP](https://github.com/ergut/mcp-server-bigquery)
-- [Notion MCP](https://mcp.notion.com)
-
-## ライセンス
-
-MITライセンス - 詳細はLICENSEファイルを参照
+4. 新しいプラグインを追加する場合は `marketplace.json` を更新
 
 ## サポート
 
-問題や質問がある場合:
-- このリポジトリにイシューを開く
-- プラグイン作者に連絡（plugin.jsonを参照）
+問題が発生した場合：
+1. 各プラグインの README.md を確認
+2. 公式ドキュメントを参照
+3. このリポジトリにイシューを開く
+4. プラグイン作者に連絡（`plugin.json` を参照）
+
+## ライセンス
+
+MIT License - 詳細は [LICENSE](./LICENSE) ファイルを参照
+
+---
+
+**作成者:** takemi-ohama - https://github.com/takemi-ohama

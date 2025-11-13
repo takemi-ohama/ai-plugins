@@ -24,16 +24,25 @@ Claude Codeの作業完了時に、**自動的に**Slackへ日本語要約付き
 - Slack Workspace へのアクセス権限
 - Slack Appの作成権限
 
-### ステップ1: プラグインのインストール
+### ステップ1: マーケットプレイスの追加
+
+まず、このプラグインが含まれるマーケットプレイスをClaude Codeに追加します：
+
+```bash
+# Claude Codeで実行
+/plugin marketplace add https://github.com/takemi-ohama/ai-agent-marketplace
+```
+
+### ステップ2: プラグインのインストール
 
 ```bash
 # Claude Codeで実行
 /plugin install slack-notification@ai-agent-marketplace
 ```
 
-### ステップ2: Slack Appのセットアップ
+### ステップ3: Slack Appのセットアップ
 
-#### 2a. Slack Appの作成
+#### 3a. Slack Appの作成
 
 1. https://api.slack.com/apps にアクセス
 2. "Create New App" をクリック
@@ -41,7 +50,7 @@ Claude Codeの作業完了時に、**自動的に**Slackへ日本語要約付き
 4. App名を入力（例: "Claude Code Notifier"）
 5. Workspaceを選択
 
-#### 2b. Bot Token Scopesの追加
+#### 3b. Bot Token Scopesの追加
 
 1. 左メニューから "OAuth & Permissions" を選択
 2. "Scopes" セクションまでスクロール
@@ -49,31 +58,31 @@ Claude Codeの作業完了時に、**自動的に**Slackへ日本語要約付き
    - `chat:write` （必須 - メッセージ送信用）
    - `channels:read` （オプション - チャンネル情報取得用）
 
-#### 2c. Workspaceへのインストール
+#### 3c. Workspaceへのインストール
 
 1. ページ上部の "Install to Workspace" をクリック
 2. 権限を確認して "Allow" をクリック
 3. **Bot User OAuth Token** をコピー（`xoxb-`で始まる）
 
-#### 2d. Botをチャンネルに追加
+#### 3d. Botをチャンネルに追加
 
 1. Slackで通知先チャンネルを開く
 2. チャンネル名をクリック → "Integrations" タブ
 3. "Add apps" をクリック
 4. 作成したアプリを選択して追加
 
-#### 2e. チャンネルIDの取得
+#### 3e. チャンネルIDの取得
 
 1. 通知先チャンネルを開く
 2. チャンネル名をクリック
 3. 下部の「その他」→ チャンネルIDをコピー（`C`で始まる）
 
-#### 2f. ユーザーIDの取得（オプション - 通知音用）
+#### 3f. ユーザーIDの取得（オプション - 通知音用）
 
 1. Slackでプロフィールを開く
 2. "その他" → "メンバーIDをコピー"（`U`で始まる）
 
-### ステップ3: 環境変数の設定
+### ステップ4: 環境変数の設定
 
 プロジェクトのルートディレクトリに `.env` ファイルを作成し、以下の内容を記載します：
 
@@ -112,7 +121,7 @@ grep "^\.env$" .gitignore
 - ✅ `.env`を必ず`.gitignore`に追加
 - ❌ `.env`ファイルをGitにコミットしない
 
-### ステップ4: 動作確認
+### ステップ5: 動作確認
 
 テスト通知を送信して、設定が正しいか確認します：
 
