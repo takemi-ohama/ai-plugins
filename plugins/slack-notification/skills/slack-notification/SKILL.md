@@ -1,11 +1,92 @@
 ---
 name: Slack Notification Hook
 description: Automatically send Slack notifications when Claude Code work is completed with repository name and work summary in Japanese
+activatesOn:
+  - stopHook
 ---
 
 # Slack Notification Hook
 
-This skill sets up automatic Slack notifications that trigger when you exit Claude Code, providing instant updates about completed work to your team.
+This skill automatically sends Slack notifications when Claude Code exits, analyzing the session's work and generating an intelligent Japanese summary.
+
+## Automatic Execution
+
+**IMPORTANT**: This skill is automatically invoked when Claude Code exits via the `stopHook`. When activated:
+
+1. **Analyze the Session**: Review conversation history, tool calls, and git changes to understand what work was completed
+2. **Generate Japanese Summary**: Create a concise, meaningful summary in Japanese (max 100 characters)
+3. **Send Notification**: Execute `.claude/slack-notify.sh complete "<work_summary>"`
+
+### Summary Generation Guidelines
+
+When generating the work summary, follow these rules:
+
+**DO:**
+- Be specific about what was accomplished (e.g., "PRレビュー対応でセキュリティ脆弱性を3件修正")
+- Include file names for significant changes (e.g., "README.mdを日本語化")
+- Mention key actions (修正, 追加, 削除, 更新, リファクタリング, レビュー対応)
+- Keep it under 100 characters in Japanese
+- Use natural Japanese phrasing
+
+**DON'T:**
+- Use vague descriptions (e.g., "ファイルを更新")
+- Include technical jargon unnecessarily
+- List every single file changed
+- Exceed character limit
+
+**Examples:**
+- Good: "mcp-integrationにスラッシュコマンド6種を追加（PR, fix, review等）"
+- Bad: "いくつかのファイルを更新しました"
+- Good: "Slack通知プラグインのREADMEを日本語化、.env対応を追加"
+- Bad: "ドキュメント作業"
+- Good: "セキュリティ脆弱性3件修正（認証情報の例をプレースホルダー化）"
+- Bad: "修正対応"
+
+### Implementation Steps
+
+When this skill is triggered by stopHook:
+
+1. **Gather Context**
+   ```bash
+   # Check recent git changes
+   git log -1 --oneline
+   git diff HEAD~1..HEAD --stat
+   git status
+   ```
+
+2. **Analyze Conversation History**
+   - Review tool calls made during the session
+   - Identify main tasks completed
+   - Note significant accomplishments
+
+3. **Generate Summary**
+   - Synthesize the information into a concise Japanese summary
+   - Focus on user-facing outcomes, not internal implementation details
+   - Example logic:
+     ```
+     If PR was created → "PRを作成: [title summary]"
+     If files were modified → "[main file]等[N]件のファイルを[action]"
+     If code review → "レビュー対応: [main issue]を修正"
+     If documentation → "[file]を[action]"
+     ```
+
+4. **Execute Notification**
+   ```bash
+   .claude/slack-notify.sh complete "生成した作業要約"
+   ```
+
+### Error Handling
+
+If notification script is not found or fails:
+- Log error silently (don't disrupt user workflow)
+- Exit gracefully with status 0
+- Don't show error messages to user unless debugging
+
+---
+
+## User-Invoked Setup
+
+This skill can also be invoked manually to set up Slack notifications in a new project.
 
 ## Features
 
