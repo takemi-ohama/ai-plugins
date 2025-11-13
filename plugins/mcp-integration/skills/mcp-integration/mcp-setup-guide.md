@@ -164,9 +164,10 @@ mcp__awslabs_aws-documentation-mcp-server__read_documentation(
 ## Best Practices
 
 ### 1. Security
-- Store tokens in environment variables, never in `.mcp.json`
-- Add `.mcp.json` to `.gitignore` if it contains sensitive data
-- Use different tokens for different environments
+- Store tokens in `.env` file using the `envFile` configuration
+- The MCP Integration skill automatically adds `.env` to `.gitignore`
+- `.mcp.json` can be safely committed as it only references the `.env` file
+- Use different `.env` files for different environments (e.g., `.env.dev`, `.env.prod`)
 
 ### 2. Performance
 - Disable unused MCP servers with `"disabled": true`

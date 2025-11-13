@@ -148,6 +148,94 @@ None - this MCP accesses public AWS documentation.
 ### Setup Steps
 No authentication required. The MCP is ready to use after configuration.
 
+## DBHub MCP
+
+### Requirements
+- Node.js (for npx)
+- Database server running (PostgreSQL, MySQL, SQL Server, MariaDB, or SQLite)
+- Database connection credentials
+
+### Setup Steps
+
+1. **Prepare Database Connection String (DSN)**
+
+   Create a connection string based on your database type:
+
+   **PostgreSQL:**
+   ```
+   postgres://username:password@localhost:5432/database_name?sslmode=disable
+   ```
+
+   **MySQL:**
+   ```
+   mysql://username:password@localhost:3306/database_name
+   ```
+
+   **SQL Server:**
+   ```
+   sqlserver://username:password@localhost:1433/database_name
+   ```
+
+   **SQLite:**
+   ```
+   sqlite:///path/to/database.db
+   ```
+
+2. **Set Environment Variable**
+
+   Add to your `.env` file:
+   ```bash
+   DATABASE_DSN=postgres://user:password@localhost:5432/mydb?sslmode=disable
+   ```
+
+3. **Verify Database Connection**
+
+   Ensure:
+   - Database server is running
+   - Username and password are correct
+   - Database exists
+   - Network/firewall allows connection
+
+### Security Best Practices
+- Never commit `.env` file with credentials
+- Use read-only database users when possible
+- Restrict database access by IP when applicable
+- Use SSL/TLS for remote database connections
+
+## Chrome DevTools MCP
+
+### Requirements
+- Node.js (for npx)
+- Chrome browser installed
+
+### Setup Steps
+
+No authentication required. Chrome DevTools MCP runs locally and controls Chrome browser instances on your machine.
+
+1. **Verify Chrome Installation**
+   ```bash
+   # Check Chrome is installed
+   google-chrome --version  # Linux
+   # or
+   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version  # macOS
+   ```
+
+2. **Node.js Verification**
+   ```bash
+   node --version
+   npx --version
+   ```
+
+### Optional Configuration
+
+For advanced use cases, you can:
+- Connect to remote Chrome instances via WebSocket
+- Configure viewport size
+- Set headless/headful mode
+- Use different Chrome channels (stable, canary, beta, dev)
+
+These are configured in `.mcp.json` args, not via authentication.
+
 ## Troubleshooting
 
 ### GitHub MCP Not Working
@@ -172,18 +260,52 @@ No authentication required. The MCP is ready to use after configuration.
 - Ensure BigQuery API is enabled in your GCP project
 - Verify project ID is correct
 
+### DBHub MCP Connection Issues
+- Verify database server is running
+- Check DATABASE_DSN format is correct
+- Ensure database credentials are valid
+- Test network connectivity to database server
+- Check firewall rules allow database connections
+
+### Chrome DevTools MCP Issues
+- Verify Chrome browser is installed
+- Check Node.js is installed (`node --version`)
+- Ensure no other processes are using Chrome DevTools Protocol port
+- Try running in non-headless mode for debugging
+
 ## Environment Variable Summary
+
+**Using `.env` file (Recommended):**
+
+Create a `.env` file in your project root:
+
+```bash
+# GitHub MCP (Required)
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_your_token_here
+
+# Notion MCP (Optional)
+NOTION_API_KEY=secret_your_token_here
+
+# BigQuery MCP (Optional)
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+
+# DBHub MCP (Optional)
+DATABASE_DSN=postgres://user:password@localhost:5432/mydb?sslmode=disable
+
+# Note: Serena MCP, AWS Documentation MCP, and Chrome DevTools MCP do not require authentication
+```
+
+**Legacy: Using shell exports:**
 
 ```bash
 # GitHub MCP
 export GITHUB_PERSONAL_ACCESS_TOKEN="ghp_your_token_here"
 
-# BigQuery MCP (if using service account)
+# BigQuery MCP
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
 
-# Optional: Set in shell configuration
-echo 'export GITHUB_PERSONAL_ACCESS_TOKEN="ghp_your_token_here"' >> ~/.bashrc
-echo 'export GOOGLE_APPLICATION_CREDENTIALS="/path/to/credentials.json"' >> ~/.bashrc
+# DBHub MCP
+export DATABASE_DSN="postgres://user:password@localhost:5432/mydb?sslmode=disable"
 ```
 
-Restart your shell or run `source ~/.bashrc` to apply changes.
+The MCP Integration skill automatically creates a `.env` template and adds it to `.gitignore` for security.
