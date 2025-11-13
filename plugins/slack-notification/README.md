@@ -80,15 +80,15 @@ Claude Codeの作業完了時に、**自動的に**Slackへ日本語要約付き
 ```bash
 # Slack Bot Token（必須）
 # 取得方法: https://api.slack.com/apps → OAuth & Permissions → Bot User OAuth Token
-SLACK_BOT_TOKEN=xoxb-your-bot-token-here
+SLACK_BOT_TOKEN=<your-bot-token-here>
 
 # 通知先チャンネルID（必須）
 # 取得方法: Slackでチャンネルを開く → チャンネル名をクリック → チャンネルIDをコピー
-SLACK_CHANNEL_ID=C0123456789
+SLACK_CHANNEL_ID=<your-channel-id>
 
 # メンション用ユーザーID（オプション - 通知音を鳴らす場合）
 # 取得方法: Slackでプロフィールを開く → その他 → メンバーIDをコピー
-SLACK_USER_MENTION=<@U0123456789>
+SLACK_USER_MENTION=<@your-user-id>
 ```
 
 **セキュリティ確保:**

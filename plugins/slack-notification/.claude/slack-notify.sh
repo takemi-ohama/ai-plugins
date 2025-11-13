@@ -20,9 +20,18 @@ load_env_file() {
         # Skip empty lines and comments
         [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
 
-        # Remove leading/trailing whitespace from key and value
-        key=$(echo "$key" | xargs)
-        value=$(echo "$value" | xargs)
+        # Remove leading/trailing whitespace from key and value using parameter expansion
+        # This avoids command injection vulnerabilities from xargs
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+
+        # Validate key name (only allow alphanumeric and underscore)
+        # This prevents code injection through arbitrary variable names
+        if [[ ! "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+          continue
+        fi
 
         # Remove quotes from value if present
         value="${value%\"}"
