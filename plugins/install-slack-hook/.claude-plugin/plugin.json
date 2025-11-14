@@ -5,6 +5,5 @@
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
-  },
-  "hooks": "./hooks/hooks.json"
+  }
 }
