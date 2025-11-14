@@ -1,7 +1,7 @@
 {
-    "name": "AWS CDK Project MCP Configuration",
     "mcpServers": {
         "github": {
+            "type": "stdio",
             "command": "docker",
             "args": [
                 "run",
@@ -18,6 +18,7 @@
             "disabled": false
         },
         "serena": {
+            "type": "stdio",
             "command": "uvx",
             "args": [
                 "--from",
@@ -31,6 +32,7 @@
             ]
         },
         "awslabs.core-mcp-server": {
+            "type": "stdio",
             "command": "uvx",
             "args": [
                 "awslabs.core-mcp-server@latest"
@@ -42,6 +44,7 @@
             "disabled": false
         },
         "awslabs.aws-documentation-mcp-server": {
+            "type": "stdio",
             "command": "uvx",
             "args": [
                 "awslabs.aws-documentation-mcp-server@latest"
