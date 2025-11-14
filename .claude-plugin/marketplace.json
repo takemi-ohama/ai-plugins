@@ -14,6 +14,11 @@
       "name": "slack-notification",
       "source": "./plugins/slack-notification",
       "description": "Automatic Slack notifications when Claude Code work is completed with Japanese work summary"
+    },
+    {
+      "name": "development-workflow-commands",
+      "source": "./plugins/development-workflow-commands",
+      "description": "GitHub development workflow commands for PR creation, review, merge, and branch cleanup"
     }
   ]
 }

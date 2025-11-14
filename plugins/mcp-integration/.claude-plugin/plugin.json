@@ -1,17 +1,9 @@
 {
   "name": "mcp-integration",
-  "version": "1.1.0",
-  "description": "Project skill for integrating GitHub, Serena, BigQuery, Notion, DBHub, Chrome DevTools, and Codex CLI MCPs into Claude Code projects, with slash commands for development workflow",
+  "version": "1.2.0",
+  "description": "Project skill for integrating GitHub, Serena, BigQuery, Notion, DBHub, Chrome DevTools, and Codex CLI MCPs into Claude Code projects",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
-  },
-  "commands": [
-    "./commands/serena.md",
-    "./commands/fix.md",
-    "./commands/pr.md",
-    "./commands/review.md",
-    "./commands/merge.md",
-    "./commands/clean.md"
-  ]
+  }
 }
