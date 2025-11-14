@@ -5,8 +5,8 @@
         "matcher": "",
         "hooks": [
           {
-            "type": "command",
-            "command": "bash -c 'dir=$(pwd); while [ \"$dir\" != \"/\" ] && [ ! -d \"$dir/.claude\" ]; do dir=$(dirname \"$dir\"); done; if [ -d \"$dir/.claude\" ]; then cd \"$dir\" && .claude/slack-notify.sh complete; fi'"
+            "type": "prompt",
+            "prompt": "Use the slack-notification skill to analyze this session, generate a concise Japanese summary of the work completed, and send a Slack notification with the summary."
           }
         ]
       }

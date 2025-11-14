@@ -1,6 +1,6 @@
 {
   "name": "slack-notification",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Automatic Slack notifications when Claude Code work is completed",
   "author": {
     "name": "takemi-ohama",

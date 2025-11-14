@@ -272,13 +272,27 @@ plugins/slack-notification/
 
 ### .claude/settings.json
 
-Claude Codeのstopフックを設定：
+Claude CodeのStopフックを設定し、スキル経由で通知を送信：
 
 ```json
 {
-  "stopHook": [".claude/slack-notify.sh", "complete"]
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Use the slack-notification skill to analyze this session, generate a concise Japanese summary of the work completed, and send a Slack notification with the summary."
+          }
+        ]
+      }
+    ]
+  }
 }
 ```
+
+このフックにより、Claude Code終了時に自動的にslack-notificationスキルが実行され、セッション内容を分析して日本語要約を生成し、Slack通知を送信します。
 
 ### slack-notify.sh
 
