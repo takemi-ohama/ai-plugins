@@ -3,13 +3,13 @@
   "hooks": {
     "Stop": [
       {
-        "type": "command",
-        "command": "bash",
-        "args": [
-          "${CLAUDE_PLUGIN_ROOT}/scripts/slack-notify.sh",
-          "complete"
-        ],
-        "description": "Send Slack notification with AI-generated summary when Claude Code exits"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/slack-notify.sh complete",
+            "description": "Send Slack notification with AI-generated summary when Claude Code exits"
+          }
+        ]
       }
     ]
   }
