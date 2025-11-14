@@ -5,8 +5,8 @@
         "matcher": "",
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "このセッションの作業内容を分析し、簡潔な日本語要約（最大100文字）を作成してください。その後、以下のコマンドを実行してSlack通知を送信してください：.claude/slack-notify.sh complete \"作成した要約\""
+            "type": "command",
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && if [ -f .claude/slack-notify.sh ]; then .claude/slack-notify.sh complete; fi'"
           }
         ]
       }
