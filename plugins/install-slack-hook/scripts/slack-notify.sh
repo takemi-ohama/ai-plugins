@@ -111,7 +111,7 @@ fi
 # Escape message for JSON payload
 ESCAPED_MENTION_MESSAGE=$(json_escape "$MENTION_MESSAGE")
 
-RESPONSE=$(curl -s -X POST  \
+RESPONSE=$(curl -s -X POST https://slack.com/api/chat.postMessage \
   -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{
