@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Use the slack-notification skill to analyze this session, generate a concise Japanese summary of the work completed (max 100 characters), and execute .claude/slack-notify.sh complete \"<summary>\" to send a Slack notification with the generated summary."
+            "prompt": "このセッションの作業内容を分析し、簡潔な日本語要約（最大100文字）を作成してください。その後、以下のコマンドを実行してSlack通知を送信してください：.claude/slack-notify.sh complete \"作成した要約\""
           }
         ]
       }
