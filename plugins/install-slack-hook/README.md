@@ -1,21 +1,18 @@
-# Install Slack Hook Plugin
+# Slack Notification Hook Plugin
 
-Claude Codeプロジェクトに**Slack通知フックとスクリプトをインストール**するプラグインです。インストール後、作業完了時に自動的にSlackへ日本語要約付きの通知を送信します。
+Claude Code終了時に**自動的にSlack通知を送信**するプラグインです。AIが作業内容を分析し、日本語要約付きの通知をSlackチャンネルに投稿します。
 
 ## 概要
 
-このプラグインは、`.claude/settings.json`と`.claude/slack-notify.sh`をインストールすることで、Claude Code終了時に自動的にSlack通知を送信する機能を提供します。AIが作業内容を分析し、**40文字以内の日本語要約**を生成して通知します。
+このプラグインは、Claude Code終了時（Stopフック）に自動的にSlack通知を送信します。gitの変更内容から日本語要約を生成し、リポジトリ名とタイムスタンプ付きで通知します。
 
-**スマート通知機能搭載**: メンション→削除→再投稿のパターンで、通知音を鳴らしつつチャンネルをクリーンに保ちます。
+**主な特徴：**
 
-**提供される機能：**
-
-- **自動通知**: Claude Code終了時に自動でSlack通知
-- **AI要約生成**: AIが作業内容を分析し40文字以内の日本語要約を作成
-- **モノレポ対応**: `.claude`ディレクトリを自動探索、どの階層からでも動作
+- **自動通知**: プラグインインストールのみで動作、追加設定不要
+- **日本語要約**: git diffから自動的に日本語の作業要約を生成
+- **スマート通知**: メンション→削除→再投稿で通知音とクリーン履歴を両立
 - **リポジトリ識別**: 通知にリポジトリ名を含めて複数プロジェクトを識別
-- **通知音対応**: メンションパターンで確実に通知音を鳴らす
-- **クリーン履歴**: 最終メッセージにメンションを残さない
+- **環境変数管理**: トークンは環境変数で安全に管理
 
 ## インストール
 
@@ -26,8 +23,6 @@ Claude Codeプロジェクトに**Slack通知フックとスクリプトをイ�
 - Slack Appの作成権限
 
 ### ステップ1: マーケットプレイスの追加
-
-まず、このプラグインが含まれるマーケットプレイスをClaude Codeに追加します：
 
 ```bash
 # Claude Codeで実行
@@ -40,6 +35,8 @@ Claude Codeプロジェクトに**Slack通知フックとスクリプトをイ�
 # Claude Codeで実行
 /plugin install install-slack-hook@ai-agent-marketplace
 ```
+
+**これだけです！** プラグインをインストールすると、Stopフックが自動的に有効になります。
 
 ### ステップ3: Slack Appのセットアップ
 
@@ -56,7 +53,7 @@ Claude Codeプロジェクトに**Slack通知フックとスクリプトをイ�
 1. 左メニューから "OAuth & Permissions" を選択
 2. "Scopes" セクションまでスクロール
 3. "Bot Token Scopes" に以下を追加：
-   - `chat:write` （必須 - メッセージ送信用）
+   - `chat:write` （必須 - メッセージ送信・削除用）
    - `channels:read` （オプション - チャンネル情報取得用）
 
 #### 3c. Workspaceへのインストール
@@ -85,98 +82,94 @@ Claude Codeプロジェクトに**Slack通知フックとスクリプトをイ�
 
 ### ステップ4: 環境変数の設定
 
-プロジェクトのルートディレクトリに `.env` ファイルを作成し、以下の内容を記載します：
+シェル設定ファイル（`~/.bashrc`, `~/.zshrc`等）に環境変数を追加します：
 
 ```bash
 # Slack Bot Token（必須）
-# 取得方法: https://api.slack.com/apps → OAuth & Permissions → Bot User OAuth Token
-SLACK_BOT_TOKEN=<your-bot-token-here>
+export SLACK_BOT_TOKEN="xoxb-your-bot-token-here"
 
 # 通知先チャンネルID（必須）
-# 取得方法: Slackでチャンネルを開く → チャンネル名をクリック → チャンネルIDをコピー
-SLACK_CHANNEL_ID=<your-channel-id>
+export SLACK_CHANNEL_ID="C0123456789"
 
 # メンション用ユーザーID（オプション - 通知音を鳴らす場合）
-# 取得方法: Slackでプロフィールを開く → その他 → メンバーIDをコピー
-SLACK_USER_MENTION=<@your-user-id>
+export SLACK_USER_MENTION="<@U0123456789>"
 ```
 
-**セキュリティ確保:**
-
-`.env` ファイルを `.gitignore` に追加して、トークンが誤ってコミットされないようにします：
+設定後、シェルを再起動するか以下を実行：
 
 ```bash
-# .gitignoreに追加（まだの場合）
-echo ".env" >> .gitignore
+source ~/.bashrc  # または ~/.zshrc
 ```
 
-確認：
-```bash
-# .envが.gitignoreに含まれているか確認
-grep "^\.env$" .gitignore
-```
-
-**注意事項:**
-- ✅ `.env`ファイルはプロジェクトルートに配置
-- ✅ トークンの値は`=`の後に直接記載（`export`は不要）
-- ✅ `.env`を必ず`.gitignore`に追加
-- ❌ `.env`ファイルをGitにコミットしない
+**⚠️ セキュリティ注意事項:**
+- ✅ 環境変数はシェル設定ファイル（`~/.bashrc`, `~/.zshrc`）に追加
+- ✅ トークンの値は引用符で囲む
+- ✅ `SLACK_USER_MENTION`は`<@...>`形式
+- ❌ **絶対に**トークンをGitにコミットしない
+- ❌ **絶対に**トークンをコードやドキュメントに記載しない
+- ❌ **絶対に**トークンをスクリーンショットや画面共有で公開しない
+- ⚠️ トークンは実際のトークン値に置き換えてください（`xoxb-your-bot-token-here`は例です）
+- ⚠️ トークンが漏洩した場合は、即座にSlack Appの設定でトークンをリボーク（無効化）してください
 
 ### ステップ5: 動作確認
 
-テスト通知を送信して、設定が正しいか確認します：
+プラグインをインストールした後、Claude Codeを一度終了して動作確認します。
 
+**自動テスト（推奨）:**
 ```bash
-# プロジェクトルートで実行
-.claude/slack-notify.sh complete
+# Claude Codeでなにか作業を行い、終了するだけ
+# 自動的にSlack通知が送信されます
 ```
 
-成功すると、Slackチャンネルに以下のような通知が届きます：
+**手動テスト（任意）:**
+スクリプトを直接実行する場合：
+```bash
+# プラグインのスクリプトパスを確認
+find ~/.claude/plugins -name "slack-notify.sh" -type f
+
+# 見つかったパスを使って実行
+bash <見つかったパス> complete "テスト通知"
+```
+
+成功すると、Slackチャンネルに通知が届きます：
 
 ```
-[リポジトリ名] Claude Codeの作業が完了しました (2025-11-13 15:30:00)
-作業内容: READMEファイルの更新
+[リポジトリ名] Claude Codeの作業が完了しました (2025-11-14 15:30:00)
+作業内容: slack-notify.shを更新
 ```
 
-## 特徴
-
-- ✅ **AI要約生成**: promptタイプのフックでAIが作業内容を40文字以内で要約
-- ✅ **自動実行**: Claude Code終了時に自動でフック起動
-- ✅ **モノレポ対応**: `.claude`ディレクトリを自動探索、gitルートに依存しない
-- ✅ **スマート通知**: メンション→削除→再投稿で通知音とクリーン履歴を両立
-- ✅ **リポジトリ識別**: 複数プロジェクトで作業時も識別可能
-- ✅ **ポータブル**: プロジェクトのサブディレクトリからも動作
-- ✅ **柔軟な設定**: .envファイルまたは環境変数で設定可能
-
-## 通知の仕組み
+## 仕組み
 
 ### 通知フロー
 
 1. **Claude Code終了** → Stopフックがトリガー
-2. **promptフック実行** → promptタイプのフックが起動
-3. **AIが要約生成**
-   - セッションの会話履歴を分析
-   - 実行されたツール呼び出しを確認
-   - 40文字以内の日本語要約を作成
-4. **Bashツールでスクリプト実行**
-   - `.claude`ディレクトリを親方向に探索
-   - 見つかったら`.claude/slack-notify.sh complete "要約"`を実行
-   - 引数として生成した要約を渡す
-5. **通知の送信（3段階）**
+2. **スクリプト実行** → `scripts/slack-notify.sh complete`が実行される
+3. **要約生成** → git diffから日本語の作業要約を自動生成
+4. **Slack通知（3段階）**
    - **ステップ1**: メンション付きで投稿 → 通知音が鳴る
    - **ステップ2**: メッセージを即座に削除
    - **ステップ3**: メンションなしで詳細メッセージを再投稿 → 履歴はクリーン
 
-### AI要約生成
+### プラグインHooksの自動マージ
 
-promptフックが以下の情報を統合して要約を生成：
+このプラグインは`hooks/hooks.json`を含んでいます。プラグインが有効な間、これらのhooksは**自動的にユーザーのhooksとマージ**されます：
 
-- **会話コンテキスト**: ユーザーが何を依頼したか
-- **ツール使用履歴**: PR作成、コミット、ファイル編集等
-- **Git変更**: 変更されたファイルとコミットメッセージ
-- **成果**: 最終的に達成されたこと
+- ユーザーの`.claude/settings.json`は変更されません
+- プラグインを無効化すると、hooksも自動的に無効化されます
+- 複数のプラグインhooksが同時に動作可能です
 
-これにより、単なる「ファイル更新」ではなく、「PRレビュー対応でセキュリティ修正」や「MCP統合プラグイン追加」のような具体的な要約（40文字以内）が生成されます。
+### 要約生成ロジック
+
+`scripts/slack-notify.sh`は以下の情報から要約を生成：
+
+- **git diff**: 変更されたファイル名とdiffステータス
+- **ファイル名の日本語化**: 拡張子やファイル名から判断
+- **変更タイプ**: 更新/追加/削除を検出
+- **40文字制限**: Slackメッセージに適した長さ
+
+**例：**
+- `slack-notify.sh`を更新 → "slack-notify.shを更新"
+- `README.md`, `SKILL.md`, `plugin.json`を更新 → "README.md等3件のファイルを更新"
 
 ### 通知メッセージの形式
 
@@ -185,53 +178,101 @@ promptフックが以下の情報を統合して要約を生成：
 作業内容: [git変更から生成された日本語要約]
 ```
 
-**例：**
+## ファイル構成
+
 ```
-[ai-agent-marketplace] Claude Codeの作業が完了しました (2025-11-13 15:30:45)
-作業内容: Slack通知プラグインのREADMEを更新
+plugins/install-slack-hook/
+├── .claude-plugin/
+│   └── plugin.json              # プラグインメタデータ
+├── hooks/
+│   └── hooks.json               # Stopフック定義
+├── scripts/
+│   └── slack-notify.sh          # 通知スクリプト
+└── README.md                    # このファイル
 ```
 
-## 使用例
+### hooks/hooks.json
 
-### 基本的な使い方
+プラグインのStopフック定義：
 
-プラグインをインストールして環境変数を設定すれば、あとは自動です。Claude Codeで作業して終了すると、promptフックが自動的に：
+```json
+{
+  "Stop": [
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash",
+          "args": [
+            "${CLAUDE_PLUGIN_ROOT}/scripts/slack-notify.sh",
+            "complete"
+          ],
+          "description": "Send Slack notification when Claude Code exits"
+        }
+      ]
+    }
+  ]
+}
+```
 
-1. セッション内容を分析
-2. 40文字以内の日本語要約を生成
-3. Bashツールで`.claude/slack-notify.sh`を実行
-4. Slack通知を送信
+- `${CLAUDE_PLUGIN_ROOT}`: プラグインディレクトリへのパス（自動設定）
+- `type: "command"`: bashコマンドを実行
+- `Stop`: Claude Code終了時にトリガー
 
-### 自動生成される要約の例
+### scripts/slack-notify.sh
 
-promptフックは作業内容を理解して、以下のような具体的な要約（40文字以内）を生成します：
+Slack通知を送信するシェルスクリプト：
+- git変更の検出と日本語要約生成
+- Slack APIへのメッセージ投稿
+- メンション→削除→再投稿のスマート通知
 
-- **PR作成時**: `"PRを作成: スラッシュコマンド追加"`
-- **レビュー対応時**: `"セキュリティ修正3件対応"`
-- **ドキュメント更新時**: `"README日本語化と.env対応追加"`
-- **複数ファイル変更時**: `"MCPプラグインにコマンド6種追加"`
+## カスタマイズ
 
-### 手動でテスト
+### 通知メッセージのフォーマット変更
 
-スクリプトを直接実行してテストすることもできます：
+`scripts/slack-notify.sh`の`DETAILED_MESSAGE`変数を編集：
 
 ```bash
+# 現在
+DETAILED_MESSAGE="[${REPO_NAME}] ${MESSAGE}\n作業内容: ${WORK_SUMMARY}"
+
+# カスタム例
+DETAILED_MESSAGE="✅ ${REPO_NAME} - ${WORK_SUMMARY} (${TIMESTAMP})"
+```
+
+### 通知条件のカスタマイズ
+
+特定の条件でのみ通知を送信：
+
+```bash
+# 例: mainブランチへのコミット時のみ通知
+BRANCH=$(git branch --show-current)
+if [ "$BRANCH" = "main" ]; then
+    # 通知を送信
+fi
+```
+
+### 手動実行
+
+スクリプトを直接実行してテストする場合：
+
+```bash
+# プラグインのインストール先を確認
+PLUGIN_PATH=$(find ~/.claude/plugins -name "install-slack-hook" -type d | head -1)
+
 # 基本的なテスト（自動要約）
-.claude/slack-notify.sh complete
+bash "${PLUGIN_PATH}/scripts/slack-notify.sh" complete
 
-# カスタム要約を指定してテスト
-.claude/slack-notify.sh complete "READMEファイルを更新"
-
-# サブディレクトリからでも動作
-cd plugins/slack-notification
-../../.claude/slack-notify.sh complete "テスト通知"
+# カスタム要約を指定
+bash "${PLUGIN_PATH}/scripts/slack-notify.sh" complete "READMEファイルを更新"
 ```
 
 ### スクリプトの引数
 
 ```bash
 # 使用方法
-.claude/slack-notify.sh [message_type] [work_summary]
+slack-notify.sh [message_type] [work_summary]
 
 # 引数1: メッセージタイプ（デフォルト: "complete"）
 #   - complete: 作業完了
@@ -242,64 +283,6 @@ cd plugins/slack-notification
 #   - 指定した場合: その内容を使用
 #   - 省略した場合: git diffから自動生成
 ```
-
-### カスタムメッセージ
-
-スクリプトを編集することで、通知メッセージをカスタマイズできます：
-
-```bash
-# .claude/slack-notify.shを編集
-vim .claude/slack-notify.sh
-```
-
-## ファイル構成
-
-```
-plugins/slack-notification/
-├── .claude-plugin/
-│   └── plugin.json              # プラグインメタデータ
-├── .claude/
-│   ├── settings.json            # フック設定
-│   └── slack-notify.sh          # 通知スクリプト
-├── skills/
-│   └── slack-notification/
-│       └── SKILL.md             # スキル説明
-└── README.md                    # このファイル
-```
-
-### .claude/settings.json
-
-Claude CodeのStopフックを設定し、スキル経由で通知を送信：
-
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "prompt",
-            "prompt": "このセッションで完了した作業の要約を40文字以内の日本語で作成してください。その後、Bashツールを使って以下のコマンドを実行してください：dir=$(pwd); while [ \"$dir\" != \"/\" ] && [ ! -d \"$dir/.claude\" ]; do dir=$(dirname \"$dir\"); done; if [ -d \"$dir/.claude\" ]; then cd \"$dir\" && .claude/slack-notify.sh complete \"作成した要約\"; fi"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-このフックにより、Claude Code終了時に：
-1. AIがセッション内容を分析して40文字以内の日本語要約を生成
-2. `.claude`ディレクトリを親方向に探索（モノレポ対応）
-3. `.claude/slack-notify.sh`を実行してSlack通知を送信
-
-### slack-notify.sh
-
-Slack通知を送信するシェルスクリプト：
-- git変更の検出
-- 日本語要約の生成
-- Slack APIへの投稿
 
 ## トラブルシューティング
 
@@ -320,7 +303,7 @@ echo $SLACK_CHANNEL_ID
 
 ### 通知音が鳴らない
 
-**原因：** `SLACK_USER_MENTION` が設定されていない
+**原因：** `SLACK_USER_MENTION` が設定されていない、または形式が間違っている
 
 **対処法：**
 ```bash
@@ -329,16 +312,31 @@ export SLACK_USER_MENTION="<@U0123456789>"
 
 ユーザーIDは `<@` と `>` で囲む必要があります。
 
+### プラグインhooksが動作しない
+
+**プラグインが有効か確認：**
+```bash
+# Claude Codeで実行
+/plugin list
+```
+
+`install-slack-hook`が表示され、有効になっているか確認。
+
+**Claude Codeを再起動：**
+プラグインインストール後は、Claude Codeを再起動する必要があります。
+
 ### スクリプトが実行されない
 
 **スクリプトの実行権限を確認：**
 ```bash
-ls -la .claude/slack-notify.sh
+# プラグインパスを探す
+PLUGIN_PATH=$(find ~/.claude/plugins -name "install-slack-hook" -type d | head -1)
+ls -la "${PLUGIN_PATH}/scripts/slack-notify.sh"
 ```
 
 実行権限がない場合は追加：
 ```bash
-chmod +x .claude/slack-notify.sh
+chmod +x "${PLUGIN_PATH}/scripts/slack-notify.sh"
 ```
 
 **git リポジトリ確認：**
@@ -364,63 +362,68 @@ brew install curl
 sudo apt-get install curl
 ```
 
-### タイムスタンプのフォーマットが正しくない
-
-**原因：** macOSとLinuxで`date`コマンドの挙動が異なる
-
-**対処法：**
-macOSの場合、GNU版dateを使用：
-```bash
-brew install coreutils
-# スクリプト内で gdate を使用
-```
-
 ## セキュリティのベストプラクティス
 
-- ✅ 環境変数でトークンを管理
-- ✅ トークンをコードやドキュメントにコミットしない
-- ✅ `.env`ファイルを使用する場合は`.gitignore`に追加
-- ✅ 必要最小限のBotスコープを使用（`chat:write`のみ）
-- ✅ トークンを定期的にローテーション
-- ❌ スクリプト内にトークンをハードコードしない
+### トークン管理
 
-## カスタマイズ
+**必須:**
+- ✅ **環境変数でトークンを管理**（シェル設定ファイルに記載）
+- ✅ **必要最小限のBotスコープ**を使用（`chat:write`のみ、`channels:read`は任意）
+- ✅ **トークンを定期的にローテーション**（推奨: 3-6ヶ月ごと）
+- ❌ **絶対に**スクリプト内にトークンをハードコードしない
+- ❌ **絶対に**トークンをGitリポジトリにコミットしない
+- ❌ **絶対に**トークンをドキュメントやコメントに記載しない
 
-### 通知メッセージのフォーマット変更
+### トークン漏洩時の対応
 
-`slack-notify.sh`の`DETAILED_MESSAGE`変数を編集：
+万が一トークンが漏洩した場合、**即座に**以下を実行してください：
+
+1. **トークンを無効化**
+   - https://api.slack.com/apps にアクセス
+   - 対象のアプリを選択
+   - "OAuth & Permissions" → "Revoke" ボタンをクリック
+
+2. **新しいトークンを発行**
+   - "Reinstall to Workspace" で再インストール
+   - 新しいトークンを環境変数に設定
+
+3. **影響範囲を確認**
+   - Slackのアクセスログを確認
+   - 不審なメッセージ投稿がないか確認
+
+### ファイルパーミッション
+
+シェル設定ファイルの権限を適切に設定：
 
 ```bash
-# 現在
-DETAILED_MESSAGE="[${REPO_NAME}] ${MESSAGE}\n作業内容: ${WORK_SUMMARY}"
+# ~/.bashrc または ~/.zshrc の権限を確認
+ls -la ~/.bashrc
 
-# カスタム例
-DETAILED_MESSAGE="✅ ${REPO_NAME} - ${WORK_SUMMARY} (${TIMESTAMP})"
+# 他のユーザーが読めないように設定
+chmod 600 ~/.bashrc
 ```
 
-### 通知条件のカスタマイズ
+### 共有環境での注意
 
-特定の条件でのみ通知を送信：
+- 共有サーバーでは個人用トークンを使用
+- チーム用トークンは専用のサービスアカウントで管理
+- トークンをログに出力しない（スクリプトは既に対策済み）
+
+## プラグインのアンインストール
 
 ```bash
-# 例: mainブランチへのコミット時のみ通知
-BRANCH=$(git branch --show-current)
-if [ "$BRANCH" = "main" ]; then
-    # 通知を送信
-fi
+# Claude Codeで実行
+/plugin uninstall install-slack-hook
 ```
 
-## 詳細ドキュメント
-
-- [SKILL.md](./skills/slack-notification/SKILL.md) - スキル概要
-- [Slack API ドキュメント](https://api.slack.com/docs) - 公式API仕様
+プラグインをアンインストールすると、hooksも自動的に無効化されます。
 
 ## サポート
 
 問題が発生した場合：
 1. 上記のトラブルシューティングセクションを確認
 2. [Slack API公式ドキュメント](https://api.slack.com/docs)を参照
-3. GitHubリポジトリでイシューを作成
+3. [GitHubリポジトリ](https://github.com/takemi-ohama/ai-agent-marketplace)でイシューを作成
 
 ## ライセンス
 

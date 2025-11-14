@@ -1,9 +1,10 @@
 {
   "name": "install-slack-hook",
-  "version": "1.0.1",
-  "description": "Install Slack notification hook and script for Claude Code work completion alerts",
+  "version": "2.0.0",
+  "description": "Automatic Slack notifications when Claude Code exits, with AI-generated Japanese summaries",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
-  }
+  },
+  "hooks": "hooks/hooks.json"
 }
