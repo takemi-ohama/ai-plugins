@@ -3,6 +3,18 @@
 # Slack notification script for Claude Code completion
 # Reads transcript_path from stdin (hook input JSON) and generates summary
 
+# Enable debug logging
+LOG_FILE="${HOME}/.claude/logs/slack-notify-debug.log"
+mkdir -p "$(dirname "$LOG_FILE")"
+
+log_debug() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+}
+
+log_debug "=== Slack notification script started ==="
+log_debug "Script invoked with args: $*"
+log_debug "Working directory: $(pwd)"
+
 # Function to load .env file from project root
 load_env_file() {
   # Get the directory where this script is located
@@ -115,13 +127,19 @@ generate_summary_from_transcript() {
 # Load environment variables from .env file (if exists)
 # Existing environment variables take precedence
 load_env_file
+log_debug "Environment variables loaded"
 
 # Get configuration from environment variables
 CHANNEL_ID="${SLACK_CHANNEL_ID}"
 USER_MENTION="${SLACK_USER_MENTION}"
 
+log_debug "SLACK_BOT_TOKEN set: $([ -n "$SLACK_BOT_TOKEN" ] && echo 'yes' || echo 'no')"
+log_debug "SLACK_CHANNEL_ID: ${CHANNEL_ID:-'not set'}"
+log_debug "SLACK_USER_MENTION: ${USER_MENTION:-'not set'}"
+
 # Exit silently if required environment variables are not set
 if [ -z "$CHANNEL_ID" ] || [ -z "$SLACK_BOT_TOKEN" ]; then
+  log_debug "Required environment variables not set. Exiting."
   exit 0
 fi
 
@@ -129,10 +147,13 @@ fi
 HOOK_INPUT=""
 if [ -t 0 ]; then
   # No stdin available (manual execution)
+  log_debug "No stdin available (terminal)"
   HOOK_INPUT=""
 else
   # Read from stdin
   HOOK_INPUT=$(cat)
+  log_debug "Hook input received from stdin (length: ${#HOOK_INPUT} chars)"
+  log_debug "Hook input preview: ${HOOK_INPUT:0:200}"
 fi
 
 # Extract transcript_path from JSON input
@@ -140,6 +161,9 @@ TRANSCRIPT_PATH=""
 if [ -n "$HOOK_INPUT" ]; then
   # Use grep to extract transcript_path (safer than jq dependency)
   TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | grep -o '"transcript_path":"[^"]*"' | cut -d'"' -f4)
+  log_debug "Extracted transcript_path: ${TRANSCRIPT_PATH:-'not found'}"
+else
+  log_debug "No hook input to parse"
 fi
 
 # Get current timestamp
@@ -207,11 +231,14 @@ WORK_SUMMARY=""
 
 # Priority 1: Generate from transcript if available
 if [ -n "$TRANSCRIPT_PATH" ]; then
+  log_debug "Attempting to generate summary from transcript"
   WORK_SUMMARY=$(generate_summary_from_transcript "$TRANSCRIPT_PATH")
+  log_debug "Transcript summary: ${WORK_SUMMARY:-'empty'}"
 fi
 
 # Priority 2: Fallback to git diff if transcript summary is empty
 if [ -z "$WORK_SUMMARY" ] && git rev-parse --git-dir > /dev/null 2>&1; then
+  log_debug "Generating summary from git diff"
   CHANGED_FILES=$(git diff --name-only 2>/dev/null | wc -l)
   MAIN_FILE=$(git diff --name-only 2>/dev/null | head -1)
   MAIN_FILE="${MAIN_FILE##*/}"
@@ -223,10 +250,12 @@ if [ -z "$WORK_SUMMARY" ] && git rev-parse --git-dir > /dev/null 2>&1; then
       WORK_SUMMARY="${MAIN_FILE}等${CHANGED_FILES}件のファイルを更新"
     fi
   fi
+  log_debug "Git diff summary: ${WORK_SUMMARY:-'empty'}"
 fi
 
 # Truncate to 150 chars to accommodate transcript-generated summaries
 WORK_SUMMARY=$(echo "$WORK_SUMMARY" | head -c 150)
+log_debug "Final work summary: ${WORK_SUMMARY:-'empty'}"
 
 # Create detailed message
 if [ -n "$WORK_SUMMARY" ]; then
@@ -238,10 +267,22 @@ fi
 # Escape message for JSON payload
 ESCAPED_DETAILED_MESSAGE=$(json_escape "$DETAILED_MESSAGE")
 
-curl -s -X POST https://slack.com/api/chat.postMessage \
+log_debug "Sending final Slack message"
+log_debug "Repository: ${REPO_NAME}"
+log_debug "Message: ${MESSAGE}"
+
+FINAL_RESPONSE=$(curl -s -X POST https://slack.com/api/chat.postMessage \
   -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{
     \"channel\": \"${CHANNEL_ID}\",
     \"text\": \"${ESCAPED_DETAILED_MESSAGE}\"
-  }"
+  }")
+
+if echo "$FINAL_RESPONSE" | grep -q '"ok":true'; then
+  log_debug "Slack notification sent successfully"
+else
+  log_debug "Slack notification failed: $FINAL_RESPONSE"
+fi
+
+log_debug "=== Slack notification script completed ==="
