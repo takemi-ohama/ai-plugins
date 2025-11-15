@@ -519,6 +519,22 @@ async function main() {
     logDebug('No stdin available (terminal)');
   }
 
+  // Check if stop_hook_active is true (hook already executed)
+  if (hookInput) {
+    try {
+      const hookData = JSON.parse(hookInput);
+      if (hookData.stop_hook_active === true) {
+        logDebug('stop_hook_active is true, exiting immediately to prevent infinite loop');
+        console.log('{"continue": false}');
+        process.exit(0);
+      }
+      logDebug(`stop_hook_active: ${hookData.stop_hook_active || 'not set'}`);
+    } catch (e) {
+      // If parsing fails, continue normally
+      logDebug(`Failed to check stop_hook_active: ${e.message}`);
+    }
+  }
+
   // Extract transcript_path from JSON input
   let transcriptPath = null;
   if (hookInput) {
@@ -627,9 +643,14 @@ async function main() {
   }
 
   logDebug('=== Slack notification script completed ===');
+
+  // Return JSON to prevent infinite loop in Stop Hook
+  console.log('{"continue": false}');
 }
 
 main().catch((error) => {
   logDebug(`Unhandled error: ${error.message}`);
+  // Return JSON even on error to prevent infinite loop
+  console.log('{"continue": false}');
   process.exit(1);
 });
