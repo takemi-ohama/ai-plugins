@@ -35,8 +35,6 @@ Task(
 - `ndf:data-analyst` - データ分析専門家
 - `ndf:researcher` - 調査専門家
 - `ndf:scanner` - ファイル読み取り専門家
-- `ndf:memory-recorder` - Serenaメモリー記録専門家
-- `ndf:slack-notifier` - Slack通知専門家
 
 ### 4つの専門サブエージェント
 

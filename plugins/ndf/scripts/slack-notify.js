@@ -9,7 +9,13 @@ const path = require('path');
 const https = require('https');
 const { spawn } = require('child_process');
 
-// Load .env file from project root
+// ============================================================================
+// Environment Management
+// ============================================================================
+
+/**
+ * Load .env file from project root by traversing up directory tree
+ */
 function loadEnvFile() {
   let currentDir = __dirname;
 
@@ -18,102 +24,121 @@ function loadEnvFile() {
     const envFile = path.join(currentDir, '.env');
 
     if (fs.existsSync(envFile)) {
-      const content = fs.readFileSync(envFile, 'utf8');
-      content.split('\n').forEach(line => {
-        line = line.trim();
-        // Skip empty lines and comments
-        if (!line || line.startsWith('#')) return;
-
-        const match = line.match(/^([^=]+)=(.*)$/);
-        if (match) {
-          const key = match[1].trim();
-          let value = match[2].trim();
-
-          // Remove quotes
-          if ((value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-          }
-
-          // Only set if not already in environment
-          if (!process.env[key]) {
-            process.env[key] = value;
-          }
-        }
-      });
+      parseEnvFile(envFile);
       break;
     }
 
     // Stop at git repository root
-    if (fs.existsSync(path.join(currentDir, '.git'))) {
-      break;
-    }
+    if (fs.existsSync(path.join(currentDir, '.git'))) break;
   }
 }
 
-// Extract text from content (string or array format)
+/**
+ * Parse .env file and set environment variables
+ */
+function parseEnvFile(envFile) {
+  const content = fs.readFileSync(envFile, 'utf8');
+  
+  content.split('\n').forEach(line => {
+    line = line.trim();
+    if (!line || line.startsWith('#')) return;
+
+    const match = line.match(/^([^=]+)=(.*)$/);
+    if (!match) return;
+
+    const key = match[1].trim();
+    let value = match[2].trim();
+
+    // Remove quotes
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+
+    // Only set if not already in environment
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  });
+}
+
+// ============================================================================
+// Transcript Processing
+// ============================================================================
+
+/**
+ * Extract text from content (string or array format)
+ */
 function extractTextFromContent(content) {
   if (typeof content === 'string') {
     return content;
-  } else if (Array.isArray(content)) {
-    // Extract text from array format: [{"type": "text", "text": "..."}]
-    for (const item of content) {
-      if (item && typeof item === 'object' && item.type === 'text' && item.text) {
-        return item.text;
-      }
-    }
   }
+  
+  if (Array.isArray(content)) {
+    const textItem = content.find(item => 
+      item && typeof item === 'object' && item.type === 'text' && item.text
+    );
+    return textItem?.text || null;
+  }
+  
   return null;
 }
 
-// Generate summary using Claude CLI
-function generateSummaryWithClaude(transcriptPath) {
-  return new Promise((resolve) => {
-    if (!fs.existsSync(transcriptPath)) {
-      resolve(null);
-      return;
+/**
+ * Read and parse recent messages from transcript
+ */
+function readTranscriptMessages(transcriptPath, lineCount = 30, messageCount = 10) {
+  if (!fs.existsSync(transcriptPath)) {
+    return null;
+  }
+
+  try {
+    const content = fs.readFileSync(transcriptPath, 'utf8');
+    const allLines = content.trim().split('\n');
+    const recentLines = allLines.slice(-lineCount);
+
+    // Extract user and assistant messages
+    const messages = [];
+    for (const line of recentLines) {
+      try {
+        const data = JSON.parse(line);
+        if (data.message?.role && ['user', 'assistant'].includes(data.message.role)) {
+          const text = extractTextFromContent(data.message.content);
+          if (text) {
+            messages.push({ role: data.message.role, text });
+          }
+        }
+      } catch (e) {
+        // Skip invalid JSON lines
+      }
     }
 
-    try {
-      // Read last 30 lines of JSONL file
-      const content = fs.readFileSync(transcriptPath, 'utf8');
-      const allLines = content.trim().split('\n');
-      const lines = allLines.slice(-30);
+    return messages.slice(-messageCount);
+  } catch (error) {
+    return null;
+  }
+}
 
-      // Extract user and assistant messages
-      const messages = [];
-      for (const line of lines) {
-        try {
-          const data = JSON.parse(line);
-          if (data.message && data.message.role) {
-            const role = data.message.role;
-            if (role === 'user' || role === 'assistant') {
-              const text = extractTextFromContent(data.message.content);
-              if (text) {
-                messages.push({ role, text });
-              }
-            }
-          }
-        } catch (e) {
-          // Skip invalid JSON lines
-        }
-      }
+/**
+ * Format messages for Claude summarization
+ */
+function formatConversationForSummary(messages) {
+  if (!messages || messages.length === 0) {
+    return null;
+  }
 
-      // Get last 10 messages
-      const recentMessages = messages.slice(-10);
+  const conversationText = messages
+    .map(m => `${m.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${m.text}`)
+    .join('\n\n');
 
-      // Build conversation context for Claude
-      const conversationText = recentMessages
-        .map(m => `${m.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${m.text}`)
-        .join('\n\n');
+  return conversationText.length >= 10 ? conversationText : null;
+}
 
-      if (!conversationText || conversationText.length < 10) {
-        resolve(null);
-        return;
-      }
-
-      // Create summarization prompt
-      const prompt = `以下の会話から実施した作業を40文字以内で要約してください。
+/**
+ * Create summarization prompt for Claude
+ */
+function createSummarizationPrompt(conversationText) {
+  return `以下の会話から実施した作業を40文字以内で要約してください。
 
 出力形式: 要約文のみ（1行、40文字以内）
 
@@ -137,83 +162,99 @@ function generateSummaryWithClaude(transcriptPath) {
 ${conversationText.substring(0, 2000)}
 
 要約:`;
+}
 
-      // Call claude CLI with -p flag and disable hooks & plugins to prevent infinite loop
-      const claude = spawn('claude', ['-p', '--settings', '{"disableAllHooks": true, "disableAllPlugins": true}', '--output-format', 'json'], {
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
+// ============================================================================
+// Claude CLI Integration
+// ============================================================================
 
-      let output = '';
-      let errorOutput = '';
+/**
+ * Call Claude CLI and get response
+ */
+function callClaudeCLI(prompt) {
+  return new Promise((resolve) => {
+    const claude = spawn('claude', [
+      '-p',
+      '--settings', '{"disableAllHooks": true, "disableAllPlugins": true}',
+      '--output-format', 'json'
+    ], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
 
-      claude.stdout.on('data', (data) => {
-        output += data.toString();
-      });
+    let output = '';
 
-      claude.stderr.on('data', (data) => {
-        errorOutput += data.toString();
-      });
+    claude.stdout.on('data', (data) => {
+      output += data.toString();
+    });
 
-      claude.on('close', (code) => {
-        if (code === 0 && output.trim()) {
-          try {
-            // Parse JSON response from Claude CLI
-            const response = JSON.parse(output.trim());
-
-            // Claude CLI may return summary in either result or content field
-            const summary = (response.result || response.content || '').trim();
-
-            // Validate summary is meaningful (at least 5 chars)
-            if (summary.length >= 5) {
-              resolve(summary);
-            } else {
-              resolve(null);
-            }
-          } catch (e) {
-            // If JSON parsing fails, fallback to raw text
-            const summary = output.trim().split('\n')[0].trim();
-            if (summary.length >= 5) {
-              resolve(summary);
-            } else {
-              resolve(null);
-            }
-          }
-        } else {
-          resolve(null);
-        }
-      });
-
-      claude.on('error', (error) => {
+    claude.on('close', (code) => {
+      if (code === 0 && output.trim()) {
+        resolve(output.trim());
+      } else {
         resolve(null);
-      });
+      }
+    });
 
-      // Send prompt to stdin
-      claude.stdin.write(prompt);
-      claude.stdin.end();
+    claude.on('error', () => resolve(null));
 
-    } catch (error) {
-      resolve(null);
-    }
+    claude.stdin.write(prompt);
+    claude.stdin.end();
   });
 }
 
-// Send message to Slack
-function sendSlackMessage(channelId, token, text) {
+/**
+ * Parse Claude CLI response and extract summary
+ */
+function parseSummaryResponse(output) {
+  if (!output) return null;
+
+  try {
+    const response = JSON.parse(output);
+    const summary = (response.result || response.content || '').trim();
+    return summary.length >= 5 ? summary : null;
+  } catch (e) {
+    // If JSON parsing fails, fallback to raw text
+    const summary = output.split('\n')[0].trim();
+    return summary.length >= 5 ? summary : null;
+  }
+}
+
+/**
+ * Generate summary using Claude CLI
+ */
+async function generateSummaryWithClaude(transcriptPath) {
+  const messages = readTranscriptMessages(transcriptPath);
+  if (!messages) return null;
+
+  const conversationText = formatConversationForSummary(messages);
+  if (!conversationText) return null;
+
+  const prompt = createSummarizationPrompt(conversationText);
+  const output = await callClaudeCLI(prompt);
+  
+  return parseSummaryResponse(output);
+}
+
+// ============================================================================
+// Slack API Integration
+// ============================================================================
+
+/**
+ * Make HTTPS request to Slack API
+ */
+function makeSlackApiRequest(apiPath, data, token) {
   return new Promise((resolve, reject) => {
-    const data = JSON.stringify({
-      channel: channelId,
-      text: text
-    });
+    const payload = JSON.stringify(data);
 
     const options = {
       hostname: 'slack.com',
       port: 443,
-      path: '/api/chat.postMessage',
+      path: apiPath,
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json; charset=utf-8',
-        'Content-Length': Buffer.byteLength(data)
+        'Content-Length': Buffer.byteLength(payload)
       }
     };
 
@@ -227,77 +268,46 @@ function sendSlackMessage(channelId, token, text) {
       res.on('end', () => {
         try {
           const result = JSON.parse(body);
-          if (result.ok) {
-            resolve(result);  // Return full result object (includes ts)
-          } else {
-            resolve(null);
-          }
+          resolve(result.ok ? result : null);
         } catch (e) {
           resolve(null);
         }
       });
     });
 
-    req.on('error', (error) => {
-      reject(error);
-    });
-
-    req.write(data);
+    req.on('error', reject);
+    req.write(payload);
     req.end();
   });
 }
 
-// Delete Slack message
+/**
+ * Send message to Slack
+ */
+function sendSlackMessage(channelId, token, text) {
+  return makeSlackApiRequest('/api/chat.postMessage', {
+    channel: channelId,
+    text: text
+  }, token);
+}
+
+/**
+ * Delete Slack message
+ */
 function deleteSlackMessage(channelId, token, messageTs) {
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify({
-      channel: channelId,
-      ts: messageTs
-    });
-
-    const options = {
-      hostname: 'slack.com',
-      port: 443,
-      path: '/api/chat.delete',
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json; charset=utf-8',
-        'Content-Length': Buffer.byteLength(data)
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let body = '';
-
-      res.on('data', (chunk) => {
-        body += chunk;
-      });
-
-      res.on('end', () => {
-        try {
-          const result = JSON.parse(body);
-          if (result.ok) {
-            resolve(true);
-          } else {
-            resolve(false);
-          }
-        } catch (e) {
-          resolve(false);
-        }
-      });
-    });
-
-    req.on('error', (error) => {
-      reject(error);
-    });
-
-    req.write(data);
-    req.end();
-  });
+  return makeSlackApiRequest('/api/chat.delete', {
+    channel: channelId,
+    ts: messageTs
+  }, token).then(result => result !== null);
 }
 
-// Get repository name
+// ============================================================================
+// Git Integration
+// ============================================================================
+
+/**
+ * Get repository name from git
+ */
 function getRepositoryName() {
   return new Promise((resolve) => {
     const gitShow = spawn('git', ['rev-parse', '--show-toplevel']);
@@ -309,8 +319,7 @@ function getRepositoryName() {
 
     gitShow.on('close', (code) => {
       if (code === 0 && output.trim()) {
-        const repoPath = output.trim();
-        resolve(path.basename(repoPath));
+        resolve(path.basename(output.trim()));
       } else {
         resolve(process.env.GIT_REPO || 'unknown');
       }
@@ -320,7 +329,38 @@ function getRepositoryName() {
   });
 }
 
-// Main function
+// ============================================================================
+// Hook Input Processing
+// ============================================================================
+
+/**
+ * Read and parse hook input from stdin
+ */
+async function readHookInput() {
+  if (process.stdin.isTTY) {
+    return null;
+  }
+
+  let hookInput = '';
+  for await (const chunk of process.stdin) {
+    hookInput += chunk;
+  }
+
+  try {
+    const hookData = JSON.parse(hookInput);
+    return hookData.transcript_path || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ============================================================================
+// Main Flow
+// ============================================================================
+
+/**
+ * Main notification flow
+ */
 async function main() {
   // Load environment variables
   loadEnvFile();
@@ -335,50 +375,26 @@ async function main() {
     process.exit(0);
   }
 
-  // Read hook input from stdin
-  let hookInput = '';
-  if (!process.stdin.isTTY) {
-    for await (const chunk of process.stdin) {
-      hookInput += chunk;
-    }
-  }
-
-  // Extract transcript_path from JSON input
-  let transcriptPath = null;
-  if (hookInput) {
-    try {
-      const hookData = JSON.parse(hookInput);
-      if (hookData.transcript_path) {
-        transcriptPath = hookData.transcript_path;
-      }
-    } catch (e) {
-      // Continue silently
-    }
-  }
+  // Read transcript path from hook input
+  const transcriptPath = await readHookInput();
 
   // Step 1: Send message with mention to trigger notification
-  const mentionMessage = userMention ? `${userMention} Claude Codeの作業が完了しました` : 'Claude Codeの作業が完了しました';
+  const mentionMessage = userMention 
+    ? `${userMention} Claude Codeの作業が完了しました`
+    : 'Claude Codeの作業が完了しました';
 
-  let mentionResult;
-  try {
-    mentionResult = await sendSlackMessage(channelId, token, mentionMessage);
-    if (!mentionResult) {
-      process.exit(1);
-    }
-  } catch (error) {
+  const mentionResult = await sendSlackMessage(channelId, token, mentionMessage);
+  if (!mentionResult) {
     process.exit(1);
   }
 
   // Step 2: Generate work summary
-  let workSummary = null;
+  const workSummary = transcriptPath 
+    ? await generateSummaryWithClaude(transcriptPath)
+    : null;
 
-  // Generate summary using Claude CLI
-  if (transcriptPath) {
-    workSummary = await generateSummaryWithClaude(transcriptPath);
-  }
-
-  // Step 3: Delete mention message (right before sending detailed message)
-  if (mentionResult && mentionResult.ts) {
+  // Step 3: Delete mention message
+  if (mentionResult.ts) {
     try {
       await deleteSlackMessage(channelId, token, mentionResult.ts);
     } catch (error) {
@@ -388,25 +404,18 @@ async function main() {
 
   // Step 4: Send detailed message with repository name and work summary
   const repoName = await getRepositoryName();
-
-  // Create detailed message (1 line format)
-  let detailedMessage;
-  if (workSummary) {
-    detailedMessage = `[${repoName}] ${workSummary}`;
-  } else {
-    detailedMessage = `[${repoName}] Claude Codeのセッションが終了しました(要約なし)`;
-  }
+  const detailedMessage = workSummary
+    ? `[${repoName}] ${workSummary}`
+    : `[${repoName}] Claude Codeのセッションが終了しました(要約なし)`;
 
   try {
     await sendSlackMessage(channelId, token, detailedMessage);
   } catch (error) {
     // Exit silently even on error
   }
-
-  // Exit silently - Stop hook will continue normally
 }
 
-main().catch((error) => {
+main().catch(() => {
   // Exit silently even on error
   process.exit(1);
 });
