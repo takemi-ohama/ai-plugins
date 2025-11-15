@@ -141,14 +141,17 @@ function generateSummaryFromTranscript(transcriptPath) {
 
       logDebug(`After noise removal: ${userRequest.substring(0, 100)}`);
 
-      // Truncate to 40 chars
-      summary = userRequest.substring(0, 40);
+      // Extract only the first meaningful line (up to 40 chars)
+      const firstLine = userRequest.split('\n')[0].trim();
+      summary = firstLine.substring(0, 40);
     }
 
     // Fallback to assistant message
     if (!summary || summary.length < 5) {
       if (assistantMessages.length > 0) {
-        summary = assistantMessages[assistantMessages.length - 1].substring(0, 40);
+        const assistantText = assistantMessages[assistantMessages.length - 1];
+        const firstLine = assistantText.split('\n')[0].trim();
+        summary = firstLine.substring(0, 40);
       }
     }
 
