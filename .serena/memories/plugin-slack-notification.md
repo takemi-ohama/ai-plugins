@@ -3,7 +3,7 @@
 ## プラグイン情報
 
 - **名前**: slack-notification
-- **バージョン**: 1.0.0
+- **バージョン**: 2.0.0 (Bot Token方式、Node.js実装)
 - **作者**: takemi-ohama
 - **タイプ**: プロジェクトスキル + フック
 - **パス**: `plugins/slack-notification`
@@ -61,12 +61,15 @@ plugins/slack-notification/
 ```bash
 export SLACK_BOT_TOKEN="xoxb-your-bot-token-here"
 export SLACK_CHANNEL_ID="C05MS4DBF9V"
+export SLACK_USER_MENTION="U05MS4DBF9V"  # ユーザーID（<@...>形式ではない）
 ```
 
-### オプション
+### 非推奨（v1.x互換性のため残存）
 ```bash
-export SLACK_USER_MENTION="<@U05MS4DBF9V>"  # 通知音のためのメンション
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 ```
+
+**注意**: v2.xではBot Token方式を推奨。Webhook方式は削除・更新ができないため、メンション機能が完全に動作しない。
 
 ## Slackアプリの設定
 

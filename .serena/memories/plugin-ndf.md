@@ -126,6 +126,89 @@ plugins/ndf/
 2. メッセージ削除
 3. メンションなし再投稿（クリーンな履歴）
 
+## Stop Hook実装の重要な知見
+
+### Stop Hook無限ループ問題と解決策
+
+**問題:**
+Stop hookスクリプト内でClaude CLIを呼び出すと、サブプロセスが終了時に再度Stop hookをトリガーし、無限ループが発生。
+
+**試行錯誤の履歴:**
+
+1. **失敗: `CLAUDE_DISABLE_HOOKS`環境変数**
+   ```bash
+   export CLAUDE_DISABLE_HOOKS=1
+   claude -p "prompt"
+   ```
+   → 動作せず。この環境変数は存在しない。
+
+2. **失敗: `stop_hook_active`フィールドチェック**
+   ```bash
+   STOP_HOOK_ACTIVE=$(echo "$HOOK_INPUT" | grep -o '"stop_hook_active":[^,}]*')
+   ```
+   → ドキュメントには記載されているが、実際のhook入力には含まれない。
+
+3. **成功: `--settings`フラグでhooksとplugins無効化**
+   ```bash
+   claude -p --settings '{"disableAllHooks": true, "disableAllPlugins": true}' --output-format text
+   ```
+   → 確実に無限ループを防止可能。
+
+**最終推奨実装（Node.js）:**
+```javascript
+const { spawn } = require('child_process');
+
+const claude = spawn('claude', [
+  '-p',
+  '--settings', '{"disableAllHooks": true, "disableAllPlugins": true}',
+  '--output-format', 'text'
+], {
+  stdio: ['pipe', 'pipe', 'pipe']
+});
+```
+
+**重要ポイント:**
+- `--settings`フラグは`claude --help`で確認可能
+- hooksだけでなくpluginsも無効化することが重要
+- transcript処理フラグによるチェックも併用すると更に安全
+
+### Slack通知の実装詳細
+
+**要約生成の3段階フォールバック:**
+
+1. **Claude CLI（優先）** - AIによる高品質な要約
+   ```bash
+   claude -p --settings '{"disableAllHooks": true, "disableAllPlugins": true}' \
+     --output-format text <<EOF
+   以下の会話から実施した作業を40文字以内で要約してください。
+   ...
+   EOF
+   ```
+
+2. **transcript解析（フォールバック1）** - セッションログから抽出
+   ```javascript
+   const transcript = fs.readFileSync(transcriptPath, 'utf-8');
+   // 最終的なAssistantメッセージから要約を抽出
+   ```
+
+3. **git diff（フォールバック2）** - ファイル変更から推測
+   ```bash
+   git diff HEAD~1 --stat | head -1
+   ```
+
+**文字長制限:**
+- 最終的に40文字に統一（試行錯誤の結果）
+- プロンプトで明示的に指示：「40文字以内で要約してください」
+
+**通知メカニズム:**
+1. メンション付き投稿（`chat.postMessage` with mention） → 通知音
+2. メッセージ削除（`chat.delete`） → 1秒後
+3. メンションなし再投稿 → クリーンな履歴
+
+**設定変更履歴:**
+- v1.x: `SLACK_WEBHOOK_URL`方式
+- v2.x: `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` + `SLACK_USER_MENTION`方式
+
 ## 環境変数
 
 `.env`ファイルで以下を設定：
@@ -137,8 +220,13 @@ plugins/ndf/
 - `NOTION_API_KEY` - Notion MCP用
 - `GOOGLE_APPLICATION_CREDENTIALS` - BigQuery MCP用
 - `DATABASE_DSN` - DBHub MCP用
-- `SLACK_WEBHOOK_URL` - Slack通知用
+- `SLACK_BOT_TOKEN` - Slack通知用（Bot User OAuth Token）
+- `SLACK_CHANNEL_ID` - Slack通知送信先チャンネルID
+- `SLACK_USER_MENTION` - Slackメンション対象ユーザーID（例: U123456789）
 - `CONTEXT7_API_KEY` - Context7 MCP用
+
+**非推奨（v1.x互換性のため残存）:**
+- `SLACK_WEBHOOK_URL` - v2.xではBot Token方式を推奨
 
 **認証不要:**
 - Serena MCP

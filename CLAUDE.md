@@ -752,3 +752,21 @@ if (transcriptPath) {
 ---
 
 **重要**: このプロジェクトで作業する際は、常にSerena MCPを第一選択肢として考えてください。効率的なコード理解と安全な編集を実現します。
+
+## Serenaメモリー更新履歴
+
+**最終更新日時**: 2025-11-15 (UTC)
+
+**更新内容**:
+- Stop Hook無限ループ問題の解決過程と最終解決策を記録
+- Slack通知機能の進化（Webhook → Bot Token方式）を記録
+- 要約生成の3段階フォールバック実装を記録
+- 文字長制限の調整履歴を記録
+- plugin-ndf、plugin-slack-notification、project-overviewメモリーを最新化
+
+**利用可能なメモリー**:
+- `plugin-ndf` - NDFプラグインの詳細
+- `plugin-slack-notification` - Slack通知プラグインの詳細
+- `plugin-mcp-integration` - MCP統合プラグインの詳細
+- `project-overview` - プロジェクト全体概要
+- `development-history-20251115` - 2025-11-12〜2025-11-15の開発履歴と知見

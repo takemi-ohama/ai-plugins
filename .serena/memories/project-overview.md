@@ -34,15 +34,35 @@ ai-agent-marketplace/
 
 ## 現在提供されているプラグイン
 
-### 1. mcp-integration (v1.0.0)
-- **説明**: GitHub、Serena、BigQuery、Notion MCPの統合スキル
+### 1. ndf (v1.0.0) ⭐ オールインワン
+- **説明**: 3つのプラグイン統合版（MCP統合、Slack通知、ワークフローコマンド）
+- **タイプ**: 複合プラグイン（MCPサーバー + フック + コマンド + エージェント）
+- **パス**: `./plugins/ndf`
+- **含まれる機能**:
+  - 9つのMCPサーバー（GitHub、Serena、BigQuery、Notion、AWS Docs、DBHub、Chrome DevTools、Codex、Context7）
+  - 6つのスラッシュコマンド（/serena、/pr、/fix、/review、/merge、/clean）
+  - 4つの専門エージェント（data-analyst、corder、researcher、scanner）
+  - 自動Slack通知（Stop hookによる作業要約送信）
+
+### 2. mcp-integration (v2.0.0)
+- **説明**: MCPサーバーの統合設定（単体利用可能）
 - **タイプ**: プロジェクトスキル
 - **パス**: `./plugins/mcp-integration`
+- **注意**: NDFプラグインに含まれているため、単体インストールは非推奨
 
-### 2. slack-notification (v1.0.0)
+### 3. slack-notification (v2.0.0)
 - **説明**: Claude Code作業完了時の自動Slack通知（日本語要約付き）
 - **タイプ**: プロジェクトスキル + フック
 - **パス**: `./plugins/slack-notification`
+- **注意**: NDFプラグインに含まれているため、単体インストールは非推奨
+
+### 4. workflow-commands (v1.0.0)
+- **説明**: 開発ワークフロー用スラッシュコマンド
+- **タイプ**: スラッシュコマンド
+- **パス**: `./plugins/workflow-commands`
+- **注意**: NDFプラグインに含まれているため、単体インストールは非推奨
+
+**推奨**: ほとんどのユーザーは**NDFプラグイン**を使用することを推奨。個別プラグインは特定機能のみ必要な場合に使用。
 
 ## インストール方法
 

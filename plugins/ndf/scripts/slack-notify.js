@@ -9,22 +9,6 @@ const path = require('path');
 const https = require('https');
 const { spawn } = require('child_process');
 
-// Setup logging
-const logDir = path.join(process.env.HOME || '/tmp', '.claude', 'logs');
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir, { recursive: true });
-}
-const logFile = path.join(logDir, 'slack-notify-debug.log');
-
-function logDebug(message) {
-  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
-  fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
-}
-
-logDebug('=== Slack notification script started (Node.js) ===');
-logDebug(`Script invoked with args: ${process.argv.slice(2).join(' ')}`);
-logDebug(`Working directory: ${process.cwd()}`);
-
 // Load .env file from project root
 function loadEnvFile() {
   let currentDir = __dirname;
@@ -86,7 +70,6 @@ function extractTextFromContent(content) {
 function generateSummaryWithClaude(transcriptPath) {
   return new Promise((resolve) => {
     if (!fs.existsSync(transcriptPath)) {
-      logDebug(`Transcript file not found: ${transcriptPath}`);
       resolve(null);
       return;
     }
@@ -118,7 +101,6 @@ function generateSummaryWithClaude(transcriptPath) {
 
       // Get last 10 messages
       const recentMessages = messages.slice(-10);
-      logDebug(`Extracted ${recentMessages.length} recent messages`);
 
       // Build conversation context for Claude
       const conversationText = recentMessages
@@ -126,7 +108,6 @@ function generateSummaryWithClaude(transcriptPath) {
         .join('\n\n');
 
       if (!conversationText || conversationText.length < 10) {
-        logDebug('No meaningful conversation found');
         resolve(null);
         return;
       }
@@ -156,8 +137,6 @@ function generateSummaryWithClaude(transcriptPath) {
 ${conversationText.substring(0, 2000)}
 
 要約:`;
-
-      logDebug('Calling Claude CLI for summarization');
 
       // Call claude CLI with -p flag and disable hooks & plugins to prevent infinite loop
       const claude = spawn('claude', ['-p', '--settings', '{"disableAllHooks": true, "disableAllPlugins": true}', '--output-format', 'text'], {
@@ -194,20 +173,16 @@ ${conversationText.substring(0, 2000)}
 
           // Validate summary is meaningful (at least 5 chars)
           if (summary.length >= 5) {
-            logDebug(`Claude generated summary: ${summary}`);
             resolve(summary);
           } else {
-            logDebug(`Claude summary too short: ${summary}`);
             resolve(null);
           }
         } else {
-          logDebug(`Claude CLI failed (exit code ${code}): ${errorOutput}`);
           resolve(null);
         }
       });
 
       claude.on('error', (error) => {
-        logDebug(`Failed to execute Claude CLI: ${error.message}`);
         resolve(null);
       });
 
@@ -216,7 +191,6 @@ ${conversationText.substring(0, 2000)}
       claude.stdin.end();
 
     } catch (error) {
-      logDebug(`Error in generateSummaryWithClaude: ${error.message}`);
       resolve(null);
     }
   });
@@ -225,7 +199,6 @@ ${conversationText.substring(0, 2000)}
 // Generate summary from transcript file (fallback method)
 function generateSummaryFromTranscript(transcriptPath) {
   if (!fs.existsSync(transcriptPath)) {
-    logDebug(`Transcript file not found: ${transcriptPath}`);
     return null;
   }
 
@@ -256,7 +229,6 @@ function generateSummaryFromTranscript(transcriptPath) {
 
     // Get last 10 messages
     const recentMessages = messages.slice(-10);
-    logDebug(`Extracted ${recentMessages.length} recent messages`);
 
     // Extract last user request
     const userMessages = recentMessages.filter(m => m.role === 'user').map(m => m.text);
@@ -266,7 +238,6 @@ function generateSummaryFromTranscript(transcriptPath) {
 
     if (userMessages.length > 0) {
       let userRequest = userMessages[userMessages.length - 1];
-      logDebug(`Last user message (raw): ${userRequest.substring(0, 100)}`);
 
       // Remove noise patterns
       userRequest = userRequest
@@ -278,8 +249,6 @@ function generateSummaryFromTranscript(transcriptPath) {
         .replace(/^#+\s*/gm, '')               // Markdown headers (##, ###)
         .replace(/\n#+\s*$/g, '')              // Trailing markdown headers
         .trim();
-
-      logDebug(`After noise removal: ${userRequest.substring(0, 100)}`);
 
       // Extract only the first meaningful line
       const firstLine = userRequest.split('\n')[0].trim();
@@ -295,11 +264,9 @@ function generateSummaryFromTranscript(transcriptPath) {
       }
     }
 
-    logDebug(`Generated summary: ${summary || 'empty'}`);
     return summary && summary.length >= 5 ? summary : null;
 
   } catch (error) {
-    logDebug(`Error parsing transcript: ${error.message}`);
     return null;
   }
 }
@@ -378,21 +345,17 @@ function sendSlackMessage(channelId, token, text) {
         try {
           const result = JSON.parse(body);
           if (result.ok) {
-            logDebug('Slack message sent successfully');
             resolve(result);  // Return full result object (includes ts)
           } else {
-            logDebug(`Slack API error: ${JSON.stringify(result)}`);
             resolve(null);
           }
         } catch (e) {
-          logDebug(`Failed to parse Slack response: ${e.message}`);
           resolve(null);
         }
       });
     });
 
     req.on('error', (error) => {
-      logDebug(`Failed to send Slack message: ${error.message}`);
       reject(error);
     });
 
@@ -432,21 +395,17 @@ function deleteSlackMessage(channelId, token, messageTs) {
         try {
           const result = JSON.parse(body);
           if (result.ok) {
-            logDebug('Slack message deleted successfully');
             resolve(true);
           } else {
-            logDebug(`Slack delete API error: ${JSON.stringify(result)}`);
             resolve(false);
           }
         } catch (e) {
-          logDebug(`Failed to parse Slack delete response: ${e.message}`);
           resolve(false);
         }
       });
     });
 
     req.on('error', (error) => {
-      logDebug(`Failed to delete Slack message: ${error.message}`);
       reject(error);
     });
 
@@ -482,20 +441,14 @@ function getRepositoryName() {
 async function main() {
   // Load environment variables
   loadEnvFile();
-  logDebug('Environment variables loaded');
 
   // Get configuration from environment
   const channelId = process.env.SLACK_CHANNEL_ID;
   const token = process.env.SLACK_BOT_TOKEN;
   const userMention = process.env.SLACK_USER_MENTION;
 
-  logDebug(`SLACK_BOT_TOKEN set: ${token ? 'yes' : 'no'}`);
-  logDebug(`SLACK_CHANNEL_ID: ${channelId || 'not set'}`);
-  logDebug(`SLACK_USER_MENTION: ${userMention || 'not set'}`);
-
   // Exit silently if required variables are not set
   if (!channelId || !token) {
-    logDebug('Required environment variables not set. Exiting.');
     process.exit(0);
   }
 
@@ -504,37 +457,6 @@ async function main() {
   if (!process.stdin.isTTY) {
     for await (const chunk of process.stdin) {
       hookInput += chunk;
-    }
-    logDebug(`Hook input received from stdin (length: ${hookInput.length} chars)`);
-    logDebug(`Hook input preview: ${hookInput.substring(0, 200)}`);
-
-    // Write full hook input to ./hooks_log.log for debugging
-    try {
-      const hooksLogPath = path.join(process.cwd(), 'hooks_log.log');
-      const timestamp = new Date().toISOString();
-      const logEntry = `\n${'='.repeat(80)}\n[${timestamp}] Hook Input Received\n${'='.repeat(80)}\n${hookInput}\n`;
-      fs.appendFileSync(hooksLogPath, logEntry);
-      logDebug(`Full hook input written to: ${hooksLogPath}`);
-    } catch (e) {
-      logDebug(`Failed to write hooks_log.log: ${e.message}`);
-    }
-  } else {
-    logDebug('No stdin available (terminal)');
-  }
-
-  // Check if stop_hook_active is true (hook already executed)
-  if (hookInput) {
-    try {
-      const hookData = JSON.parse(hookInput);
-      if (hookData.stop_hook_active === true) {
-        logDebug('stop_hook_active is true, exiting immediately to prevent infinite loop');
-        // Exit silently - Stop hook will continue normally
-        process.exit(0);
-      }
-      logDebug(`stop_hook_active: ${hookData.stop_hook_active || 'not set'}`);
-    } catch (e) {
-      // If parsing fails, continue normally
-      logDebug(`Failed to check stop_hook_active: ${e.message}`);
     }
   }
 
@@ -545,32 +467,9 @@ async function main() {
       const hookData = JSON.parse(hookInput);
       if (hookData.transcript_path) {
         transcriptPath = hookData.transcript_path;
-        logDebug(`Extracted transcript_path: ${transcriptPath}`);
       }
     } catch (e) {
-      logDebug(`Failed to parse hook input JSON: ${e.message}`);
-    }
-  }
-
-  // IMPORTANT: Prevent infinite loop by checking if transcript has been processed
-  if (transcriptPath) {
-    const processedFlagFile = path.join(
-      require('os').tmpdir(),
-      `.claude-hook-processed-${path.basename(transcriptPath)}`
-    );
-
-    if (fs.existsSync(processedFlagFile)) {
-      logDebug(`Transcript already processed (flag file exists): ${processedFlagFile}`);
-      // Exit silently - Stop hook will continue normally
-      process.exit(0);
-    }
-
-    // Mark transcript as being processed
-    try {
-      fs.writeFileSync(processedFlagFile, new Date().toISOString());
-      logDebug(`Created processed flag file: ${processedFlagFile}`);
-    } catch (e) {
-      logDebug(`Failed to create processed flag file: ${e.message}`);
+      // Continue silently
     }
   }
 
@@ -589,19 +488,14 @@ async function main() {
 
   // Step 1: Send message with mention to trigger notification
   const mentionMessage = userMention ? `${userMention} ${message}` : message;
-  logDebug(`Step 1: Sending mention message: "${mentionMessage}"`);
 
   let mentionResult;
   try {
     mentionResult = await sendSlackMessage(channelId, token, mentionMessage);
     if (!mentionResult) {
-      logDebug('Failed to send mention message (no result)');
       process.exit(1);
     }
-    logDebug(`Mention message sent successfully (ts: ${mentionResult.ts})`);
   } catch (error) {
-    logDebug(`Failed to send mention message: ${error.message}`);
-    logDebug(`Error stack: ${error.stack}`);
     process.exit(1);
   }
 
@@ -610,35 +504,24 @@ async function main() {
 
   // Priority 1: Generate summary using Claude CLI (highest quality)
   if (transcriptPath) {
-    logDebug('Attempting Claude CLI summarization (with hooks disabled)');
     workSummary = await generateSummaryWithClaude(transcriptPath);
-    logDebug(`Claude CLI summary: ${workSummary || 'empty'}`);
   }
 
   // Priority 2: Fallback to transcript text parsing
   if (!workSummary && transcriptPath) {
-    logDebug('Fallback: Generating summary from transcript (text parsing)');
     workSummary = generateSummaryFromTranscript(transcriptPath);
-    logDebug(`Transcript summary: ${workSummary || 'empty'}`);
   }
 
   // Priority 3: Fallback to git diff
   if (!workSummary) {
-    logDebug('Fallback: Generating summary from git diff');
     workSummary = await generateSummaryFromGit();
-    logDebug(`Git diff summary: ${workSummary || 'empty'}`);
   }
-
-  logDebug(`Final work summary: ${workSummary || 'empty'}`);
 
   // Step 3: Delete mention message (right before sending detailed message)
   if (mentionResult && mentionResult.ts) {
-    logDebug(`Deleting mention message (ts: ${mentionResult.ts})`);
     try {
       await deleteSlackMessage(channelId, token, mentionResult.ts);
-      logDebug('Mention message deleted successfully');
     } catch (error) {
-      logDebug(`Failed to delete mention message: ${error.message}`);
       // Continue even if deletion fails
     }
   }
@@ -654,25 +537,16 @@ async function main() {
     detailedMessage = `[${repoName}] ${message}`;
   }
 
-  logDebug('Sending final Slack message');
-  logDebug(`Repository: ${repoName}`);
-  logDebug(`Message: ${message}`);
-  logDebug(`Work summary: ${workSummary || 'none'}`);
-
   try {
     await sendSlackMessage(channelId, token, detailedMessage);
-    logDebug('Slack notification sent successfully');
   } catch (error) {
-    logDebug('Slack notification failed');
+    // Exit silently even on error
   }
-
-  logDebug('=== Slack notification script completed ===');
 
   // Exit silently - Stop hook will continue normally
 }
 
 main().catch((error) => {
-  logDebug(`Unhandled error: ${error.message}`);
   // Exit silently even on error
   process.exit(1);
 });
