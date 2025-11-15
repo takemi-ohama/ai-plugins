@@ -135,6 +135,8 @@ function generateSummaryFromTranscript(transcriptPath) {
         .replace(/^[Ee]xit code.*/i, '')       // "Exit code"
         .replace(/^error:.*/i, '')             // "error:"
         .replace(/^already.*/i, '')            // "already"
+        .replace(/^#+\s*/gm, '')               // Markdown headers (##, ###)
+        .replace(/\n#+\s*$/g, '')              // Trailing markdown headers
         .trim();
 
       logDebug(`After noise removal: ${userRequest.substring(0, 100)}`);
