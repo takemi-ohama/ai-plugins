@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Slack notification script for Claude Code completion
+# Reads transcript_path from stdin (hook input JSON) and generates summary
 
 # Function to load .env file from project root
 load_env_file() {
@@ -68,6 +69,49 @@ json_escape() {
   echo "$value"
 }
 
+# Function to generate summary from transcript
+generate_summary_from_transcript() {
+  local transcript_path="$1"
+
+  # Check if transcript file exists
+  if [ ! -f "$transcript_path" ]; then
+    return 1
+  fi
+
+  # Extract the last few user and assistant messages from JSONL transcript
+  # Get last 5 lines, extract content from user/assistant messages
+  local summary=""
+  local last_messages=$(tail -20 "$transcript_path" | grep -E '"role":"(user|assistant)"' | tail -5)
+
+  # Try to extract meaningful content
+  local user_request=$(echo "$last_messages" | grep '"role":"user"' | tail -1 | grep -o '"content":"[^"]*"' | sed 's/"content":"//;s/"$//' | head -c 100)
+  local assistant_action=$(echo "$last_messages" | grep '"role":"assistant"' | tail -1 | grep -o '"content":"[^"]*"' | sed 's/"content":"//;s/"$//' | head -c 100)
+
+  # Generate Japanese summary based on extracted content
+  if [ -n "$user_request" ]; then
+    summary="ユーザーリクエスト: ${user_request}"
+  elif [ -n "$assistant_action" ]; then
+    summary="アシスタント作業: ${assistant_action}"
+  fi
+
+  # Fallback to file change summary if transcript parsing fails
+  if [ -z "$summary" ] && git rev-parse --git-dir > /dev/null 2>&1; then
+    local changed_files=$(git diff --name-only 2>/dev/null | wc -l)
+    local main_file=$(git diff --name-only 2>/dev/null | head -1)
+    main_file="${main_file##*/}"
+
+    if [ "$changed_files" -gt 0 ] && [ -n "$main_file" ]; then
+      if [ "$changed_files" -eq 1 ]; then
+        summary="${main_file}を更新"
+      else
+        summary="${main_file}等${changed_files}件のファイルを更新"
+      fi
+    fi
+  fi
+
+  echo "$summary"
+}
+
 # Load environment variables from .env file (if exists)
 # Existing environment variables take precedence
 load_env_file
@@ -81,12 +125,28 @@ if [ -z "$CHANNEL_ID" ] || [ -z "$SLACK_BOT_TOKEN" ]; then
   exit 0
 fi
 
+# Read hook input from stdin (JSON with transcript_path)
+HOOK_INPUT=""
+if [ -t 0 ]; then
+  # No stdin available (manual execution)
+  HOOK_INPUT=""
+else
+  # Read from stdin
+  HOOK_INPUT=$(cat)
+fi
+
+# Extract transcript_path from JSON input
+TRANSCRIPT_PATH=""
+if [ -n "$HOOK_INPUT" ]; then
+  # Use grep to extract transcript_path (safer than jq dependency)
+  TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | grep -o '"transcript_path":"[^"]*"' | cut -d'"' -f4)
+fi
+
 # Get current timestamp
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
-# Check message type and work summary from arguments
-MESSAGE_TYPE=${1:-"complete"}
-WORK_SUMMARY_ARG=${2:-""}
+# Check message type from arguments (for backward compatibility)
+MESSAGE_TYPE=${1:-"session_end"}
 
 # Create message based on type
 case "$MESSAGE_TYPE" in
@@ -142,32 +202,31 @@ fi
 # Get repository name from git remote or environment variable
 REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "${GIT_REPO:-unknown}")
 
-# Use work summary from argument if provided, otherwise generate from git diff
+# Generate work summary
 WORK_SUMMARY=""
-if [ -n "$WORK_SUMMARY_ARG" ]; then
-  # Use the summary provided as argument (from SKILL)
-  WORK_SUMMARY="$WORK_SUMMARY_ARG"
-else
-  # Fallback: Generate Japanese work summary from git diff
-  if git rev-parse --git-dir > /dev/null 2>&1; then
-    # Get changed files from last commit
-    CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null | wc -l)
-    MAIN_FILE=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null | head -1)
-    # Get basename using parameter expansion (safe, no xargs)
-    MAIN_FILE="${MAIN_FILE##*/}"
 
-    if [ "$CHANGED_FILES" -gt 0 ] && [ -n "$MAIN_FILE" ]; then
-      if [ "$CHANGED_FILES" -eq 1 ]; then
-        WORK_SUMMARY="${MAIN_FILE}を更新"
-      else
-        WORK_SUMMARY="${MAIN_FILE}等${CHANGED_FILES}件のファイルを更新"
-      fi
+# Priority 1: Generate from transcript if available
+if [ -n "$TRANSCRIPT_PATH" ]; then
+  WORK_SUMMARY=$(generate_summary_from_transcript "$TRANSCRIPT_PATH")
+fi
+
+# Priority 2: Fallback to git diff if transcript summary is empty
+if [ -z "$WORK_SUMMARY" ] && git rev-parse --git-dir > /dev/null 2>&1; then
+  CHANGED_FILES=$(git diff --name-only 2>/dev/null | wc -l)
+  MAIN_FILE=$(git diff --name-only 2>/dev/null | head -1)
+  MAIN_FILE="${MAIN_FILE##*/}"
+
+  if [ "$CHANGED_FILES" -gt 0 ] && [ -n "$MAIN_FILE" ]; then
+    if [ "$CHANGED_FILES" -eq 1 ]; then
+      WORK_SUMMARY="${MAIN_FILE}を更新"
+    else
+      WORK_SUMMARY="${MAIN_FILE}等${CHANGED_FILES}件のファイルを更新"
     fi
   fi
 fi
 
-# Truncate to 100 chars (increased from 40 to accommodate SKILL-generated summaries)
-WORK_SUMMARY=$(echo "$WORK_SUMMARY" | head -c 100)
+# Truncate to 150 chars to accommodate transcript-generated summaries
+WORK_SUMMARY=$(echo "$WORK_SUMMARY" | head -c 150)
 
 # Create detailed message
 if [ -n "$WORK_SUMMARY" ]; then
