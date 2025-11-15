@@ -4,7 +4,14 @@ Claude Codeプラグイン、プロジェクトスキル、MCP（Model Context P
 
 ## 概要
 
-このマーケットプレイスは、チーム全体でClaude Codeの導入を加速するための事前設定されたプラグインを提供します。MCPサーバーの自動セットアップ、開発ワークフローの効率化、作業完了通知など、開発体験を向上させる機能を提供します。
+このマーケットプレイスは、チーム全体でClaude Codeの導入を加速するための事前設定されたプラグインを提供します。
+
+**NDFプラグイン**は、以下の機能を**オールインワン**で提供する統合プラグインです：
+
+- **9つのMCPサーバー**: GitHub、Serena、BigQuery、Notion、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Context7
+- **6つの開発ワークフローコマンド**: `/pr`, `/fix`, `/review`, `/merge`, `/clean`, `/serena`
+- **6つの専門エージェント**: データ分析、コーディング、調査、ファイル読み取り、Slack通知、作業記録
+- **自動フック**: Claude Code終了時にtranscript解析による日本語要約をSlack通知
 
 ## 利用方法
 
@@ -21,19 +28,17 @@ Claude Codeでマーケットプレイスを追加します：
 利用したいプラグインをインストールします：
 
 ```bash
-# MCPサーバーの自動セットアップ
-/plugin install mcp-integration@ai-agent-marketplace
-
-# Slack通知の自動化
-/plugin install slack-notification@ai-agent-marketplace
+# NDFプラグイン（オールインワン統合プラグイン）
+/plugin install ndf@ai-agent-marketplace
 ```
+
+このプラグイン1つで、MCP統合、開発ワークフロー、専門エージェント、自動フックのすべてが利用可能です。
 
 ### 利用可能なプラグイン
 
 | プラグイン名 | バージョン | 説明 | 詳細 |
 |------------|----------|------|------|
-| **mcp-integration** | 1.1.0 | GitHub、Serena、Notion、BigQuery、DBHub、Chrome DevTools、Codex CLI、AWS DocumentationのMCPサーバーを自動セットアップ。開発ワークフロー用の6つのスラッシュコマンド（`/pr`, `/fix`, `/review`, `/merge`, `/clean`, `/serena`）を含む。 | [README](./plugins/mcp-integration/README.md) |
-| **slack-notification** | 1.0.0 | Claude Code作業完了時に自動的にSlack通知を送信。git変更から日本語要約を自動生成し、スマート通知で音を鳴らしながらチャンネルをクリーンに保つ。 | [README](./plugins/slack-notification/README.md) |
+| **ndf** | 1.0.0 | Claude Code開発環境を**オールインワン**で強化する統合プラグイン。9つのMCPサーバー（GitHub、Serena、BigQuery、Notion、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Context7）、6つの開発ワークフローコマンド、6つの専門エージェント、Stopフック（transcript解析によるSlack通知）を提供。 | [README](./plugins/ndf/README.md) |
 
 ## 開発ガイドライン
 
