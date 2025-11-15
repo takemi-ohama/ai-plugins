@@ -3,10 +3,13 @@
   "hooks": {
     "Stop": [
       {
-        "type": "command",
-        "command": "bash",
-        "args": ["${pluginDir}/scripts/slack-notify.sh", "session_end"],
-        "description": "Send Slack notification when Claude Code exits"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${pluginDir}/scripts/slack-notify.sh session_end",
+            "description": "Send Slack notification when Claude Code exits"
+          }
+        ]
       }
     ]
   }
