@@ -608,6 +608,37 @@ Stop hookを実装する際：
 2. または、開発中は直接`~/.claude/plugins/marketplaces/`内のファイルを確認・更新
 3. または、プラグインを一度削除して再インストール
 
+#### 問題4: Stop hookスクリプト内でClaude CLIを呼び出すと無限ループ
+
+Stop hookスクリプト内で`claude`コマンドをサブプロセスとして呼び出すと、そのサブプロセスが終了時に自身のStop hookをトリガーし、無限ループが発生します。
+
+**解決策**: `--settings`フラグを使って、サブプロセスのhooksを無効化します。
+
+Node.jsの実装例：
+```javascript
+const { spawn } = require('child_process');
+
+// Claude CLIをサブプロセスとして呼び出す際、hooksを無効化
+const claude = spawn('claude', [
+  '-p',
+  '--settings', '{"disableAllHooks": true}',  // ★ これが重要
+  '--output-format', 'text'
+], {
+  stdio: ['pipe', 'pipe', 'pipe']
+});
+```
+
+Bashの実装例：
+```bash
+# Claude CLIをサブプロセスとして呼び出す際、hooksを無効化
+claude -p --settings '{"disableAllHooks": true}' --output-format text
+```
+
+**重要**: `--settings`フラグは`claude --help`で確認できます：
+```
+--settings <file-or-json>   Path to a settings JSON file or a JSON string to load additional settings from
+```
+
 #### 推奨実装パターン（Bash）
 
 ```bash

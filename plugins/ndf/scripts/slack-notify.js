@@ -159,8 +159,8 @@ ${conversationText.substring(0, 2000)}
 
       logDebug('Calling Claude CLI for summarization');
 
-      // Call claude CLI with -p flag
-      const claude = spawn('claude', ['-p', '--output-format', 'text'], {
+      // Call claude CLI with -p flag and disable hooks to prevent infinite loop
+      const claude = spawn('claude', ['-p', '--settings', '{"disableAllHooks": true}', '--output-format', 'text'], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
 
@@ -611,15 +611,21 @@ async function main() {
   // Step 2: Generate work summary
   let workSummary = null;
 
-  // Priority 1: Generate from transcript (text parsing)
-  // NOTE: Claude CLI summarization is disabled to prevent infinite loop
+  // Priority 1: Generate summary using Claude CLI (highest quality)
   if (transcriptPath) {
-    logDebug('Generating summary from transcript (text parsing)');
+    logDebug('Attempting Claude CLI summarization (with hooks disabled)');
+    workSummary = await generateSummaryWithClaude(transcriptPath);
+    logDebug(`Claude CLI summary: ${workSummary || 'empty'}`);
+  }
+
+  // Priority 2: Fallback to transcript text parsing
+  if (!workSummary && transcriptPath) {
+    logDebug('Fallback: Generating summary from transcript (text parsing)');
     workSummary = generateSummaryFromTranscript(transcriptPath);
     logDebug(`Transcript summary: ${workSummary || 'empty'}`);
   }
 
-  // Priority 2: Fallback to git diff
+  // Priority 3: Fallback to git diff
   if (!workSummary) {
     logDebug('Fallback: Generating summary from git diff');
     workSummary = await generateSummaryFromGit();
