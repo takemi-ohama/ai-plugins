@@ -16,9 +16,9 @@ fi
 # Check if stop_hook_active is true (hook already executed)
 STOP_HOOK_ACTIVE=$(echo "$HOOK_INPUT" | grep -o '"stop_hook_active":[^,}]*' | grep -o 'true\|false')
 
-# If hook already executed, exit immediately with continue: false
+# If hook already executed, exit immediately
 if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
-  echo '{"continue": false}'
+  # Exit silently - Stop hook will continue normally
   exit 0
 fi
 
@@ -311,5 +311,4 @@ fi
 
 log_debug "=== Slack notification script completed ==="
 
-# Return JSON to prevent infinite loop in Stop Hook
-echo '{"continue": false}'
+# Exit silently - Stop hook will continue normally

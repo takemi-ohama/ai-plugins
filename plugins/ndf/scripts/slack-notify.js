@@ -569,7 +569,7 @@ async function main() {
 
     if (fs.existsSync(processedFlagFile)) {
       logDebug(`Transcript already processed (flag file exists): ${processedFlagFile}`);
-      console.log('{"continue": false}');
+      // Exit silently - Stop hook will continue normally
       process.exit(0);
     }
 
@@ -610,11 +610,16 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 2: Delete the message with mention
+  // Step 2: Wait for notification to be delivered, then delete the message
   if (mentionResult && mentionResult.ts) {
-    logDebug(`Deleting mention message (ts: ${mentionResult.ts})`);
+    logDebug(`Waiting 1 second before deleting mention message (ts: ${mentionResult.ts})`);
+    // Wait 1 second to ensure notification is delivered
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    logDebug('Deleting mention message');
     try {
       await deleteSlackMessage(channelId, token, mentionResult.ts);
+      logDebug('Mention message deleted successfully');
     } catch (error) {
       logDebug(`Failed to delete mention message: ${error.message}`);
       // Continue even if deletion fails
@@ -677,13 +682,11 @@ async function main() {
 
   logDebug('=== Slack notification script completed ===');
 
-  // Return JSON to prevent infinite loop in Stop Hook
-  console.log('{"continue": false}');
+  // Exit silently - Stop hook will continue normally
 }
 
 main().catch((error) => {
   logDebug(`Unhandled error: ${error.message}`);
-  // Return JSON even on error to prevent infinite loop
-  console.log('{"continue": false}');
+  // Exit silently even on error
   process.exit(1);
 });

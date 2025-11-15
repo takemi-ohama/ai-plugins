@@ -14,7 +14,7 @@ STOP_HOOK_ACTIVE=$(echo "$HOOK_INPUT" | grep -o '"stop_hook_active":[^,}]*' | gr
 
 # If hook already executed, exit immediately
 if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
-  echo '{"continue": false}'
+  # Exit silently - Stop hook will continue normally
   exit 0
 fi
 
@@ -26,7 +26,7 @@ if [ -n "$TRANSCRIPT_PATH" ]; then
   PROCESSED_FLAG="/tmp/.claude-hook-processed-$(basename "$TRANSCRIPT_PATH")"
 
   if [ -f "$PROCESSED_FLAG" ]; then
-    echo '{"continue": false}'
+    # Exit silently - Stop hook will continue normally
     exit 0
   fi
 
