@@ -157,9 +157,11 @@ ${conversationText.substring(0, 2000)}
       claude.on('close', (code) => {
         if (code === 0 && output.trim()) {
           try {
-            // Parse JSON response
+            // Parse JSON response from Claude CLI
             const response = JSON.parse(output.trim());
-            const summary = (response.content || response).trim();
+
+            // Claude CLI with --output-format json returns: { type: "result", result: "actual summary", ... }
+            const summary = (response.result || '').trim();
 
             // Validate summary is meaningful (at least 5 chars)
             if (summary.length >= 5) {
@@ -186,7 +188,7 @@ ${conversationText.substring(0, 2000)}
       });
 
       // Send prompt to stdin
-      claude.stdin.write(prompt);
+      claude.stdin.write(conversationPrompt);
       claude.stdin.end();
 
     } catch (error) {
