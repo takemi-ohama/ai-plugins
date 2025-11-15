@@ -91,32 +91,45 @@ generate_summary_from_transcript() {
   fi
 
   # Extract the last few user and assistant messages from JSONL transcript
-  # Get last 5 lines, extract content from user/assistant messages
   local summary=""
-  local last_messages=$(tail -20 "$transcript_path" | grep -E '"role":"(user|assistant)"' | tail -5)
+  local last_messages=$(tail -30 "$transcript_path" | grep -E '"role":"(user|assistant)"' | tail -10)
 
-  # Try to extract meaningful content
-  local user_request=$(echo "$last_messages" | grep '"role":"user"' | tail -1 | grep -o '"content":"[^"]*"' | sed 's/"content":"//;s/"$//' | head -c 100)
-  local assistant_action=$(echo "$last_messages" | grep '"role":"assistant"' | tail -1 | grep -o '"content":"[^"]*"' | sed 's/"content":"//;s/"$//' | head -c 100)
+  # Extract the last user request (most recent user message)
+  local user_request=$(echo "$last_messages" | grep '"role":"user"' | tail -1 | grep -o '"content":"[^"]*"' | sed 's/"content":"//;s/"$//;s/^[[:space:]]*//;s/[[:space:]]*$//')
 
-  # Generate Japanese summary based on extracted content
+  # Extract the last assistant message for additional context
+  local assistant_action=$(echo "$last_messages" | grep '"role":"assistant"' | tail -1 | grep -o '"content":"[^"]*"' | sed 's/"content":"//;s/"$//;s/^[[:space:]]*//;s/[[:space:]]*$//')
+
+  # Generate concise Japanese summary (max 40 chars)
   if [ -n "$user_request" ]; then
-    summary="ユーザーリクエスト: ${user_request}"
+    # Remove command prefixes like "/ndf:merged", "hooks", etc.
+    user_request=$(echo "$user_request" | sed 's/^\/[^[:space:]]*[[:space:]]*//;s/^[Hh]ooks*[[:space:]]*//;s/^[Ee]xit code.*//;s/^error:.*//;s/^already.*//i')
+    # Truncate to 40 chars (considering Japanese characters)
+    summary=$(echo "$user_request" | head -c 40)
+    # If still empty after cleanup, try assistant action
+    if [ -z "$summary" ] || [ ${#summary} -lt 5 ]; then
+      summary=$(echo "$assistant_action" | head -c 40)
+    fi
   elif [ -n "$assistant_action" ]; then
-    summary="アシスタント作業: ${assistant_action}"
+    summary=$(echo "$assistant_action" | head -c 40)
   fi
 
-  # Fallback to file change summary if transcript parsing fails
-  if [ -z "$summary" ] && git rev-parse --git-dir > /dev/null 2>&1; then
-    local changed_files=$(git diff --name-only 2>/dev/null | wc -l)
-    local main_file=$(git diff --name-only 2>/dev/null | head -1)
-    main_file="${main_file##*/}"
+  # Remove trailing incomplete Japanese characters
+  summary=$(echo "$summary" | sed 's/\xE2\x80[\x80-\xBF]$//' | sed 's/\xE[0-F]$//')
 
-    if [ "$changed_files" -gt 0 ] && [ -n "$main_file" ]; then
-      if [ "$changed_files" -eq 1 ]; then
-        summary="${main_file}を更新"
-      else
-        summary="${main_file}等${changed_files}件のファイルを更新"
+  # Fallback to file change summary if transcript parsing fails or result is too short
+  if [ -z "$summary" ] || [ ${#summary} -lt 5 ]; then
+    if git rev-parse --git-dir > /dev/null 2>&1; then
+      local changed_files=$(git diff --name-only 2>/dev/null | wc -l)
+      local main_file=$(git diff --name-only 2>/dev/null | head -1)
+      main_file="${main_file##*/}"
+
+      if [ "$changed_files" -gt 0 ] && [ -n "$main_file" ]; then
+        if [ "$changed_files" -eq 1 ]; then
+          summary="${main_file}を更新"
+        else
+          summary="${main_file}等${changed_files}件を更新"
+        fi
       fi
     fi
   fi
@@ -166,22 +179,19 @@ else
   log_debug "No hook input to parse"
 fi
 
-# Get current timestamp
-TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-
 # Check message type from arguments (for backward compatibility)
 MESSAGE_TYPE=${1:-"session_end"}
 
-# Create message based on type
+# Create message based on type (without timestamp)
 case "$MESSAGE_TYPE" in
   "error")
-    MESSAGE="Claude Codeでエラーが発生しました (${TIMESTAMP})"
+    MESSAGE="Claude Codeでエラーが発生しました"
     ;;
   "session_end")
-    MESSAGE="Claude Codeのセッションが終了しました (${TIMESTAMP})"
+    MESSAGE="Claude Codeのセッションが終了しました"
     ;;
   *)
-    MESSAGE="Claude Codeの作業が完了しました (${TIMESTAMP})"
+    MESSAGE="Claude Codeの作業が完了しました"
     ;;
 esac
 
@@ -253,13 +263,14 @@ if [ -z "$WORK_SUMMARY" ] && git rev-parse --git-dir > /dev/null 2>&1; then
   log_debug "Git diff summary: ${WORK_SUMMARY:-'empty'}"
 fi
 
-# Truncate to 150 chars to accommodate transcript-generated summaries
-WORK_SUMMARY=$(echo "$WORK_SUMMARY" | head -c 150)
+# Truncate to 40 chars for work summary
+WORK_SUMMARY=$(echo "$WORK_SUMMARY" | head -c 40)
 log_debug "Final work summary: ${WORK_SUMMARY:-'empty'}"
 
-# Create detailed message
+# Create detailed message with proper line breaks
 if [ -n "$WORK_SUMMARY" ]; then
-  DETAILED_MESSAGE="[${REPO_NAME}] ${MESSAGE}\n作業内容: ${WORK_SUMMARY}"
+  DETAILED_MESSAGE="[${REPO_NAME}] ${MESSAGE}
+作業内容: ${WORK_SUMMARY}"
 else
   DETAILED_MESSAGE="[${REPO_NAME}] ${MESSAGE}"
 fi
