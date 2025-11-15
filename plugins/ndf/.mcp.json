@@ -1,0 +1,97 @@
+{
+  "mcpServers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "envFile": "${workspaceFolder}/.env"
+    },
+    "notion": {
+      "type": "http",
+      "url": "https://mcp.notion.com/mcp",
+      "envFile": "${workspaceFolder}/.env"
+    },
+    "serena": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server",
+        "--context",
+        "ide-assistant",
+        "--enable-web-dashboard",
+        "False"
+      ],
+      "envFile": "${workspaceFolder}/.env"
+    },
+    "awslabs.aws-documentation-mcp-server": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "awslabs.aws-documentation-mcp-server@latest"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "AWS_DOCUMENTATION_PARTITION": "aws"
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "disabled": false
+    },
+    "mcp-server-bigquery": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-server-bigquery@latest"
+      ],
+      "envFile": "${workspaceFolder}/.env",
+      "disabled": false
+    },
+    "dbhub": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@bytebase/dbhub",
+        "--transport",
+        "http",
+        "--port",
+        "8080",
+        "--dsn",
+        "${DATABASE_DSN}"
+      ],
+      "envFile": "${workspaceFolder}/.env",
+      "disabled": false
+    },
+    "chrome-devtools-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ],
+      "envFile": "${workspaceFolder}/.env",
+      "disabled": false
+    },
+    "codex": {
+      "type": "stdio",
+      "command": "codex",
+      "args": [
+        "mcp-server"
+      ],
+      "envFile": "${workspaceFolder}/.env",
+      "disabled": false
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "disabled": false
+    }
+  }
+}

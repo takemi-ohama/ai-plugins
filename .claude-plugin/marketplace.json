@@ -19,6 +19,11 @@
       "name": "workflow-commands",
       "source": "./plugins/workflow-commands",
       "description": "GitHub development workflow commands for PR creation, review, merge, and branch cleanup"
+    },
+    {
+      "name": "ndf",
+      "source": "./plugins/ndf",
+      "description": "All-in-one plugin combining 8 MCP servers, development workflow commands, and Slack notifications"
     }
   ]
 }

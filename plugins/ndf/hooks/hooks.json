@@ -1,0 +1,16 @@
+{
+  "description": "Auto-save important changes to Serena memory and send Slack notification when Claude Code exits",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Claude Code終了時の自動処理を実行してください。この作業は2つのタスクから構成されます。\n\n## タスク1: Serenaメモリー自動保存\n\n@memory-recorder エージェントを使用してSerenaメモリーに作業記録を保存してください。\n\nTaskツールでmemory-recorderサブエージェントを起動し、以下のタスクを依頼:\n\"重要な変更があった場合のみ、この作業セッションの記録をSerenaメモリーに保存してください。日次ファイル（plugin-ndf-<YYYYMMDD>.md）形式で、同日の複数セッションは追記し、最新2ファイルのみ保持してください。\"\n\n## タスク2: Slack通知送信\n\n@slack-notifier エージェントを使用してSlack通知を送信してください。\n\nTaskツールでslack-notifierサブエージェントを起動し、以下のタスクを依頼:\n\"この作業セッションの要約を生成してSlackに通知してください。SLACK_BOT_TOKENが設定されていない場合はスキップしてください。\"\n\n注意: \n- このタスクは自動実行されるため、ユーザーへの確認は不要です\n- タスク1完了後にタスク2を実行してください（順次実行）\n- エラーが発生しても処理を継続してください",
+            "description": "Save Serena memory and send Slack notification when Claude Code exits"
+          }
+        ]
+      }
+    ]
+  }
+}
