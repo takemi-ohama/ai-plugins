@@ -47,7 +47,7 @@ function loadEnvFile() {
 
           // Remove quotes
           if ((value.startsWith('"') && value.endsWith('"')) ||
-              (value.startsWith("'") && value.endsWith("'"))) {
+            (value.startsWith("'") && value.endsWith("'"))) {
             value = value.slice(1, -1);
           }
 
@@ -132,9 +132,9 @@ function generateSummaryWithClaude(transcriptPath) {
       }
 
       // Create summarization prompt
-      const prompt = `以下の会話から実施した作業を30文字以内で要約してください。
+      const prompt = `以下の会話から実施した作業を40文字以内で要約してください。
 
-出力形式: 要約文のみ（1行、30文字以内）
+出力形式: 要約文のみ（1行、40文字以内）
 
 禁止事項:
 - 「ユーザーさん」「調査結果」などの前置き
@@ -630,11 +630,6 @@ async function main() {
     logDebug('Fallback: Generating summary from git diff');
     workSummary = await generateSummaryFromGit();
     logDebug(`Git diff summary: ${workSummary || 'empty'}`);
-  }
-
-  // Truncate to 40 chars (safety check)
-  if (workSummary) {
-    workSummary = workSummary.substring(0, 40);
   }
 
   logDebug(`Final work summary: ${workSummary || 'empty'}`);
