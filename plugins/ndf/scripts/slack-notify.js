@@ -387,20 +387,74 @@ function sendSlackMessage(channelId, token, text) {
           const result = JSON.parse(body);
           if (result.ok) {
             logDebug('Slack message sent successfully');
-            resolve(true);
+            resolve(result);  // Return full result object (includes ts)
           } else {
             logDebug(`Slack API error: ${JSON.stringify(result)}`);
-            resolve(false);
+            resolve(null);
           }
         } catch (e) {
           logDebug(`Failed to parse Slack response: ${e.message}`);
-          resolve(false);
+          resolve(null);
         }
       });
     });
 
     req.on('error', (error) => {
       logDebug(`Failed to send Slack message: ${error.message}`);
+      reject(error);
+    });
+
+    req.write(data);
+    req.end();
+  });
+}
+
+// Delete Slack message
+function deleteSlackMessage(channelId, token, messageTs) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify({
+      channel: channelId,
+      ts: messageTs
+    });
+
+    const options = {
+      hostname: 'slack.com',
+      port: 443,
+      path: '/api/chat.delete',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Length': Buffer.byteLength(data)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let body = '';
+
+      res.on('data', (chunk) => {
+        body += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const result = JSON.parse(body);
+          if (result.ok) {
+            logDebug('Slack message deleted successfully');
+            resolve(true);
+          } else {
+            logDebug(`Slack delete API error: ${JSON.stringify(result)}`);
+            resolve(false);
+          }
+        } catch (e) {
+          logDebug(`Failed to parse Slack delete response: ${e.message}`);
+          resolve(false);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      logDebug(`Failed to delete Slack message: ${error.message}`);
       reject(error);
     });
 
@@ -495,14 +549,30 @@ async function main() {
   // Step 1: Send message with mention to trigger notification
   const mentionMessage = userMention ? `${userMention} ${message}` : message;
 
+  let mentionResult;
   try {
-    await sendSlackMessage(channelId, token, mentionMessage);
+    mentionResult = await sendSlackMessage(channelId, token, mentionMessage);
+    if (!mentionResult) {
+      logDebug('Failed to send initial message');
+      process.exit(1);
+    }
   } catch (error) {
     logDebug('Failed to send initial message');
     process.exit(1);
   }
 
-  // Step 2: Generate work summary
+  // Step 2: Delete the message with mention
+  if (mentionResult && mentionResult.ts) {
+    logDebug(`Deleting mention message (ts: ${mentionResult.ts})`);
+    try {
+      await deleteSlackMessage(channelId, token, mentionResult.ts);
+    } catch (error) {
+      logDebug(`Failed to delete mention message: ${error.message}`);
+      // Continue even if deletion fails
+    }
+  }
+
+  // Step 3: Generate work summary
   let workSummary = null;
 
   // Priority 1: Generate with Claude CLI (AI-powered)
@@ -533,7 +603,7 @@ async function main() {
 
   logDebug(`Final work summary: ${workSummary || 'empty'}`);
 
-  // Step 3: Send detailed message with repository name and work summary
+  // Step 4: Send detailed message with repository name and work summary
   const repoName = await getRepositoryName();
 
   // Create detailed message with line break
