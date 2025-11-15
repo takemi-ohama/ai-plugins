@@ -6,24 +6,9 @@
   },
   "plugins": [
     {
-      "name": "mcp-integration",
-      "source": "./plugins/mcp-integration",
-      "description": "Automatically integrates 8 powerful MCP servers (GitHub, Serena, BigQuery, Notion, DBHub, Chrome DevTools, AWS Docs, Codex CLI) into Claude Code projects"
-    },
-    {
-      "name": "install-slack-hook",
-      "source": "./plugins/install-slack-hook",
-      "description": "Automatic Slack notifications when Claude Code exits, with AI-generated Japanese summaries"
-    },
-    {
-      "name": "workflow-commands",
-      "source": "./plugins/workflow-commands",
-      "description": "GitHub development workflow commands for PR creation, review, merge, and branch cleanup"
-    },
-    {
       "name": "ndf",
       "source": "./plugins/ndf",
-      "description": "All-in-one plugin combining 8 MCP servers, development workflow commands, and Slack notifications"
+      "description": "All-in-one plugin combining 10 MCP servers, 6 development workflow commands, 6 specialized agents, and Slack notifications with AI-generated summaries"
     }
   ]
 }

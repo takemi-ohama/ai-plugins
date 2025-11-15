@@ -1,9 +1,0 @@
-{
-  "name": "install-slack-hook",
-  "version": "2.0.0",
-  "description": "Automatic Slack notifications when Claude Code exits, with AI-generated Japanese summaries",
-  "author": {
-    "name": "takemi-ohama",
-    "url": "https://github.com/takemi-ohama"
-  }
-}
