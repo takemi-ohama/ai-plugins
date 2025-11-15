@@ -515,6 +515,17 @@ async function main() {
     }
     logDebug(`Hook input received from stdin (length: ${hookInput.length} chars)`);
     logDebug(`Hook input preview: ${hookInput.substring(0, 200)}`);
+
+    // Write full hook input to ./hooks_log.log for debugging
+    try {
+      const hooksLogPath = path.join(process.cwd(), 'hooks_log.log');
+      const timestamp = new Date().toISOString();
+      const logEntry = `\n${'='.repeat(80)}\n[${timestamp}] Hook Input Received\n${'='.repeat(80)}\n${hookInput}\n`;
+      fs.appendFileSync(hooksLogPath, logEntry);
+      logDebug(`Full hook input written to: ${hooksLogPath}`);
+    } catch (e) {
+      logDebug(`Failed to write hooks_log.log: ${e.message}`);
+    }
   } else {
     logDebug('No stdin available (terminal)');
   }
@@ -546,6 +557,28 @@ async function main() {
       }
     } catch (e) {
       logDebug(`Failed to parse hook input JSON: ${e.message}`);
+    }
+  }
+
+  // IMPORTANT: Prevent infinite loop by checking if transcript has been processed
+  if (transcriptPath) {
+    const processedFlagFile = path.join(
+      require('os').tmpdir(),
+      `.claude-hook-processed-${path.basename(transcriptPath)}`
+    );
+
+    if (fs.existsSync(processedFlagFile)) {
+      logDebug(`Transcript already processed (flag file exists): ${processedFlagFile}`);
+      console.log('{"continue": false}');
+      process.exit(0);
+    }
+
+    // Mark transcript as being processed
+    try {
+      fs.writeFileSync(processedFlagFile, new Date().toISOString());
+      logDebug(`Created processed flag file: ${processedFlagFile}`);
+    } catch (e) {
+      logDebug(`Failed to create processed flag file: ${e.message}`);
     }
   }
 

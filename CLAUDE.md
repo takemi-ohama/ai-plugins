@@ -451,6 +451,229 @@ MCPインテグレーションを更新する際：
 - インライン認証情報保存の推奨
 - セキュリティ考慮事項のスキップ
 
+## Stop Hook実装ガイドライン
+
+### 重要: Stop Hookの正しい構造
+
+Stop hookは**必ず以下の入れ子構造**で定義してください：
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "your-command-here"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**注意**: `"Stop": [{"hooks": [...]}]`という入れ子構造が正しい仕様です。`"Stop": [{type: "command", ...}]`のようにフラットな構造にしないでください。
+
+参照: https://code.claude.com/docs/en/hooks#stop-and-subagentstop-input
+
+### Stop Hookの入力形式
+
+Stop hookには以下のJSON入力が渡されます：
+
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "~/.claude/projects/.../session.jsonl",
+  "permission_mode": "default",
+  "hook_event_name": "Stop",
+  "stop_hook_active": true
+}
+```
+
+### 無限ループ防止（必須）
+
+**重要**: Stop hookスクリプト内でClaude CLIを呼び出す場合、**必ず無限ループ防止策を実装**してください。
+
+#### 方法1: stop_hook_activeフィールドのチェック
+
+```bash
+#!/bin/bash
+
+# Read hook input from stdin
+HOOK_INPUT=$(cat)
+
+# Check if stop_hook_active is true
+STOP_HOOK_ACTIVE=$(echo "$HOOK_INPUT" | grep -o '"stop_hook_active":[^,}]*' | grep -o 'true\|false')
+
+# If hook already executed, exit immediately
+if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+  echo '{"continue": false}'
+  exit 0
+fi
+
+# Your hook logic here...
+```
+
+#### 方法2: CLAUDE_DISABLE_HOOKS環境変数の設定
+
+```bash
+#!/bin/bash
+
+# IMPORTANT: Prevent infinite loop when calling Claude CLI
+export CLAUDE_DISABLE_HOOKS=1
+
+# Now safe to call Claude CLI
+claude --help
+```
+
+#### 方法3: transcriptの処理状態チェック
+
+```bash
+#!/bin/bash
+
+# Check if transcript has already been processed
+TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | grep -o '"transcript_path":"[^"]*"' | cut -d'"' -f4)
+PROCESSED_FLAG="/tmp/.claude-hook-processed-$(basename "$TRANSCRIPT_PATH")"
+
+if [ -f "$PROCESSED_FLAG" ]; then
+  echo '{"continue": false}'
+  exit 0
+fi
+
+# Mark as processed
+touch "$PROCESSED_FLAG"
+
+# Your hook logic here...
+```
+
+### Stop Hookの出力形式
+
+Stop hookは以下のJSON形式で出力できます：
+
+```json
+{
+  "decision": "block",
+  "reason": "追加のタスクがあります。次のステップ: ..."
+}
+```
+
+- `"decision": "block"`: Claude Codeの停止をブロック（継続実行）
+- `"decision"`: undefined または省略: 通常通り終了
+- `"reason"`: blockの場合は必須。Claudeへの次の指示を記述
+
+### 実装チェックリスト
+
+Stop hookを実装する際：
+
+- [ ] 入れ子構造 `"Stop": [{"hooks": [...]}]` を使用
+- [ ] `stop_hook_active`チェックを実装
+- [ ] Claude CLI呼び出し時は`CLAUDE_DISABLE_HOOKS=1`を設定
+- [ ] transcriptの重複処理を防ぐ仕組みを実装（**最も確実**）
+- [ ] 無限ループのテストを実施
+
+### 実際の問題と解決策（実装時の注意点）
+
+#### 問題1: stop_hook_activeフィールドが含まれない
+
+**ドキュメントでは`stop_hook_active`フィールドが含まれると記載されていますが、実際のhook入力には含まれない場合があります。**
+
+実際のhook入力例：
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "/path/to/transcript.jsonl",
+  "cwd": "/path/to/project"
+}
+```
+
+**解決策**: `stop_hook_active`チェックだけに依存せず、**transcript処理状態チェック（方法3）を必ず実装してください**。
+
+#### 問題2: 複数のプラグインがStop hookを設定している
+
+複数のプラグイン（例: `ndf`と`install-slack-hook`）がStop hookを設定している場合、それぞれが独立して実行され、無限ループが発生する可能性があります。
+
+**解決策**:
+1. 各プラグインでtranscript処理状態チェックを実装
+2. 同じフラグファイル名を使用（例: `/tmp/.claude-hook-processed-{transcript-basename}`）
+3. 最初に実行されたhookがフラグを作成し、2番目以降は即座に終了
+
+#### 問題3: マーケットプレイスの更新が反映されない
+
+ローカルで`hooks.json`やスクリプトを更新しても、`~/.claude/plugins/marketplaces/`にあるマーケットプレイスのコピーは自動的に更新されません。
+
+**解決策**:
+1. マーケットプレイスを再読み込み: Claude Codeを再起動またはプロジェクトを再読み込み
+2. または、開発中は直接`~/.claude/plugins/marketplaces/`内のファイルを確認・更新
+3. または、プラグインを一度削除して再インストール
+
+#### 推奨実装パターン（Bash）
+
+```bash
+#!/bin/bash
+
+# IMPORTANT: Prevent infinite loop - Read stdin first
+HOOK_INPUT=""
+if [ ! -t 0 ]; then
+  HOOK_INPUT=$(cat)
+fi
+
+# Method 1: Check stop_hook_active (may not always be present)
+STOP_HOOK_ACTIVE=$(echo "$HOOK_INPUT" | grep -o '"stop_hook_active":[^,}]*' | grep -o 'true\|false')
+if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+  echo '{"continue": false}'
+  exit 0
+fi
+
+# Method 2: Extract transcript_path
+TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | grep -o '"transcript_path":"[^"]*"' | cut -d'"' -f4)
+
+# Method 3: Check if transcript already processed (MOST RELIABLE)
+if [ -n "$TRANSCRIPT_PATH" ]; then
+  PROCESSED_FLAG="/tmp/.claude-hook-processed-$(basename "$TRANSCRIPT_PATH")"
+
+  if [ -f "$PROCESSED_FLAG" ]; then
+    echo '{"continue": false}'
+    exit 0
+  fi
+
+  # Mark as processed
+  touch "$PROCESSED_FLAG"
+fi
+
+# Your hook logic here...
+```
+
+#### 推奨実装パターン（Node.js）
+
+```javascript
+#!/usr/bin/env node
+
+// Method 1: Set CLAUDE_DISABLE_HOOKS when calling Claude CLI
+const claude = spawn('claude', ['-p'], {
+  env: {
+    ...process.env,
+    CLAUDE_DISABLE_HOOKS: '1'  // Prevent Stop hook in subprocess
+  }
+});
+
+// Method 2: Check transcript processed flag (MOST RELIABLE)
+if (transcriptPath) {
+  const processedFlagFile = path.join(
+    require('os').tmpdir(),
+    `.claude-hook-processed-${path.basename(transcriptPath)}`
+  );
+
+  if (fs.existsSync(processedFlagFile)) {
+    console.log('{"continue": false}');
+    process.exit(0);
+  }
+
+  fs.writeFileSync(processedFlagFile, new Date().toISOString());
+}
+```
+
 ## テストチェックリスト
 
 変更をコミットする前に：

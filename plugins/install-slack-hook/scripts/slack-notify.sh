@@ -2,6 +2,38 @@
 
 # Slack notification script for Claude Code completion
 
+# IMPORTANT: Prevent infinite loop when called from Stop Hook
+# Read hook input from stdin first (before any other stdin operations)
+HOOK_INPUT=""
+if [ ! -t 0 ]; then
+  HOOK_INPUT=$(cat)
+fi
+
+# Check if stop_hook_active is true (hook already executed)
+STOP_HOOK_ACTIVE=$(echo "$HOOK_INPUT" | grep -o '"stop_hook_active":[^,}]*' | grep -o 'true\|false')
+
+# If hook already executed, exit immediately
+if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+  echo '{"continue": false}'
+  exit 0
+fi
+
+# Extract transcript_path from JSON input
+TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | grep -o '"transcript_path":"[^"]*"' | cut -d'"' -f4)
+
+# IMPORTANT: Prevent infinite loop by checking if transcript has been processed
+if [ -n "$TRANSCRIPT_PATH" ]; then
+  PROCESSED_FLAG="/tmp/.claude-hook-processed-$(basename "$TRANSCRIPT_PATH")"
+
+  if [ -f "$PROCESSED_FLAG" ]; then
+    echo '{"continue": false}'
+    exit 0
+  fi
+
+  # Mark transcript as being processed
+  touch "$PROCESSED_FLAG"
+fi
+
 # Function to load .env file from project root
 load_env_file() {
   # Get the directory where this script is located
