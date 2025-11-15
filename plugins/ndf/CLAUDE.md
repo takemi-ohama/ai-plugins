@@ -14,9 +14,29 @@ NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの�
 
 メインエージェント（あなた）は全体の調整役として：
 1. **タスクの分類**: ユーザーの要求を分析し、適切なサブエージェントを判断
-2. **エージェント起動**: `@agent-name` でサブエージェントを起動
+2. **エージェント起動**: Taskツールで`subagent_type="ndf:agent-name"`を指定して起動
 3. **結果の統合**: 複数のサブエージェントの結果を統合して報告
 4. **品質確認**: サブエージェントの出力を検証
+
+### サブエージェントの呼び出し方法
+
+**Taskツールを使用**してサブエージェントを呼び出します：
+
+```
+Task(
+  subagent_type="ndf:corder",           # エージェント名（ndf:プレフィックス必須）
+  prompt="実装してほしい内容の詳細",    # エージェントへの指示
+  description="Task description"        # 3-5語の説明
+)
+```
+
+**利用可能なsubagent_type:**
+- `ndf:corder` - コーディング専門家
+- `ndf:data-analyst` - データ分析専門家
+- `ndf:researcher` - 調査専門家
+- `ndf:scanner` - ファイル読み取り専門家
+- `ndf:memory-recorder` - Serenaメモリー記録専門家
+- `ndf:slack-notifier` - Slack通知専門家
 
 ### 4つの専門サブエージェント
 
@@ -35,7 +55,14 @@ NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの�
 **活用例:**
 ```
 ユーザー: 「BigQueryで過去1ヶ月の売上データを分析して、トップ10の商品を教えて」
-→ @data-analyst を起動してデータ分析を依頼
+
+メインエージェントの判断: データ分析タスク → ndf:data-analyst に委譲
+
+Task(
+  subagent_type="ndf:data-analyst",
+  prompt="BigQueryで過去1ヶ月の売上データを分析して、トップ10の商品を抽出してください。データセットは sales_data.transactions を使用してください。",
+  description="Analyze sales data"
+)
 ```
 
 **NGパターン（やってはいけない）:**
@@ -59,7 +86,14 @@ NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの�
 **活用例:**
 ```
 ユーザー: 「ユーザー認証機能を実装してください」
-→ @corder を起動してコーディングを依頼
+
+メインエージェントの判断: コーディングタスク → ndf:corder に委譲
+
+Task(
+  subagent_type="ndf:corder",
+  prompt="ユーザー認証機能を実装してください。JWT認証を使用し、ログイン・ログアウト・トークン更新のエンドポイントを含めてください。セキュリティベストプラクティスに従い、Codexでレビューしてください。",
+  description="Implement user authentication"
+)
 ```
 
 **NGパターン（やってはいけない）:**
@@ -84,7 +118,14 @@ NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの�
 **活用例:**
 ```
 ユーザー: 「AWS Lambdaのベストプラクティスを調査して」
-→ @researcher を起動して調査を依頼
+
+メインエージェントの判断: 調査タスク → ndf:researcher に委譲
+
+Task(
+  subagent_type="ndf:researcher",
+  prompt="AWS Lambdaのベストプラクティスを調査してください。AWS公式ドキュメントを参照し、パフォーマンス最適化、セキュリティ、コスト削減の観点でまとめてください。",
+  description="Research AWS Lambda best practices"
+)
 ```
 
 **NGパターン（やってはいけない）:**
@@ -105,7 +146,14 @@ NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの�
 **活用例:**
 ```
 ユーザー: 「document.pdfの内容を読み取って要約して」
-→ @scanner を起動してファイル読み取りを依頼
+
+メインエージェントの判断: ファイル読み取りタスク → ndf:scanner に委譲
+
+Task(
+  subagent_type="ndf:scanner",
+  prompt="/path/to/document.pdfの内容を読み取って、主要なポイントを3-5点に要約してください。",
+  description="Read and summarize PDF"
+)
 ```
 
 **NGパターン（やってはいけない）:**
@@ -119,29 +167,29 @@ NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの�
     ↓
 [タスクの種類を判断]
     ↓
-┌─────────────────────────────────────┐
-│ データ関連？                          │
-│ - SQL、データベース、データ分析      │
-│ → YES: @data-analyst                │
-└─────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│ データ関連？                               │
+│ - SQL、データベース、データ分析           │
+│ → YES: Task(subagent_type="ndf:data-analyst") │
+└──────────────────────────────────────────┘
     ↓ NO
-┌─────────────────────────────────────┐
-│ コーディング関連？                    │
-│ - 実装、リファクタリング、レビュー   │
-│ → YES: @corder                       │
-└─────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│ コーディング関連？                         │
+│ - 実装、リファクタリング、レビュー        │
+│ → YES: Task(subagent_type="ndf:corder")  │
+└──────────────────────────────────────────┘
     ↓ NO
-┌─────────────────────────────────────┐
-│ 調査関連？                           │
-│ - ドキュメント、Webスクレイピング   │
-│ → YES: @researcher                   │
-└─────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│ 調査関連？                                 │
+│ - ドキュメント、Webスクレイピング         │
+│ → YES: Task(subagent_type="ndf:researcher") │
+└──────────────────────────────────────────┘
     ↓ NO
-┌─────────────────────────────────────┐
-│ ファイル読み取り関連？               │
-│ - PDF、画像、Office文書             │
-│ → YES: @scanner                      │
-└─────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│ ファイル読み取り関連？                    │
+│ - PDF、画像、Office文書                   │
+│ → YES: Task(subagent_type="ndf:scanner") │
+└──────────────────────────────────────────┘
     ↓ NO
 [メインエージェント自身で処理]
 ```
@@ -156,10 +204,10 @@ NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの�
 ユーザー: 「BigQueryで売上データを分析して、結果をPowerPointにまとめて」
 
 手順:
-1. @data-analyst でデータ分析
+1. Task(subagent_type="ndf:data-analyst", ...) でデータ分析
 2. 結果をメインエージェントが受け取る
 3. メインエージェントがPowerPointファイルを作成
-4. @scanner でPowerPointが正しく作成されたか確認
+4. Task(subagent_type="ndf:scanner", ...) でPowerPointが正しく作成されたか確認
 ```
 
 ### 例2: 調査 → 実装
@@ -168,9 +216,9 @@ NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの�
 ユーザー: 「AWS Lambdaのベストプラクティスを調べて、それに基づいてコードを書いて」
 
 手順:
-1. @researcher でAWS Lambdaのベストプラクティスを調査
+1. Task(subagent_type="ndf:researcher", ...) でAWS Lambdaのベストプラクティスを調査
 2. 調査結果をメインエージェントが受け取る
-3. @corder でベストプラクティスに基づいたコードを実装
+3. Task(subagent_type="ndf:corder", ...) でベストプラクティスに基づいたコードを実装
 ```
 
 ### 例3: PDF読み取り → データ分析
@@ -179,10 +227,10 @@ NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの�
 ユーザー: 「このPDFの売上データを読み取って、データベースにインポートして分析して」
 
 手順:
-1. @scanner でPDFを読み取り、データ抽出
+1. Task(subagent_type="ndf:scanner", ...) でPDFを読み取り、データ抽出
 2. 抽出データをメインエージェントが確認
-3. @data-analyst でデータベースにインポート
-4. @data-analyst でデータ分析を実行
+3. Task(subagent_type="ndf:data-analyst", ...) でデータベースにインポート
+4. Task(subagent_type="ndf:data-analyst", ...) でデータ分析を実行
 ```
 
 ## ベストプラクティス
@@ -191,26 +239,29 @@ NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの�
 
 ✅ **タスクごとに専門エージェントを活用**
 ```
-良い例: 「@data-analyst BigQueryで売上分析をお願いします」
+良い例:
+Task(subagent_type="ndf:data-analyst", prompt="BigQueryで売上分析を実行", ...)
 ```
 
 ✅ **複雑なタスクは分解して複数エージェントに委譲**
 ```
 良い例:
-1. @researcher で調査
-2. @corder で実装
-3. @data-analyst でデータ確認
+1. Task(subagent_type="ndf:researcher", ...) で調査
+2. Task(subagent_type="ndf:corder", ...) で実装
+3. Task(subagent_type="ndf:data-analyst", ...) でデータ確認
 ```
 
 ✅ **エージェントの結果を検証して統合**
 ```
 良い例:
-@data-analyst の分析結果を確認 → 追加の質問や修正指示 → 最終報告
+ndf:data-analyst の分析結果を確認 → 追加の質問や修正指示 → 最終報告
 ```
 
 ✅ **並行処理が可能な場合は並行して起動**
 ```
-良い例: 複数の調査を @researcher に並行して依頼
+良い例: 複数の調査をTaskツールで並行起動
+Task(subagent_type="ndf:researcher", prompt="調査A", ...)
+Task(subagent_type="ndf:researcher", prompt="調査B", ...)
 ```
 
 ### DON'T（非推奨）
@@ -218,25 +269,25 @@ NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの�
 ❌ **専門外のタスクをメインエージェントで処理**
 ```
 悪い例: メインエージェント自身がSQLを書いてデータ分析
-→ @data-analyst に委譲すべき
+→ Task(subagent_type="ndf:data-analyst", ...) に委譲すべき
 ```
 
 ❌ **サブエージェントを使わずに推測で回答**
 ```
 悪い例: AWS Lambdaについて一般的な知識で回答
-→ @researcher でAWS公式ドキュメントを調査すべき
+→ Task(subagent_type="ndf:researcher", ...) でAWS公式ドキュメントを調査すべき
 ```
 
 ❌ **複雑なコードをレビューなしで実装**
 ```
 悪い例: メインエージェントが書いたコードをそのまま提供
-→ @corder に委譲してCodexレビューを通すべき
+→ Task(subagent_type="ndf:corder", ...) に委譲してCodexレビューを通すべき
 ```
 
 ❌ **PDFや画像を直接処理しようとする**
 ```
 悪い例: メインエージェントがPDFの内容を推測
-→ @scanner に委譲して正確に読み取るべき
+→ Task(subagent_type="ndf:scanner", ...) に委譲して正確に読み取るべき
 ```
 
 ## 利用可能なMCPツール（参考）
