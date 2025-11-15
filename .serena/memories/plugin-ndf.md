@@ -9,7 +9,14 @@ NDFプラグインは、3つの既存プラグインを統合したオールイ�
 2. `install-slack-hook` (v2.0.0) - Slack notifications
 3. `workflow-commands` (v1.0.0) - Development workflow commands
 
-**バージョン:** 1.0.0
+**バージョン:** 1.0.1
+
+**重要な変更 (v1.0.1):**
+- MCP-integration、install-slack-hook、workflow-commandsの3プラグインを削除
+- すべての機能をNDFプラグインに統合
+- マーケットプレイスをNDF単一プラグインに整理
+- MCPサーバー数を9→10に更新（Claude Code MCP追加）
+- コマンド形式を`/ndf:pr`等、プレフィックス付きに統一
 
 ## ディレクトリ構造
 
@@ -40,7 +47,7 @@ plugins/ndf/
 
 ## 機能
 
-### 1. MCP統合 (9サーバー)
+### 1. MCP統合 (10サーバー)
 
 `.mcp.json`で定義されたMCPサーバー：
 
@@ -53,17 +60,18 @@ plugins/ndf/
 7. **chrome-devtools-mcp** (stdio) - Chromeブラウザ自動化
 8. **codex** (stdio) - AIコードレビュー
 9. **context7** (HTTP) - 最新のコード例とドキュメント取得
+10. **claude-code** (stdio) - Claude Codeプラグイン開発支援
 
 ### 2. 開発ワークフローコマンド (6コマンド)
 
 `plugin.json`の`commands`フィールドで定義：
 
-- `/serena` - 開発記憶の記録
-- `/pr` - PR作成
-- `/fix` - PR修正対応
-- `/review` - PRレビュー
-- `/merge` - マージ後クリーンアップ
-- `/clean` - ブランチクリーンアップ
+- `/ndf:serena` - 開発記憶の記録
+- `/ndf:pr` - PR作成
+- `/ndf:fix` - PR修正対応
+- `/ndf:review` - PRレビュー
+- `/ndf:merge` - マージ後クリーンアップ
+- `/ndf:clean` - ブランチクリーンアップ
 
 ### 3. 専門エージェント (4種類)
 
@@ -93,25 +101,9 @@ plugins/ndf/
 
 `hooks/hooks.json`で定義された統合Stopフック：
 
-**実装方式:** 1つのPrompt型フック（順次実行を保証）
+**実装方式:** 1つのPrompt型フック
 
-重要: Claude Codeのフックは並列実行されるため、処理順序を保証するために1つのpromptで2つのタスクを順次実行する設計。
-
-**タスク1: Serenaメモリー自動保存**
-- AIがgit変更を確認し、重要なファイルパターンを判定
-- 重要な変更がある場合に作業セッション記録を`.serena/memories/`に保存
-
-保存対象パターン：
-- `plugins/`, `.claude-plugin/`, `.mcp.json`
-- `CLAUDE.md`, `README.md`, `plugin.json`, `package.json`
-
-保存内容：
-- 変更ファイル一覧、Git diff統計、最近のコミット
-- 作業セッションのサマリー、タイムスタンプ
-
-メモリー名: `work-session-YYYYMMDD-HHMMSS.md`
-
-**タスク2: Slack通知送信**
+**Slack通知送信**
 - AIが作業内容を40文字以内の日本語で要約
 - Bashツールで`scripts/slack-notify.sh complete "<要約>"`を実行
 - SLACK_BOT_TOKENが設定されている場合のみ実行
@@ -251,15 +243,26 @@ const claude = spawn('claude', [
 3. **メンテナンス性**: 重複コードなし
 4. **ユーザビリティ**: インストール・管理が容易
 
-## 既存プラグインとの関係
+## プラグイン統合の完了 (v1.0.1)
 
-NDFプラグインは、以下の3プラグインの機能をすべて含みます：
+**PR #37 (2025-11-15):**
+- mcp-integration、install-slack-hook、workflow-commandsの3プラグインを削除
+- すべての機能をNDFプラグインに統合完了
+- マーケットプレイスはNDF単一プラグインに整理
 
-- `mcp-integration` - `.mcp.json`を統合
-- `install-slack-hook` - `hooks/`と`scripts/`を統合
-- `workflow-commands` - `commands/`を統合
+**統合の利点:**
+- **シンプルな導線**: ユーザーは1つのプラグインをインストールするだけ
+- **バージョン管理の統一**: 個別プラグインの非同期更新問題を解消
+- **設定の簡素化**: 単一の.mcp.json、単一のhooks設定
+- **ドキュメント保守の容易さ**: 1つのREADME.mdに全情報を集約
 
-既存プラグインは引き続き個別に利用可能ですが、オールインワン体験を望むユーザーはNDFプラグインを選択できます。
+**削除されたプラグイン:**
+- `plugins/mcp-integration/` (17ファイル)
+- `plugins/install-slack-hook/` (4ファイル)
+- `plugins/workflow-commands/` (7ファイル)
+
+**現在のマーケットプレイス構成:**
+- NDFプラグインのみ（10 MCP servers、6 commands、6 agents、Slack notifications）
 
 ## トラブルシューティング
 

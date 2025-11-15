@@ -758,15 +758,12 @@ if (transcriptPath) {
 **最終更新日時**: 2025-11-15 (UTC)
 
 **更新内容**:
-- Stop Hook無限ループ問題の解決過程と最終解決策を記録
-- Slack通知機能の進化（Webhook → Bot Token方式）を記録
-- 要約生成の3段階フォールバック実装を記録
-- 文字長制限の調整履歴を記録
-- plugin-ndf、plugin-slack-notification、project-overviewメモリーを最新化
+- プラグイン統合（PR #37）: 3つの個別プラグインを削除し、NDFに統合
+- development-history-20251115にプラグイン統合の知見を追記
+- plugin-mcp-integration、plugin-slack-notificationメモリーを削除（NDFに統合）
+- plugin-ndfメモリーを最新化（v1.0.2、10 MCP servers、4 agents）
 
 **利用可能なメモリー**:
-- `plugin-ndf` - NDFプラグインの詳細
-- `plugin-slack-notification` - Slack通知プラグインの詳細
-- `plugin-mcp-integration` - MCP統合プラグインの詳細
+- `plugin-ndf` - NDFプラグインの詳細（v1.0.2、統合版）
 - `project-overview` - プロジェクト全体概要
-- `development-history-20251115` - 2025-11-12〜2025-11-15の開発履歴と知見
+- `development-history-20251115` - 2025-11-12〜2025-11-15の開発履歴と知見（プラグイン統合を含む）

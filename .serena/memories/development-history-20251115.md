@@ -180,6 +180,50 @@ git diff HEAD~1 --stat | head -1 | awk '{print $1}'
 
 → **ユーザー体験の一貫性を保つ**
 
+### 6. プラグイン統合と整理 (PR #37)
+
+**課題:**
+マーケットプレイスに4つの個別プラグイン（ndf、mcp-integration、install-slack-hook、workflow-commands）が存在し、管理が複雑化。
+
+**実施内容:**
+
+#### 削除したプラグイン
+1. **plugins/mcp-integration/** - 10個のMCPサーバー統合
+2. **plugins/install-slack-hook/** - Slack通知機能
+3. **plugins/workflow-commands/** - 6つの開発ワークフローコマンド
+
+**コミット:**
+- 236ce98: Remove: NDF統合済みプラグイン3つを削除してマーケットプレイスを整理
+
+#### 統合後の構成
+- **NDFプラグイン単一化**: すべての機能をNDFに集約
+- **10 MCP servers**: GitHub、Notion、Serena、AWS Docs、BigQuery、Context7、Chrome DevTools、Codex、Claude Code、DBHub
+- **6 commands**: `/ndf:pr`、`/ndf:review`、`/ndf:clean`、`/ndf:merge`、`/ndf:fix`、`/ndf:serena`
+- **6 agents**: corder、data-analyst、researcher、scanner、memory-recorder、slack-notifier
+- **Slack notifications**: AI生成要約機能付き
+
+#### ドキュメント更新
+1. **marketplace.json**: pluginsをNDF単一エントリに更新
+2. **README.md**: 
+   - MCPサーバー数: 9→10（Claude Code MCP追加）
+   - コマンド形式: プレフィックス付き（`/ndf:pr`等）に統一
+   - プラグインバージョン: 1.0.0→1.0.1
+   - AI生成要約機能を強調
+
+**統計:**
+- 17ファイル削除
+- 1,519行削除、5行追加
+
+**重要な学び:**
+1. **単一プラグイン戦略**: ユーザーは1つのプラグインインストールで全機能利用可能
+2. **バージョン管理の統一**: 個別プラグインの非同期更新問題を解消
+3. **設定のシンプル化**: 単一の.mcp.json、単一のhooks設定で管理
+4. **ドキュメント保守の容易さ**: 1つのREADME.mdに全情報を集約
+
+**ユーザーへの影響:**
+- **既存ユーザー**: NDFインストール済みなら影響なし、個別プラグインは削除推奨
+- **新規ユーザー**: シンプルな導線、1プラグインのみインストール
+
 ## 次回開発時の注意点
 
 1. **Stop Hook実装時:**
