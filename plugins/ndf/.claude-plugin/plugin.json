@@ -12,7 +12,7 @@
     "./commands/pr.md",
     "./commands/fix.md",
     "./commands/review.md",
-    "./commands/merge.md",
+    "./commands/merged.md",
     "./commands/clean.md"
   ],
   "agents": [
