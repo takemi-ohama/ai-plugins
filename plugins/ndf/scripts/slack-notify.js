@@ -132,14 +132,19 @@ function generateSummaryWithClaude(transcriptPath) {
       }
 
       // Create summarization prompt
-      const prompt = `以下の会話の内容を、日本語で30文字以内に要約してください。
-要約は1行のみで、最も重要な作業内容を簡潔に表現してください。
-マークダウン記号やコマンドプレフィックス（/）は含めないでください。
+      const prompt = `以下の会話内容から、実施した作業を30文字以内の日本語で要約してください。
+
+【重要な指示】
+- 要約のみを出力してください（挨拶や説明は不要）
+- 1行のみ、30文字以内
+- 「〜しました」「〜を実施」などの完了形
+- マークダウン記号やコマンドプレフィックス（/）は含めない
+- 「ユーザーさん」などの呼びかけは不要
 
 会話内容:
 ${conversationText.substring(0, 2000)}
 
-要約（30文字以内の1行のみ）:`;
+作業要約:`;
 
       logDebug('Calling Claude CLI for summarization');
 
@@ -161,9 +166,32 @@ ${conversationText.substring(0, 2000)}
 
       claude.on('close', (code) => {
         if (code === 0 && output.trim()) {
-          const summary = output.trim().split('\n')[0].substring(0, 40);
-          logDebug(`Claude generated summary: ${summary}`);
-          resolve(summary);
+          let summary = output.trim();
+
+          // Remove common greeting/filler phrases
+          summary = summary
+            .replace(/^ユーザーさん、?/i, '')
+            .replace(/^調査結果をまとめます：?/i, '')
+            .replace(/^以下の要約です：?/i, '')
+            .replace(/^要約：?/i, '')
+            .replace(/^作業内容：?/i, '')
+            .replace(/^実施した作業：?/i, '')
+            .trim();
+
+          // Get first line only
+          summary = summary.split('\n')[0].trim();
+
+          // Truncate to 40 chars
+          summary = summary.substring(0, 40);
+
+          // Validate summary is meaningful (at least 5 chars)
+          if (summary.length >= 5) {
+            logDebug(`Claude generated summary: ${summary}`);
+            resolve(summary);
+          } else {
+            logDebug(`Claude summary too short: ${summary}`);
+            resolve(null);
+          }
         } else {
           logDebug(`Claude CLI failed (exit code ${code}): ${errorOutput}`);
           resolve(null);
