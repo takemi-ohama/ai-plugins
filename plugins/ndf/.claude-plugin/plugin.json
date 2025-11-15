@@ -22,8 +22,5 @@
     "./agents/scanner.md",
     "./agents/slack-notifier.md",
     "./agents/memory-recorder.md"
-  ],
-  "hooks": [
-    "./hooks/hooks.json"
   ]
 }
