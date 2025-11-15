@@ -7,6 +7,21 @@
 # If this script invokes Claude CLI, hooks must be disabled
 export CLAUDE_DISABLE_HOOKS=1
 
+# Read hook input from stdin first (before any other stdin operations)
+HOOK_INPUT=""
+if [ ! -t 0 ]; then
+  HOOK_INPUT=$(cat)
+fi
+
+# Check if stop_hook_active is true (hook already executed)
+STOP_HOOK_ACTIVE=$(echo "$HOOK_INPUT" | grep -o '"stop_hook_active":[^,}]*' | grep -o 'true\|false')
+
+# If hook already executed, exit immediately with continue: false
+if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+  echo '{"continue": false}'
+  exit 0
+fi
+
 # Enable debug logging
 LOG_FILE="${HOME}/.claude/logs/slack-notify-debug.log"
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -160,18 +175,10 @@ if [ -z "$CHANNEL_ID" ] || [ -z "$SLACK_BOT_TOKEN" ]; then
   exit 0
 fi
 
-# Read hook input from stdin (JSON with transcript_path)
-HOOK_INPUT=""
-if [ -t 0 ]; then
-  # No stdin available (manual execution)
-  log_debug "No stdin available (terminal)"
-  HOOK_INPUT=""
-else
-  # Read from stdin
-  HOOK_INPUT=$(cat)
-  log_debug "Hook input received from stdin (length: ${#HOOK_INPUT} chars)"
-  log_debug "Hook input preview: ${HOOK_INPUT:0:200}"
-fi
+# Hook input already read at the beginning of the script
+log_debug "Hook input length: ${#HOOK_INPUT} chars"
+log_debug "Hook input preview: ${HOOK_INPUT:0:200}"
+log_debug "stop_hook_active: ${STOP_HOOK_ACTIVE:-'not set'}"
 
 # Extract transcript_path from JSON input
 TRANSCRIPT_PATH=""
@@ -303,3 +310,6 @@ else
 fi
 
 log_debug "=== Slack notification script completed ==="
+
+# Return JSON to prevent infinite loop in Stop Hook
+echo '{"continue": false}'
