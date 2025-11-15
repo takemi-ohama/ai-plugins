@@ -82,7 +82,111 @@ function extractTextFromContent(content) {
   return null;
 }
 
-// Generate summary from transcript file
+// Generate summary using Claude CLI
+function generateSummaryWithClaude(transcriptPath) {
+  return new Promise((resolve) => {
+    if (!fs.existsSync(transcriptPath)) {
+      logDebug(`Transcript file not found: ${transcriptPath}`);
+      resolve(null);
+      return;
+    }
+
+    try {
+      // Read last 30 lines of JSONL file
+      const content = fs.readFileSync(transcriptPath, 'utf8');
+      const allLines = content.trim().split('\n');
+      const lines = allLines.slice(-30);
+
+      // Extract user and assistant messages
+      const messages = [];
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line);
+          if (data.message && data.message.role) {
+            const role = data.message.role;
+            if (role === 'user' || role === 'assistant') {
+              const text = extractTextFromContent(data.message.content);
+              if (text) {
+                messages.push({ role, text });
+              }
+            }
+          }
+        } catch (e) {
+          // Skip invalid JSON lines
+        }
+      }
+
+      // Get last 10 messages
+      const recentMessages = messages.slice(-10);
+      logDebug(`Extracted ${recentMessages.length} recent messages`);
+
+      // Build conversation context for Claude
+      const conversationText = recentMessages
+        .map(m => `${m.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${m.text}`)
+        .join('\n\n');
+
+      if (!conversationText || conversationText.length < 10) {
+        logDebug('No meaningful conversation found');
+        resolve(null);
+        return;
+      }
+
+      // Create summarization prompt
+      const prompt = `以下の会話の内容を、日本語で30文字以内に要約してください。
+要約は1行のみで、最も重要な作業内容を簡潔に表現してください。
+マークダウン記号やコマンドプレフィックス（/）は含めないでください。
+
+会話内容:
+${conversationText.substring(0, 2000)}
+
+要約（30文字以内の1行のみ）:`;
+
+      logDebug('Calling Claude CLI for summarization');
+
+      // Call claude CLI with -p flag
+      const claude = spawn('claude', ['-p', '--output-format', 'text'], {
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      let output = '';
+      let errorOutput = '';
+
+      claude.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+
+      claude.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+      });
+
+      claude.on('close', (code) => {
+        if (code === 0 && output.trim()) {
+          const summary = output.trim().split('\n')[0].substring(0, 40);
+          logDebug(`Claude generated summary: ${summary}`);
+          resolve(summary);
+        } else {
+          logDebug(`Claude CLI failed (exit code ${code}): ${errorOutput}`);
+          resolve(null);
+        }
+      });
+
+      claude.on('error', (error) => {
+        logDebug(`Failed to execute Claude CLI: ${error.message}`);
+        resolve(null);
+      });
+
+      // Send prompt to stdin
+      claude.stdin.write(prompt);
+      claude.stdin.end();
+
+    } catch (error) {
+      logDebug(`Error in generateSummaryWithClaude: ${error.message}`);
+      resolve(null);
+    }
+  });
+}
+
+// Generate summary from transcript file (fallback method)
 function generateSummaryFromTranscript(transcriptPath) {
   if (!fs.existsSync(transcriptPath)) {
     logDebug(`Transcript file not found: ${transcriptPath}`);
@@ -357,21 +461,28 @@ async function main() {
   // Step 2: Generate work summary
   let workSummary = null;
 
-  // Priority 1: Generate from transcript
+  // Priority 1: Generate with Claude CLI (AI-powered)
   if (transcriptPath) {
-    logDebug('Attempting to generate summary from transcript');
+    logDebug('Attempting to generate summary with Claude CLI');
+    workSummary = await generateSummaryWithClaude(transcriptPath);
+    logDebug(`Claude AI summary: ${workSummary || 'empty'}`);
+  }
+
+  // Priority 2: Fallback to simple transcript parsing
+  if (!workSummary && transcriptPath) {
+    logDebug('Fallback: Generating summary from transcript (text parsing)');
     workSummary = generateSummaryFromTranscript(transcriptPath);
     logDebug(`Transcript summary: ${workSummary || 'empty'}`);
   }
 
-  // Priority 2: Fallback to git diff
+  // Priority 3: Fallback to git diff
   if (!workSummary) {
-    logDebug('Generating summary from git diff');
+    logDebug('Fallback: Generating summary from git diff');
     workSummary = await generateSummaryFromGit();
     logDebug(`Git diff summary: ${workSummary || 'empty'}`);
   }
 
-  // Truncate to 40 chars
+  // Truncate to 40 chars (safety check)
   if (workSummary) {
     workSummary = workSummary.substring(0, 40);
   }
