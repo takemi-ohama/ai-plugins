@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/slack-notify.sh session_end",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/slack-notify.js session_end",
             "description": "Send Slack notification when Claude Code exits"
           }
         ]
