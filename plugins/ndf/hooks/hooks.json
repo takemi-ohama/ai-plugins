@@ -1,6 +1,23 @@
 {
-  "description": "Send Slack notification when Claude Code exits",
+  "description": "NDF Plugin hooks: Auto-setup and notifications",
   "hooks": {
+    "SessionStart": [
+      {
+        "description": "Ensure Playwright browser is installed",
+        "matcher": "startup|resume",
+        "priority": 100,
+        "enabled": true,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/ensure-playwright.js",
+            "description": "Auto-install Playwright chromium on first use",
+            "continueOnError": false,
+            "suppressOutput": false
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
