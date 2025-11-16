@@ -111,7 +111,7 @@
       "args": [
         "@playwright/mcp@latest",
         "--browser",
-        "chrome",
+        "chromium",
         "--isolated",
         "--no-sandbox"
       ],
