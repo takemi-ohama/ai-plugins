@@ -10,7 +10,7 @@ Claude Codeプラグイン、プロジェクトスキル、MCP（Model Context P
 
 - **10つのMCPサーバー**: GitHub、Serena、BigQuery、Notion、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Context7、Claude Code
 - **6つの開発ワークフローコマンド**: `/ndf:pr`, `/ndf:fix`, `/ndf:review`, `/ndf:merged`, `/ndf:clean`, `/ndf:serena`
-- **4つの専門エージェント**: データ分析、コーディング、調査、ファイル読み取り
+- **5つの専門エージェント**: データ分析、コーディング、調査、ファイル読み取り、品質管理
 - **自動フック**: Claude Code終了時にAI要約生成とSlack通知
 
 ## 利用方法
@@ -38,7 +38,7 @@ Claude Codeでマーケットプレイスを追加します：
 
 | プラグイン名 | バージョン | 説明 | 詳細 |
 |------------|----------|------|------|
-| **ndf** | 1.0.2 | Claude Code開発環境を**オールインワン**で強化する統合プラグイン。10つのMCPサーバー（GitHub、Serena、BigQuery、Notion、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Context7、Claude Code）、6つの開発ワークフローコマンド、4つの専門エージェント、Stopフック（AI要約生成とSlack通知）を提供。 | [README](./plugins/ndf/README.md) |
+| **ndf** | 1.0.3 | Claude Code開発環境を**オールインワン**で強化する統合プラグイン。10つのMCPサーバー（GitHub、Serena、BigQuery、Notion、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Context7、Claude Code）、6つの開発ワークフローコマンド、5つの専門エージェント（データ分析、コーディング、調査、ファイル読み取り、品質管理）、Stopフック（AI要約生成とSlack通知）を提供。 | [README](./plugins/ndf/README.md) |
 
 ## 開発ガイドライン
 

@@ -761,9 +761,9 @@ if (transcriptPath) {
 - プラグイン統合（PR #37）: 3つの個別プラグインを削除し、NDFに統合
 - development-history-20251115にプラグイン統合の知見を追記
 - plugin-mcp-integration、plugin-slack-notificationメモリーを削除（NDFに統合）
-- plugin-ndfメモリーを最新化（v1.0.2、10 MCP servers、4 agents）
+- plugin-ndfメモリーを最新化（v1.0.3、10 MCP servers、5 agents）
 
 **利用可能なメモリー**:
-- `plugin-ndf` - NDFプラグインの詳細（v1.0.2、統合版）
+- `plugin-ndf` - NDFプラグインの詳細（v1.0.3、統合版）
 - `project-overview` - プロジェクト全体概要
 - `development-history-20251115` - 2025-11-12〜2025-11-15の開発履歴と知見（プラグイン統合を含む）
