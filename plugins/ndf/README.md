@@ -9,7 +9,7 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 1. **MCP統合**: 10個の強力なMCPサーバー（GitHub、Serena、BigQuery、Notion、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Context7、Claude Code）
 2. **開発ワークフロー**: PR作成、レビュー、マージ、ブランチクリーンアップコマンド
 3. **専門エージェント**: 5つの特化型AIエージェント（データ分析、コーディング、調査、ファイル読み取り、品質管理）
-4. **自動フック**: Serenaメモリー保存とSlack通知
+4. **自動フック**: Slack通知
 
 ## インストール
 
@@ -85,36 +85,36 @@ echo ".env" >> .gitignore
 <details>
 <summary><strong>DATABASE_DSN の設定方法（DBHub MCP用）</strong></summary>
 
-DBHub MCPは複数のデータベースに対応しています。データベースごとに接続文字列（DSN）の形式が異なります。
+DBHub MCPは複数のデータベースに対応しています。
 
 **PostgreSQL:**
 ```bash
 DATABASE_DSN="postgres://USERNAME:PASSWORD@HOST:PORT/DATABASE?sslmode=disable"
 ```
 
-例：
+SSL接続が必要な場合：
 ```bash
-DATABASE_DSN="postgres://myuser:mypassword@localhost:5432/mydb?sslmode=disable"
+DATABASE_DSN="postgres://USERNAME:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
 ```
 
-**MySQL:**
+**MySQL / MariaDB:**（同じDSN形式）
 ```bash
 DATABASE_DSN="mysql://USERNAME:PASSWORD@HOST:PORT/DATABASE"
 ```
 
-例：
-```bash
-DATABASE_DSN="mysql://root:password@localhost:3306/testdb"
-```
+SSH踏み台サーバー経由で接続する場合：
+1. SSHトンネルを作成（ローカルポート転送）
+   ```bash
+   ssh -L 3307:DB_HOST:3306 USER@BASTION_HOST -N
+   ```
+2. ローカルポート経由で接続
+   ```bash
+   DATABASE_DSN="mysql://USERNAME:PASSWORD@localhost:3307/DATABASE"
+   ```
 
 **SQLite:**
 ```bash
 DATABASE_DSN="sqlite:///PATH/TO/DATABASE.db"
-```
-
-例：
-```bash
-DATABASE_DSN="sqlite:///./data/local.db"
 ```
 
 **SQL Server:**
@@ -122,16 +122,9 @@ DATABASE_DSN="sqlite:///./data/local.db"
 DATABASE_DSN="sqlserver://USERNAME:PASSWORD@HOST:PORT?database=DATABASE"
 ```
 
-**MariaDB:**
-```bash
-DATABASE_DSN="mysql://USERNAME:PASSWORD@HOST:PORT/DATABASE"
-```
-（MySQL と同じ形式）
-
 **注意事項:**
 - パスワードに特殊文字が含まれる場合は、URLエンコードが必要
 - ローカルデータベースの場合は `localhost` を使用
-- SSLが不要な場合は `?sslmode=disable` を追加（PostgreSQL）
 
 </details>
 
@@ -234,112 +227,38 @@ CONTEXT7_API_KEY="your-api-key-here"
 
 ## 機能詳細
 
-### 1. MCP統合 (10サーバー)
+### 1. 開発ワークフローコマンド
 
-#### GitHub MCP (Local)
-- PR作成・レビュー・マージ
-- イシュー管理
-- コード検索
-- ブランチ・タグ操作
-
-#### Serena MCP (Local)
-- セマンティックコード分析
-- シンボルベース編集
-- リファレンス検索
-- コードメモリー管理
-
-#### Notion MCP (HTTP)
-- ページ検索・作成
-- データベース操作
-- コンテンツ更新
-
-#### AWS Documentation MCP (Local)
-- AWS公式ドキュメント検索
-- コンテンツ読み込み
-- 関連ページ推奨
-
-#### BigQuery MCP (Local)
-- SQLクエリ実行
-- テーブル・データセット管理
-- スキーマ操作
-
-#### DBHub MCP (Local)
-- PostgreSQL、MySQL、SQL Server、MariaDB、SQLite対応
-- スキーマ探索
-- SQL実行とトランザクションサポート
-
-#### Chrome DevTools MCP (Local)
-- ブラウザ自動化
-- パフォーマンス分析
-- ネットワーク監視
-- デバッグ
-
-#### Codex CLI MCP (Local)
-- コード品質・アーキテクチャ分析
-- セキュリティ脆弱性検出
-- AIコードレビュー
-
-#### Context7 MCP (HTTP)
-- 最新のコード例とドキュメント取得
-- フレームワーク・ライブラリの最新情報
-- コミュニティのベストプラクティス参照
-
-#### Claude Code MCP (Local)
-- Claude Code CLIツールへのアクセス
-- View、Edit、LSなどのファイル操作
-- 他のアプリケーションからClaude Codeの機能を利用
-
-### 2. 開発ワークフローコマンド
+開発の各段階で使用するコマンド群です。効率的なワークフローを実現します。
 
 #### `/serena`
-Serena MCPを使った開発記憶の記録
-
-**使用例:**
-```
-/serena
-```
+**用途:** Serena MCPを使用した開発記憶（メモリー）の記録  
+**使用タイミング:** 重要な実装内容や設計判断を記録したいとき
 
 #### `/pr`
-現在のブランチからPRを作成
-
-**使用例:**
-```
-/pr
-```
-
-#### `/fix`
-PR修正を効率化
-
-**使用例:**
-```
-/fix
-```
+**用途:** 現在のブランチから自動的にプルリクエストを作成  
+**使用タイミング:** 機能実装やバグ修正が完了し、レビューを依頼したいとき  
+コミット履歴とdiffを分析し、適切なPR説明を自動生成します。
 
 #### `/review`
-指定されたPRをレビュー
+**用途:** 指定されたPRの内容をレビュー  
+**使用タイミング:** 他の開発者のPRをレビューする必要があるとき  
+コード品質、セキュリティ、ベストプラクティスの観点から包括的にレビューします。
 
-**使用例:**
-```
-/review
-/review 123
-/review https://github.com/owner/repo/pull/456
-```
+#### `/fix`
+**用途:** PRのレビューコメントを確認し、指摘事項に対応  
+**使用タイミング:** PRにレビューコメントが付いたとき  
+レビュー内容を分析し、必要な修正を実施してコミット・プッシュします。
 
-#### `/merge`
-PRマージ後のクリーンアップ
-
-**使用例:**
-```
-/merge
-```
+#### `/merged`
+**用途:** PRマージ後のローカルブランチクリーンアップ  
+**使用タイミング:** 自分が作成したPRがマージされた直後  
+mainブランチを更新し、マージ済みのfeatureブランチを安全に削除します。
 
 #### `/clean`
-マージ済みブランチをクリーンアップ
-
-**使用例:**
-```
-/clean
-```
+**用途:** マージ済みの古いブランチを一括クリーンアップ  
+**使用タイミング:** ローカルに不要なブランチが溜まってきたとき  
+リモートで削除済みのブランチをローカルからも削除します。
 
 ### 3. 専門エージェント (5種類)
 
@@ -453,64 +372,51 @@ PRマージ後のクリーンアップ
 @qa プラグインがClaude Code仕様に準拠しているか確認してください
 ```
 
-### 4. 自動フック
+### 2. MCP統合 (10サーバー)
 
-Claude Code終了時に自動実行される統合フック：
+このプラグインは10個の強力なMCPサーバーを統合しています。各MCPの詳細な使用方法やベストプラクティスは、エージェント向けガイド `plugins/ndf/CLAUDE.md` を参照してください。
 
-**実装方式:** 1つのPrompt型フック（順次実行を保証）
+**GitHub、Serena、Notion** などの基本MCP、**BigQuery、DBHub** などのデータベースMCP、**Chrome DevTools、AWS Docs、Codex CLI、Context7、Claude Code** など専門MCPを含みます。
 
-Claude Codeのフックは並列実行されるため、処理順序を保証するために1つのpromptで2つのタスクを順次実行します。
+#### 使用しないMCPの無効化（推奨）
 
-**動作確認:**
-- フック実行開始時に「## Stop処理を開始します」というメッセージが表示されます
-- これにより、自動処理が開始されたことを確認できます
+パフォーマンス向上のため、使用しないMCPは無効化することを推奨します。
 
-#### Slack通知送信
+**手順:**
 
-Stop hookが直接`slack-notify.js`スクリプトを実行してSlack通知を送信します（SLACK_BOT_TOKENが設定されている場合のみ）。
+Claude Codeで以下のコマンドを実行します：
 
-**処理フロー:**
-1. SLACK_BOT_TOKENが未設定の場合は自動スキップ
-2. transcript（会話履歴）の解析を試行（優先度1）
-3. フォールバック: transcriptテキスト解析（優先度2）
-4. フォールバック: git diff解析（優先度3）
-5. 生成した要約をSlackに送信
+```
+/mcp
+```
 
-**要約例:**
-- 「NDFプラグインにContext7追加」
-- 「4つの専門エージェント実装」
-- 「詳細な設定ガイド追加」
+表示されるMCPサーバー一覧から、使用しないMCPを選択して無効化できます。
 
-**通知内容:**
-- AI生成の40文字要約
-- リポジトリ名
-- タイムスタンプ
+**補足:**
+- MCPの有効化/無効化は各プロジェクトごとに設定されます
+- 設定はClaude Codeの設定ファイル（`.claude/settings.json`等）に保存されます
+- 変更後、Claude Codeを再起動すると設定が反映されます
 
-**通知メカニズム:**
-1. Slackにメンション付きで投稿（通知音が鳴る）
-2. メッセージを即座に削除
-3. メンションなしで詳細メッセージを再投稿（クリーンな履歴）
+### 3. 自動フック
 
-**設定方法:**
-1. Slack Appを作成（Bot Token Scopesが必要）
-2. `.env`に以下を設定:
-   - `SLACK_BOT_TOKEN`
-   - `SLACK_CHANNEL_ID`
-   - `SLACK_USER_MENTION`（オプション）
-3. Claude Codeを再起動
+Claude Code終了時に自動的に以下が実行されます：
 
-詳細は [SLACK_BOT_TOKENとSLACK_CHANNEL_IDの設定方法](#各認証情報の詳細設定) を参照。
+#### Slack通知
 
-**設定:** プラグインインストール後、自動的に有効になります
+作業終了時にSlackへ要約通知を送信します（`SLACK_BOT_TOKEN`設定時のみ）。
 
-**無限ループ防止:**
-- `slack-notify.js`スクリプトはClaude CLI呼び出し時に`--settings '{"disableAllHooks": true, "disableAllPlugins": true}'`を使用
-- これによりサブプロセスのhooksとpluginsを無効化し、フック無限ループを防止
+**機能:**
+- Claude Codeとのやり取りをAIが自動要約（40文字）
+- 会話履歴、transcript、git diffから最適な情報源を自動選択
+- リポジトリ名とタイムスタンプも含めて通知
+
+**設定:**
+- `.env`に`SLACK_BOT_TOKEN`、`SLACK_CHANNEL_ID`、`SLACK_USER_MENTION`を設定
+- 詳細な設定手順は上記の[SLACK_BOT_TOKENとSLACK_CHANNEL_IDの設定方法](#各認証情報の詳細設定)を参照
+- 設定後、Claude Codeを再起動で有効化
 
 **注意:**
-- フックはClaude Code再起動後に有効化されます
-- `/plugin update ndf`でプラグインを更新した場合も再起動が必要です
-
+- プラグイン更新後も再起動が必要です
 ## 利用方法
 
 セットアップが完了したら、Claude Codeで自然言語でリクエストするだけです：
@@ -528,51 +434,6 @@ Claude Codeが自動的に適切なMCPツールを選択・利用します。
 /review 123
 /merge
 ```
-
-## トラブルシューティング
-
-### MCPサーバーが起動しない
-
-1. `.env` ファイルがプロジェクトルートに存在するか確認
-2. 環境変数が正しく設定されているか確認
-3. Claude Codeを完全に再起動
-4. ログを確認（Claude Codeの設定から）
-
-### 認証エラー
-
-**GitHub:**
-- トークンが有効か確認
-- 必要なスコープ（`repo`、`read:org`等）があるか確認
-
-**Notion:**
-- 統合トークンが正しいか確認
-- 統合がページ/データベースに接続されているか確認
-
-**BigQuery:**
-- サービスアカウントキーのパスが正しいか確認
-- プロジェクトでBigQuery APIが有効か確認
-
-**DBHub:**
-- データベース接続文字列（DSN）が正しいか確認
-- データベースサーバーが起動しているか確認
-
-**Codex CLI:**
-- Codex CLIがインストールされているか確認（`codex --version`）
-- 認証済みか確認（`codex login`）
-
-### Slack通知が送信されない
-
-1. `SLACK_BOT_TOKEN`と`SLACK_CHANNEL_ID`が正しく設定されているか確認
-2. Slack AppがWorkspaceにインストールされているか確認
-3. Botがチャンネルにメンバーとして追加されているか確認
-4. 必要なBot Token Scopes（`chat:write`, `chat:write.public`）が付与されているか確認
-5. Claude Codeのログ（`hooks_log.log`）でエラーを確認
-
-### コマンドが表示されない
-
-1. Claude Codeを再起動
-2. プラグインが正しくインストールされているか確認: `/plugin list`
-3. コマンドファイルが正しく配置されているか確認
 
 ## セキュリティのベストプラクティス
 
