@@ -109,7 +109,8 @@ RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get install -y --no-install-recommends \
     locales git wget vim sudo nano jq make \
     curl ca-certificates gnupg lsb-release \
-    libnss3 libxrandr2 libxss1; \
+    libnss3 libxrandr2 libxss1 \
+    fonts-noto-cjk fonts-noto-cjk-extra; \
     install -m 0755 -d /etc/apt/keyrings; \
     # Docker リポジトリ
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
@@ -122,12 +123,18 @@ RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
     | gpg --dearmor -o /etc/apt/keyrings/hashicorp-archive-keyring.gpg; \
     echo "deb [signed-by=/etc/apt/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
     > /etc/apt/sources.list.d/hashicorp.list; \
+    # Google Chrome リポジトリ
+    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+    | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg; \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+    > /etc/apt/sources.list.d/google-chrome.list; \
     # リポジトリ追加後に再度update
     apt-get update; \
     apt-get install -y --no-install-recommends \
     docker-ce docker-ce-cli containerd.io \
     docker-buildx-plugin docker-compose-plugin \
-    terraform; \
+    terraform \
+    google-chrome-stable; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*
 
@@ -201,3 +208,4 @@ RUN git config --global credential.helper store
 VOLUME  /home/${USERNAME}
 
 ENTRYPOINT [ "entrypoint.sh" ]
+
