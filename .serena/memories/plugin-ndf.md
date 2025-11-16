@@ -9,7 +9,7 @@ NDFプラグインは、3つの既存プラグインを統合したオールイ�
 2. `install-slack-hook` (v2.0.0) - Slack notifications
 3. `workflow-commands` (v1.0.0) - Development workflow commands
 
-**バージョン:** 1.0.4
+**バージョン:** 1.0.3
 
 **重要な変更 (v1.0.1):**
 - MCP-integration、install-slack-hook、workflow-commandsの3プラグインを削除
