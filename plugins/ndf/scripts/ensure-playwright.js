@@ -24,8 +24,27 @@ console.log('ネットワーク環境により1-2分かかる場合がありま�
 console.log('');
 
 try {
-  // PLAYWRIGHT_BROWSERS_PATHを設定してインストール
-  execSync('npx playwright install chromium', {
+  // @playwright/mcpが依存するPlaywrightのバージョンを取得
+  console.log('🔍 @playwright/mcpが使用するPlaywrightバージョンを確認中...');
+  const depsOutput = execSync('npm view @playwright/mcp@latest dependencies --json', {
+    encoding: 'utf-8',
+    cwd: PLUGIN_ROOT,
+    timeout: 30000
+  });
+
+  const deps = JSON.parse(depsOutput);
+  const playwrightVersion = deps.playwright || deps['playwright-core'];
+
+  if (!playwrightVersion) {
+    throw new Error('@playwright/mcpの依存関係からPlaywrightバージョンを取得できませんでした');
+  }
+
+  console.log(`✓ Playwright ${playwrightVersion} を使用します`);
+  console.log('');
+
+  // @playwright/mcpと互換性のあるバージョンのChromiumをインストール
+  console.log(`📦 Playwright ${playwrightVersion} でChromiumをインストール中...`);
+  execSync(`npx -y playwright@${playwrightVersion} install chromium`, {
     stdio: 'inherit',
     cwd: PLUGIN_ROOT,
     timeout: TIMEOUT_MS,
@@ -41,13 +60,15 @@ try {
     installed: new Date().toISOString(),
     plugin: 'ndf',
     browser: 'chromium',
-    browserPath: BROWSER_PATH
+    browserPath: BROWSER_PATH,
+    playwrightVersion: playwrightVersion
   };
 
   fs.writeFileSync(FLAG_FILE, JSON.stringify(flagData, null, 2));
 
   console.log('');
   console.log('✅ セットアップ完了！Playwright Chromiumの準備ができました。');
+  console.log(`   Playwrightバージョン: ${playwrightVersion}`);
   console.log(`   ブラウザパス: ${BROWSER_PATH}`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   process.exit(0);
@@ -59,7 +80,8 @@ try {
   console.error('エラー:', error.message);
   console.error('');
   console.error('手動でインストールするには以下を実行してください:');
-  console.error(`  PLAYWRIGHT_BROWSERS_PATH=${BROWSER_PATH} npx playwright install chromium`);
+  console.error(`  npm view @playwright/mcp@latest dependencies`);
+  console.error(`  PLAYWRIGHT_BROWSERS_PATH=${BROWSER_PATH} npx playwright@<version> install chromium`);
   console.error('');
   console.error('トラブルシューティング:');
   console.error('  https://playwright.dev/docs/browsers');
