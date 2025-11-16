@@ -4,21 +4,175 @@
 
 このドキュメントは、NDFプラグインを使用するAIエージェント（メインエージェント）向けのガイドラインです。
 
-NDFプラグインは**10個のMCPサーバー、6つのコマンド、4つの専門サブエージェント**を提供します。タスクに応じて**適切なサブエージェントに委譲する**ことで、より高品質な結果を得られます。
+NDFプラグインは**10個のMCPサーバー、6つのコマンド、5つの専門サブエージェント**を提供します。タスクに応じて**適切なサブエージェントに委譲する**ことで、より高品質な結果を得られます。
 
-## サブエージェントの積極的な活用
+## 大方針
 
-### 基本方針
+### 1. 日本語で応答
+すべての応答、ドキュメント、コミットメッセージは**日本語で記述**してください。
 
-**重要**: 複雑なタスクや専門性の高いタスクは、**必ず専門サブエージェントに委譲**してください。
+### 2. Git操作の制限
+- **勝手なgit pushは禁止**です
+- 特に**デフォルトブランチ（main/master）への直接pushは厳禁**
+- コミットやプッシュが必要な場合は、必ずユーザーに確認を取ってください
+- 作業用ブランチを作成し、プルリクエスト経由でマージすることを推奨
 
-メインエージェント（あなた）は全体の調整役として：
-1. **タスクの分類**: ユーザーの要求を分析し、適切なサブエージェントを判断
-2. **エージェント起動**: Taskツールで`subagent_type="ndf:agent-name"`を指定して起動
-3. **結果の統合**: 複数のサブエージェントの結果を統合して報告
-4. **品質確認**: サブエージェントの出力を検証
+## 行動指針
 
-### サブエージェントの呼び出し方法
+### 1. コンテキストの管理と段階的開示
+
+**重要**: 不要な情報を読み込まず、必要な情報だけを段階的に取得してください。
+
+- ファイル全体を読む前に、まずシンボル概要や構造を確認
+- 必要な部分だけをピンポイントで読み込む
+- トークン使用量を常に意識し、効率的な情報取得を心がける
+
+### 2. サブエージェントとMCPの積極活用
+
+**メインエージェントの役割:**
+- **TodoListの管理**: 全体のタスク進捗を追跡
+- **結果の統合**: 各サブエージェントからの結果をまとめる
+- **タスクの振り分け**: 適切なサブエージェントへ委譲
+
+**基本方針:**
+- 複雑なタスク、専門性の高いタスクは**必ずサブエージェントに委譲**
+- メインエージェント自身で処理するのは、簡単な調整作業のみ
+- データ分析、コーディング、調査、ファイル読み取り、品質管理は各専門エージェントに任せる
+
+### 3. Serena MCPの活用
+
+**Serena MCPは、main/subどちらのエージェントでも積極的に活用**してください。
+
+#### Serena MCPの基本ワークフロー
+
+**1. プロジェクトのアクティベート:**
+```bash
+mcp__plugin_ndf_serena__activate_project /path/to/project
+mcp__plugin_ndf_serena__check_onboarding_performed
+```
+
+**2. メモリーの活用:**
+```bash
+# 利用可能なメモリー一覧
+mcp__plugin_ndf_serena__list_memories
+
+# メモリーの読み込み
+mcp__plugin_ndf_serena__read_memory project-overview.md
+```
+
+**3. コード構造の理解（ファイル全体を読む前に）:**
+```bash
+# ファイルのシンボル概要を取得
+mcp__plugin_ndf_serena__get_symbols_overview relative_path="path/to/file.py"
+
+# ディレクトリ構造の確認
+mcp__plugin_ndf_serena__list_dir relative_path="src/" recursive=false
+```
+
+**4. ターゲットを絞ったコード探索:**
+```bash
+# シンボルを名前で検索
+mcp__plugin_ndf_serena__find_symbol name_path="/ClassName" relative_path="src/"
+
+# シンボルの本体を含めて読み込む
+mcp__plugin_ndf_serena__find_symbol name_path="/function_name" include_body=true relative_path="src/module.py"
+
+# 子要素も含めて取得（depth=1でメソッド等）
+mcp__plugin_ndf_serena__find_symbol name_path="/ClassName" depth=1 include_body=false relative_path="src/module.py"
+```
+
+**5. パターン検索:**
+```bash
+# 特定のパターンを検索
+mcp__plugin_ndf_serena__search_for_pattern substring_pattern="TODO" relative_path="src/"
+
+# コードファイルのみに制限
+mcp__plugin_ndf_serena__search_for_pattern substring_pattern="class.*Error" restrict_search_to_code_files=true
+```
+
+**6. シンボルベース編集（推奨）:**
+```bash
+# シンボル本体の置き換え
+mcp__plugin_ndf_serena__replace_symbol_body name_path="/function_name" relative_path="file.py" body="新しいコード"
+
+# シンボルの後に挿入
+mcp__plugin_ndf_serena__insert_after_symbol name_path="/ClassName" relative_path="file.py" body="新しいメソッド"
+
+# シンボルの前に挿入（import文等）
+mcp__plugin_ndf_serena__insert_before_symbol name_path="/first_function" relative_path="file.py" body="import statement"
+
+# シンボルのリネーム（コードベース全体）
+mcp__plugin_ndf_serena__rename_symbol name_path="/OldName" relative_path="file.py" new_name="NewName"
+```
+
+**7. 参照の検索:**
+```bash
+# シンボルを参照している箇所を検索
+mcp__plugin_ndf_serena__find_referencing_symbols name_path="function_name" relative_path="source.py"
+```
+
+**8. メモリーへの記録:**
+```bash
+# 新しいメモリーを作成
+mcp__plugin_ndf_serena__write_memory memory_file_name="feature-implementation.md" content="詳細な説明..."
+
+# メモリーの編集
+mcp__plugin_ndf_serena__edit_memory memory_file_name="project-overview.md" regex="old text" repl="new text"
+```
+
+#### Serenaを使うべき場面
+
+**必ず使用:**
+- ✅ テキストファイル（.py, .js, .md等）の読み書き
+- ✅ コード構造の理解
+- ✅ シンボル（クラス、関数、メソッド）の検索と編集
+- ✅ 複数ファイルにまたがる参照の検索
+- ✅ シンボルのリネーム
+
+**使用を検討:**
+- 🔍 マークダウンファイルの構造把握
+- 🔍 設定ファイルの検索
+- 🔍 パターンマッチング
+
+**使用不要（別ツールを使用）:**
+- ❌ PDF、画像、Office文書（xls, ppt等）のバイナリファイル → **scannerエージェント経由でCodex MCPに依頼**
+- ❌ 小さなテキストファイルの一回限りの読み込み → Readツール使用可
+- ❌ 新規ファイルの作成 → Writeツール使用可
+
+#### Serenaベストプラクティス
+
+1. **段階的な探索**
+   ```
+   list_dir → get_symbols_overview → find_symbol → 詳細読み込み
+   ```
+
+2. **メモリーファースト**
+   - タスク開始時に関連メモリーを読む
+   - 新しい発見は必ずメモリーに記録
+
+3. **シンボルベース編集優先**
+   - 正規表現より安全で正確
+   - リファクタリングにも対応
+
+4. **トークン効率**
+   - ファイル全体を読まない
+   - 必要なシンボルだけを取得
+   - `include_body=false`でメタデータのみ取得
+
+### 4. 事実を調査する
+
+**技術的に難易度が高い課題は、推測せずに外部リソースを調査**してください。
+
+- AWS、Google Cloud等のクラウドサービス → **researcherエージェント**でAWS Docs MCPを活用
+- 最新のライブラリやフレームワーク → **corderエージェント**でContext7 MCPを活用
+- Webサイトの動作確認 → **researcherエージェント**でChrome DevTools MCPを活用
+
+**NGパターン:**
+- ❌ 一般的な知識だけで回答してしまう
+- ❌ 古い情報に基づいて実装してしまう
+- ❌ 公式ドキュメントを確認せずに推測で進める
+
+## サブエージェントの呼び出し方法
 
 **Taskツールを使用**してサブエージェントを呼び出します：
 
@@ -35,8 +189,9 @@ Task(
 - `ndf:data-analyst` - データ分析専門家
 - `ndf:researcher` - 調査専門家
 - `ndf:scanner` - ファイル読み取り専門家
+- `ndf:qa` - 品質管理専門家
 
-### 4つの専門サブエージェント
+### 5つの専門サブエージェント
 
 #### 1. @data-analyst - データ分析の専門家
 
@@ -158,6 +313,64 @@ Task(
 - メインエージェント自身がPDFや画像を処理しようとする
 - Claude Codeの標準ツールでサポートされていないファイルを直接読もうとする
 
+#### 5. @qa - 品質管理の専門家
+
+**活用すべき場面:**
+- コード品質をレビューする時
+- セキュリティ脆弱性をチェックする時
+- Webアプリケーションのパフォーマンスを測定する時
+- テストカバレッジを確認する時
+- ドキュメント品質を検証する時
+- Claude Codeプラグインの仕様準拠を確認する時
+
+**使用MCPツール:**
+- Codex CLI MCP（コードレビュー、セキュリティチェック）
+- Serena MCP（コードベース分析）
+- Chrome DevTools MCP（パフォーマンステスト）
+- Claude Code MCP（プラグイン品質検証）
+
+**活用例:**
+```
+ユーザー: 「このコードの品質とセキュリティをレビューしてください」
+
+メインエージェントの判断: 品質管理タスク → ndf:qa に委譲
+
+Task(
+  subagent_type="ndf:qa",
+  prompt="src/auth.jsのコードをレビューしてください。コード品質（可読性、保守性）、セキュリティ（OWASP Top 10）、ベストプラクティスへの準拠を確認し、改善提案を行ってください。Codexでセキュリティスキャンを実施してください。",
+  description="Code quality and security review"
+)
+```
+
+```
+ユーザー: 「Webアプリケーションのパフォーマンスを測定してください」
+
+メインエージェントの判断: パフォーマンステストタスク → ndf:qa に委譲
+
+Task(
+  subagent_type="ndf:qa",
+  prompt="https://example.comのパフォーマンスを測定してください。Chrome DevToolsでCore Web Vitals（LCP、FID、CLS）を評価し、ネットワークパフォーマンス、レンダリングパフォーマンスを分析してください。ボトルネックがあれば改善提案を含めてください。",
+  description="Performance testing with Chrome DevTools"
+)
+```
+
+```
+ユーザー: 「このプラグインがClaude Code仕様に準拠しているか確認してください」
+
+メインエージェントの判断: プラグイン品質検証タスク → ndf:qa に委譲
+
+Task(
+  subagent_type="ndf:qa",
+  prompt="plugins/my-plugin のClaude Code仕様準拠を確認してください。plugin.json、SKILL.md、メタデータの完全性、ドキュメント品質、動作テストを実施し、マーケットプレイス公開基準に適合しているか検証してください。",
+  description="Claude Code plugin validation"
+)
+```
+
+**NGパターン（やってはいけない）:**
+- メインエージェント自身がセキュリティ脆弱性をスキャンしようとする
+- Chrome DevToolsを使わずにパフォーマンスを推測する
+- Claude Codeプラグイン仕様を手動で確認しようとする
+
 ## タスク分類のフローチャート
 
 ```
@@ -187,6 +400,12 @@ Task(
 │ ファイル読み取り関連？                    │
 │ - PDF、画像、Office文書                   │
 │ → YES: Task(subagent_type="ndf:scanner") │
+└──────────────────────────────────────────┘
+    ↓ NO
+┌──────────────────────────────────────────┐
+│ 品質管理関連？                             │
+│ - コードレビュー、セキュリティ、パフォーマンス │
+│ → YES: Task(subagent_type="ndf:qa")      │
 └──────────────────────────────────────────┘
     ↓ NO
 [メインエージェント自身で処理]
@@ -318,31 +537,3 @@ Task(subagent_type="ndf:researcher", prompt="調査B", ...)
 
 **成功の鍵:**
 複雑なタスクを無理に自分で処理せず、**適切なサブエージェントに委譲すること**。これにより、より高品質で専門的な結果が得られます。
-
-## Stop Hook実装の重要な注意事項
-
-### Claude CLI呼び出し時の無限ループ防止
-
-Stop hookスクリプト内で`claude`コマンドをサブプロセスとして呼び出す場合、**必ず`--settings`フラグでhooksとpluginsを無効化**してください。
-
-これを忘れると、サブプロセスが終了時に自身のStop hookをトリガーし、無限ループが発生します。
-
-**正しい実装（Node.js）:**
-```javascript
-const { spawn } = require('child_process');
-
-const claude = spawn('claude', [
-  '-p',
-  '--settings', '{"disableAllHooks": true, "disableAllPlugins": true}',  // ★ 必須
-  '--output-format', 'text'
-], {
-  stdio: ['pipe', 'pipe', 'pipe']
-});
-```
-
-**正しい実装（Bash）:**
-```bash
-claude -p --settings '{"disableAllHooks": true, "disableAllPlugins": true}' --output-format text
-```
-
-詳細は、リポジトリルートの`CLAUDE.md`の「Stop Hook実装ガイドライン」セクションを参照してください。

@@ -9,7 +9,7 @@ NDFプラグインは、3つの既存プラグインを統合したオールイ�
 2. `install-slack-hook` (v2.0.0) - Slack notifications
 3. `workflow-commands` (v1.0.0) - Development workflow commands
 
-**バージョン:** 1.0.1
+**バージョン:** 1.0.4
 
 **重要な変更 (v1.0.1):**
 - MCP-integration、install-slack-hook、workflow-commandsの3プラグインを削除
@@ -40,7 +40,8 @@ plugins/ndf/
 │   ├── data-analyst.md     # データアナリストエージェント
 │   ├── corder.md           # コーディングエージェント
 │   ├── researcher.md       # リサーチャーエージェント
-│   └── scanner.md          # スキャナーエージェント
+│   ├── scanner.md          # スキャナーエージェント
+│   └── qa.md               # 品質管理エージェント
 ├── CLAUDE.md                # メインエージェント向け指示（サブエージェント活用促進）
 └── README.md                # 統合ドキュメント
 ```
@@ -73,7 +74,7 @@ plugins/ndf/
 - `/ndf:merge` - マージ後クリーンアップ
 - `/ndf:clean` - ブランチクリーンアップ
 
-### 3. 専門エージェント (4種類)
+### 3. 専門エージェント (5種類)
 
 `plugin.json`の`agents`フィールドで定義：
 
@@ -96,6 +97,12 @@ plugins/ndf/
 - Codex MCPを活用
 - PDF、画像、PowerPoint、Excelファイルの読み取り
 - OCR、データ抽出、構造化
+
+**qa** - 品質管理とテスト
+- Codex MCP（コードレビュー、セキュリティチェック）、Serena MCP（コードベース分析）、Chrome DevTools MCP（パフォーマンステスト）、Claude Code MCP（プラグイン品質検証）を活用
+- コード品質レビュー、セキュリティ脆弱性検出（OWASP Top 10対応）
+- パフォーマンステスト（Core Web Vitals評価）、テストカバレッジ確認
+- ドキュメント品質検証、Claude Codeプラグイン仕様準拠確認
 
 ### 4. 自動フック
 
@@ -262,7 +269,7 @@ const claude = spawn('claude', [
 - `plugins/workflow-commands/` (7ファイル)
 
 **現在のマーケットプレイス構成:**
-- NDFプラグインのみ（10 MCP servers、6 commands、6 agents、Slack notifications）
+- NDFプラグインのみ（10 MCP servers、6 commands、5 agents、Slack notifications）
 
 ## トラブルシューティング
 
@@ -281,7 +288,7 @@ const claude = spawn('claude', [
 **サブエージェント活用の基本方針:**
 - 複雑なタスクや専門性の高いタスクは、適切なサブエージェントに委譲
 - メインエージェントは全体の調整役、タスク分類、結果統合を担当
-- 各サブエージェント（@data-analyst, @corder, @researcher, @scanner）の役割を明確化
+- 各サブエージェント（@data-analyst, @corder, @researcher, @scanner, @qa）の役割を明確化
 
 **主な指示内容:**
 - タスク分類のフローチャート
