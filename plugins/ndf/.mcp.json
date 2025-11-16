@@ -104,6 +104,18 @@
       ],
       "envFile": "${workspaceFolder}/.env",
       "disabled": true
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--browser",
+        "chrome",
+        "--isolated",
+        "--no-sandbox"
+      ],
+      "envFile": "${workspaceFolder}/.env"
     }
   }
 }
