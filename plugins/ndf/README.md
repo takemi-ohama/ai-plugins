@@ -378,23 +378,82 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 
 **GitHub、Serena、Notion** などの基本MCP、**BigQuery、DBHub** などのデータベースMCP、**Chrome DevTools、AWS Docs、Codex CLI、Context7、Claude Code** など専門MCPを含みます。
 
-#### 使用しないMCPの無効化（推奨）
+#### MCPのデフォルト状態
 
-パフォーマンス向上のため、使用しないMCPは無効化することを推奨します。
+コンテキスト使用量を最適化するため、よく使うMCPのみがデフォルトで有効化されています。
+
+**デフォルトで有効（5つ）:**
+- ✅ **GitHub MCP** - PR/イシュー管理（必須）
+- ✅ **Serena MCP** - コード分析（必須）
+- ✅ **Chrome DevTools MCP** - Web調査、パフォーマンステスト
+- ✅ **Codex CLI MCP** - コードレビュー、ファイル読み取り
+- ✅ **Context7 MCP** - 最新ライブラリドキュメント
+
+**デフォルトで無効（5つ）:**
+- ⏸️ **Notion MCP** - コンテキストが大きいため無効
+- ⏸️ **AWS Documentation MCP** - エラーが発生するため無効
+- ⏸️ **BigQuery MCP** - 利用するプロジェクトが限られるため無効
+- ⏸️ **DBHub MCP** - 利用するプロジェクトが限られるため無効
+- ⏸️ **Claude Code MCP** - コンテキストが大きいため無効
+
+#### 無効化されているMCPを有効にする方法
+
+特定のプロジェクトで無効化されているMCPを使いたい場合、以下の手順で有効化できます：
+
+**方法1: Claude Codeのコマンド（推奨）**
+
+1. Claude Codeで以下のコマンドを実行：
+   ```
+   /mcp
+   ```
+
+2. 表示されるMCPサーバー一覧から、有効化したいMCPを選択
+
+3. Claude Codeを再起動して変更を反映
+
+**方法2: .mcp.jsonを直接編集**
+
+1. プロジェクトルートの`.mcp.json`を開く
+
+2. 有効化したいMCPの`"disabled"`を`false`に変更：
+   ```json
+   "notion": {
+     "type": "http",
+     "url": "https://mcp.notion.com/mcp",
+     "envFile": "${workspaceFolder}/.env",
+     "disabled": false  // trueからfalseに変更
+   }
+   ```
+
+3. Claude Codeを再起動
+
+**注意事項:**
+- MCPを有効化すると、コンテキスト使用量が増加します
+- BigQueryやDBHubを有効化する場合は、対応する認証情報（`.env`）も設定してください
+- 使わないMCPは無効のままにしておくことを推奨します
+
+#### 現在有効なMCPをさらに無効化する
+
+デフォルトで有効になっている5つのMCPのうち、使用しないものがあればさらに無効化できます。
 
 **手順:**
 
-Claude Codeで以下のコマンドを実行します：
+1. Claude Codeで以下のコマンドを実行：
+   ```
+   /mcp
+   ```
 
-```
-/mcp
-```
+2. 表示されるMCPサーバー一覧から、無効化したいMCPを選択
 
-表示されるMCPサーバー一覧から、使用しないMCPを選択して無効化できます。
+3. Claude Codeを再起動して変更を反映
+
+**例:**
+- Context7を使わない場合は無効化してコンテキストを節約
+- Chrome DevToolsを使わない場合は無効化
 
 **補足:**
 - MCPの有効化/無効化は各プロジェクトごとに設定されます
-- 設定はClaude Codeの設定ファイル（`.claude/settings.json`等）に保存されます
+- 設定はプロジェクトの`.claude/settings.json`等に保存されます
 - 変更後、Claude Codeを再起動すると設定が反映されます
 
 ### 3. 自動フック
