@@ -1,21 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * SessionStart Hook: Inject NDF Plugin Guide to project's CLAUDE.md or AGENT.md
+ * SessionStart Hook: Copy NDF Plugin Guide and add @import to CLAUDE.md
  *
  * This script:
- * 1. Finds project's CLAUDE.md or AGENT.md (prioritize root, then .claude/)
- * 2. Checks if latest version is already injected
- * 3. Removes old version if exists
- * 4. Appends latest version to the end of file
+ * 1. Copies CLAUDE_plugin.md to project root as CLAUDE.ndf.md
+ * 2. Adds @CLAUDE.ndf.md import line to CLAUDE.md or AGENT.md
  */
 
 const fs = require('fs');
 const path = require('path');
-
-// Markers for version management (固定マーカー)
-const START_MARKER = '<!-- NDF_PLUGIN_GUIDE_START_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->';
-const END_MARKER = '<!-- NDF_PLUGIN_GUIDE_END_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->';
 
 // Get current working directory (project root)
 const projectRoot = process.cwd();
@@ -26,8 +20,10 @@ if (!pluginRoot) {
   process.exit(1);
 }
 
-// Path to plugin guide source
+// Paths
 const pluginGuidePath = path.join(pluginRoot, 'CLAUDE_plugin.md');
+const targetGuidePath = path.join(projectRoot, 'CLAUDE.ndf.md');
+const importLine = '@CLAUDE.ndf.md';
 
 // Find target file (CLAUDE.md or AGENT.md)
 function findTargetFile() {
@@ -50,91 +46,65 @@ function findTargetFile() {
   return null;
 }
 
-// Extract version from content
-function extractVersion(content) {
-  const versionMatch = content.match(/<!-- VERSION: (\d+) -->/);
-  return versionMatch ? parseInt(versionMatch[1], 10) : null;
-}
-
-// Read plugin guide
-function readPluginGuide() {
-  if (!fs.existsSync(pluginGuidePath)) {
-    console.error(`Error: Plugin guide not found at ${pluginGuidePath}`);
-    process.exit(1);
-  }
-  return fs.readFileSync(pluginGuidePath, 'utf8');
-}
-
-// Remove old version from content
-function removeOldVersion(content) {
-  const startIdx = content.indexOf(START_MARKER);
-  const endIdx = content.indexOf(END_MARKER);
-
-  if (startIdx === -1 || endIdx === -1) {
-    return content; // No old version found
-  }
-
-  // Remove old version (including markers and trailing newlines)
-  const before = content.substring(0, startIdx).trimEnd();
-  const after = content.substring(endIdx + END_MARKER.length).trimStart();
-
-  return before + (after ? '\n\n' + after : '');
-}
-
 // Main function
 function main() {
-  // Find target file
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('📋 NDF Plugin: Inject Plugin Guide');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  // Step 1: Copy plugin guide to project root
+  if (!fs.existsSync(pluginGuidePath)) {
+    console.error(`❌ Error: Plugin guide not found at ${pluginGuidePath}`);
+    process.exit(1);
+  }
+
+  const pluginGuideContent = fs.readFileSync(pluginGuidePath, 'utf8');
+
+  // Check if CLAUDE.ndf.md needs update
+  let shouldCopy = true;
+  if (fs.existsSync(targetGuidePath)) {
+    const existingContent = fs.readFileSync(targetGuidePath, 'utf8');
+    if (existingContent === pluginGuideContent) {
+      console.log('✓ CLAUDE.ndf.md is already up to date');
+      shouldCopy = false;
+    }
+  }
+
+  if (shouldCopy) {
+    fs.writeFileSync(targetGuidePath, pluginGuideContent, 'utf8');
+    console.log(`✓ Copied plugin guide to ${targetGuidePath}`);
+  }
+
+  // Step 2: Add @import line to CLAUDE.md or AGENT.md
   const targetFile = findTargetFile();
 
   if (!targetFile) {
-    console.log('No CLAUDE.md or AGENT.md found in project. Skipping injection.');
+    console.log('⚠ No CLAUDE.md or AGENT.md found in project');
+    console.log('  Plugin guide is available at CLAUDE.ndf.md');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return;
   }
 
-  console.log(`Target file: ${targetFile}`);
+  let targetContent = fs.readFileSync(targetFile, 'utf8');
 
-  // Read plugin guide
-  const pluginGuide = readPluginGuide();
-  const pluginVersion = extractVersion(pluginGuide);
-
-  if (!pluginVersion) {
-    console.error('Error: Cannot extract version from plugin guide');
-    process.exit(1);
-  }
-
-  console.log(`Plugin guide version: ${pluginVersion}`);
-
-  // Read target file
-  let targetContent = fs.existsSync(targetFile)
-    ? fs.readFileSync(targetFile, 'utf8')
-    : '';
-
-  // Check if already injected with same version
-  const existingVersion = extractVersion(targetContent);
-  if (existingVersion === pluginVersion) {
-    console.log(`Plugin guide v${pluginVersion} already injected. Skipping.`);
+  // Check if import line already exists
+  if (targetContent.includes(importLine)) {
+    console.log(`✓ Import line already exists in ${path.basename(targetFile)}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return;
   }
 
-  // Remove old version if exists
-  if (existingVersion) {
-    console.log(`Removing old version v${existingVersion}...`);
-    targetContent = removeOldVersion(targetContent);
-  }
-
-  // Append new version
-  console.log(`Injecting plugin guide v${pluginVersion}...`);
-  const newContent = targetContent.trimEnd() + '\n\n' + pluginGuide.trim() + '\n';
-
-  // Write back
+  // Add import line at the end
+  const newContent = targetContent.trimEnd() + '\n' + importLine + '\n';
   fs.writeFileSync(targetFile, newContent, 'utf8');
-  console.log(`Successfully injected plugin guide to ${targetFile}`);
+  console.log(`✓ Added import line to ${path.basename(targetFile)}`);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-  // Notify Claude Code that CLAUDE.md was updated
+  // Notify Claude Code
   const hookOutput = {
     hookSpecificOutput: {
       hookEventName: "SessionStart",
-      additionalContext: `📝 CLAUDE.mdが更新されました。NDFプラグインガイド（v${pluginVersion}）が追加されています。最新のガイドラインを確認してください。`
+      additionalContext: "📝 NDFプラグインガイドがCLAUDE.ndf.mdとしてインポートされました。最新のガイドラインを参照できます。"
     }
   };
   console.log(JSON.stringify(hookOutput));
@@ -144,6 +114,6 @@ function main() {
 try {
   main();
 } catch (error) {
-  console.error('Error:', error.message);
+  console.error('❌ Error:', error.message);
   process.exit(1);
 }
