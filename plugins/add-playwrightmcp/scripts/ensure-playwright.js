@@ -6,7 +6,7 @@ const path = require('path');
 const os = require('os');
 
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || __dirname;
-const FLAG_FILE = path.join(os.homedir(), '.claude-ndf-playwright-installed');
+const FLAG_FILE = path.join(os.homedir(), '.claude-add-playwrightmcp-installed');
 const BROWSER_PATH = path.join(os.homedir(), '.cache', 'ms-playwright');
 const TIMEOUT_MS = 5 * 60 * 1000; // 5分タイムアウト
 
@@ -16,7 +16,7 @@ if (fs.existsSync(FLAG_FILE)) {
 }
 
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('🎭 NDF Plugin: 初回セットアップ');
+console.log('🎭 Playwright MCP Plugin: 初回セットアップ');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log('');
 console.log('Playwright Chromiumブラウザをインストール中...');
@@ -58,7 +58,7 @@ try {
   // インストール成功フラグを作成
   const flagData = {
     installed: new Date().toISOString(),
-    plugin: 'ndf',
+    plugin: 'add-playwrightmcp',
     browser: 'chromium',
     browserPath: BROWSER_PATH,
     playwrightVersion: playwrightVersion

@@ -108,22 +108,6 @@
       ],
       "envFile": "${workspaceFolder}/.env",
       "disabled": true
-    },
-    "playwright": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@playwright/mcp@latest",
-        "--browser",
-        "chromium",
-        "--isolated",
-        "--no-sandbox"
-      ],
-      "env": {
-        "PLAYWRIGHT_BROWSERS_PATH": "${HOME}/.cache/ms-playwright"
-      },
-      "envFile": "${workspaceFolder}/.env"
     }
   }
 }

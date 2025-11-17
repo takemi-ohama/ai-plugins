@@ -1,0 +1,19 @@
+{
+  "name": "add-playwrightmcp",
+  "version": "1.0.0",
+  "description": "Playwright MCPを自動セットアップするプラグイン。Chromiumブラウザの自動インストールとMCP設定を提供します。",
+  "author": "NDF Team",
+  "tags": ["mcp", "playwright", "browser", "automation", "testing"],
+  "license": "MIT",
+  "repository": "https://github.com/takemi-ohama/ai-agent-marketplace",
+  "capabilities": {
+    "mcp": true,
+    "hooks": true
+  },
+  "requirements": {
+    "claudeCode": ">=1.0.0",
+    "system": {
+      "node": ">=18.0.0"
+    }
+  }
+}
