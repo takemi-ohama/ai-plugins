@@ -3,6 +3,21 @@
   "hooks": {
     "SessionStart": [
       {
+        "description": "Inject NDF Plugin Guide to project CLAUDE.md",
+        "matcher": "startup|resume",
+        "priority": 50,
+        "enabled": true,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/inject-plugin-guide.js",
+            "description": "Auto-inject NDF plugin guidelines to project CLAUDE.md",
+            "continueOnError": true,
+            "suppressOutput": false
+          }
+        ]
+      },
+      {
         "description": "Ensure Playwright browser is installed",
         "matcher": "startup|resume",
         "priority": 100,
