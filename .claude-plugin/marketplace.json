@@ -9,6 +9,11 @@
       "name": "ndf",
       "source": "./plugins/ndf",
       "description": "All-in-one plugin combining 10 MCP servers, 6 development workflow commands, 6 specialized agents, and Slack notifications with AI-generated summaries"
+    },
+    {
+      "name": "add-playwrightmcp",
+      "source": "./plugins/add-playwrightmcp",
+      "description": "Playwright MCP auto-setup plugin with Chromium browser installation and configuration"
     }
   ]
 }
