@@ -9,7 +9,7 @@ NDFプラグインは、3つの既存プラグインを統合したオールイ�
 2. `install-slack-hook` (v2.0.0) - Slack notifications
 3. `workflow-commands` (v1.0.0) - Development workflow commands
 
-**バージョン:** 1.0.3
+**バージョン:** 1.0.6
 
 **重要な変更 (v1.0.1):**
 - MCP-integration、install-slack-hook、workflow-commandsの3プラグインを削除
@@ -17,6 +17,12 @@ NDFプラグインは、3つの既存プラグインを統合したオールイ�
 - マーケットプレイスをNDF単一プラグインに整理
 - MCPサーバー数を9→10に更新（Claude Code MCP追加）
 - コマンド形式を`/ndf:pr`等、プレフィックス付きに統一
+
+**重要な変更 (v1.0.6):**
+- **directorサブエージェントを追加** - タスク統括と調整の専門エージェント
+- Main Agentの責務をdirectorに移譲（調査、計画、取りまとめ）
+- Main Agentは指示出しのみに徹し、複雑なタスクはdirectorに委譲
+- 専門エージェント数: 5→6に更新
 
 ## ディレクトリ構造
 
@@ -37,6 +43,7 @@ plugins/ndf/
 │   ├── merge.md            # /merge コマンド
 │   └── clean.md            # /clean コマンド
 ├── agents/
+│   ├── director.md         # ディレクターエージェント（統括）
 │   ├── data-analyst.md     # データアナリストエージェント
 │   ├── corder.md           # コーディングエージェント
 │   ├── researcher.md       # リサーチャーエージェント
@@ -74,9 +81,19 @@ plugins/ndf/
 - `/ndf:merge` - マージ後クリーンアップ
 - `/ndf:clean` - ブランチクリーンアップ
 
-### 3. 専門エージェント (5種類)
+### 3. 専門エージェント (6種類)
 
 `plugin.json`の`agents`フィールドで定義：
+
+**director** - タスク統括と調整（NEW v1.0.6）
+- Serena MCP、GitHub MCP、基本ツールを活用
+- タスク全体の理解と分解
+- 情報収集と調査
+- 計画立案と実行戦略
+- 他のサブエージェントへの指示出し
+- 結果の統合と取りまとめ
+- ユーザーへの詳細報告
+- **Main Agentが担っていた責務をすべて引き継ぎ、Main Agentは指示出しのみに徹する**
 
 **data-analyst** - データ分析とSQL操作
 - BigQuery MCP、DBHub MCPを活用
@@ -283,18 +300,21 @@ const claude = spawn('claude', [
 
 ## メインエージェント向け指示
 
-`CLAUDE.md`ファイルで、メインエージェント（親エージェント）に対して以下を指示：
+`CLAUDE.ndf.md`ファイルで、メインエージェント（親エージェント）に対して以下を指示：
 
 **サブエージェント活用の基本方針:**
-- 複雑なタスクや専門性の高いタスクは、適切なサブエージェントに委譲
-- メインエージェントは全体の調整役、タスク分類、結果統合を担当
-- 各サブエージェント（@data-analyst, @corder, @researcher, @scanner, @qa）の役割を明確化
+- **ほとんどの複雑なタスクはdirectorエージェントに最初に委譲する（推奨）**
+- Directorがタスクの調査、計画、他のサブエージェントへの指示出しを担当
+- Main Agentは最小限の調整のみに徹する
+- 各サブエージェント（@director, @data-analyst, @corder, @researcher, @scanner, @qa）の役割を明確化
 
 **主な指示内容:**
-- タスク分類のフローチャート
-- 各サブエージェントを活用すべき場面とNGパターン
+- タスク分類のフローチャート（directorを最優先）
+- Directorエージェントの活用方法と責務
+- 各専門サブエージェントを活用すべき場面
 - 複数エージェントの連携パターン
 - ベストプラクティス（DO/DON'T）
+- Main AgentとDirector Agentの役割分担
 
 ## 今後の拡張
 

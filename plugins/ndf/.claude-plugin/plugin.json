@@ -1,6 +1,6 @@
 {
   "name": "ndf",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Integrated plugin combining MCP servers, development workflow commands, specialized agents, and Slack notifications",
   "author": {
     "name": "takemi-ohama",
@@ -16,6 +16,7 @@
     "./commands/clean.md"
   ],
   "agents": [
+    "./agents/director.md",
     "./agents/data-analyst.md",
     "./agents/corder.md",
     "./agents/researcher.md",

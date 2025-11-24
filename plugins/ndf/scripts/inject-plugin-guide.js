@@ -4,7 +4,7 @@
  * SessionStart Hook: Copy NDF Plugin Guide and add @import to CLAUDE.md
  *
  * This script:
- * 1. Copies CLAUDE_plugin.md to project root as CLAUDE.ndf.md
+ * 1. Copies CLAUDE.ndf.md to project root as CLAUDE.ndf.md
  * 2. Adds @CLAUDE.ndf.md import line to CLAUDE.md or AGENT.md
  */
 
@@ -21,7 +21,7 @@ if (!pluginRoot) {
 }
 
 // Paths
-const pluginGuidePath = path.join(pluginRoot, 'CLAUDE_plugin.md');
+const pluginGuidePath = path.join(pluginRoot, 'CLAUDE.ndf.md');
 const targetGuidePath = path.join(projectRoot, 'CLAUDE.ndf.md');
 
 // Find target file (CLAUDE.md or AGENT.md)

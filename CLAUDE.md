@@ -1,753 +1,350 @@
-<!-- NDF_PLUGIN_GUIDE_START_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
-<!-- VERSION: 1 -->
-# NDF Plugin - AI Agent Guidelines (Mini)
+# AI Agent Marketplace - 開発ガイドライン
 
-## Overview
+## プロジェクト概要
 
-NDF plugin provides **10 MCP servers, 6 commands, and 5 specialized sub-agents**. Delegate complex tasks to appropriate sub-agents for better results.
+このリポジトリは**Claude Codeプラグインマーケットプレイス**の開発プロジェクトです。チーム全体でClaude Codeの導入を加速するための事前設定されたプラグインを提供します。
 
-## Core Policies
+**リポジトリ**: https://github.com/takemi-ohama/ai-agent-marketplace
 
-### 1. Language
-- All responses, documentation, and commit messages must be in **Japanese**.
+## 重要な注意事項
 
-### 2. Git Restrictions
-- **No unauthorized git push/merge**
-- **Never push/merge directly to default branch (main/master)**
-- Always confirm with user before commit/push/PR merge (except explicit slash commands)
-- Use feature branches and create pull requests
+### 言語とコミュニケーション
+- すべてのAIエージェントとのやり取りは**日本語**で行う
+- ドキュメント、コミットメッセージ、PR説明も日本語
 
-## Action Guidelines
+### Git運用ルール
+- **mainブランチへの直接コミット/プッシュ禁止**
+- 必ずfeatureブランチを作成して作業
+- Pull Requestを通じてレビュー・マージ
+- ユーザーの許可なくPRを承認しない
 
-### 1. Context Management
+## マーケットプレイスの構造
 
-**Critical**: Load only necessary information progressively.
-
-- Check symbol overview before reading entire files
-- Load only required portions
-- Be conscious of token usage
-
-### 2. Sub-Agent Delegation
-
-**Main Agent Responsibilities:**
-- **TodoList management**: Track overall task progress
-- **Result integration**: Consolidate results from sub-agents
-- **Task distribution**: Delegate to appropriate sub-agents
-
-**Core Principle:**
-- Delegate complex/specialized tasks to sub-agents
-- Main agent handles only simple coordination
-- Use specialized agents for data analysis, coding, research, file reading, QA
-
-### 3. Serena MCP Usage
-
-**Use Serena MCP actively** for efficient code exploration and editing.
-
-#### Key Commands
-
-**Read code progressively (not entire files):**
-```bash
-# 1. Get symbol overview first
-mcp__plugin_ndf_serena__get_symbols_overview relative_path="path/to/file.py"
-
-# 2. Find specific symbol
-mcp__plugin_ndf_serena__find_symbol name_path="/ClassName" relative_path="src/" include_body=true
-
-# 3. Search pattern if symbol name unknown
-mcp__plugin_ndf_serena__search_for_pattern substring_pattern="TODO" relative_path="src/"
-```
-
-**Edit code safely:**
-```bash
-# Replace symbol body (preferred)
-mcp__plugin_ndf_serena__replace_symbol_body name_path="/function_name" relative_path="file.py" body="new code"
-
-# Rename across codebase
-mcp__plugin_ndf_serena__rename_symbol name_path="/OldName" relative_path="file.py" new_name="NewName"
-
-# Find all references
-mcp__plugin_ndf_serena__find_referencing_symbols name_path="function_name" relative_path="source.py"
-```
-
-**Use memories:**
-```bash
-mcp__plugin_ndf_serena__read_memory project-overview.md
-mcp__plugin_ndf_serena__write_memory memory_file_name="feature.md" content="..."
-```
-
-#### Best Practices
-
-✅ **DO**: Get symbol overview before reading files, use symbol-based editing
-❌ **DON'T**: Read entire files, use for binary files (PDF/images)
-
-### 4. Research Facts
-
-**For technically challenging tasks, research external resources instead of guessing.**
-
-- Cloud services (AWS, GCP) → **researcher agent** with AWS Docs MCP
-- Latest libraries/frameworks → **corder agent** with Context7 MCP
-- Website behavior → **researcher agent** with Chrome DevTools MCP
-
-## Sub-Agent Invocation
-
-Use **Task tool** to invoke sub-agents:
-
-```
-Task(
-  subagent_type="ndf:corder",          # Agent name (ndf: prefix required)
-  prompt="detailed instructions",      # Instructions for agent
-  description="Task description"       # 3-5 word description
-)
-```
-
-**Available subagent_type:**
-- `ndf:corder` - Coding expert
-- `ndf:data-analyst` - Data analysis expert
-- `ndf:researcher` - Research expert
-- `ndf:scanner` - File reading expert
-- `ndf:qa` - Quality assurance expert
-
-### 5 Specialized Sub-Agents
-
-#### 1. @data-analyst - Data Analysis Expert
-
-**Use Cases:**
-- Database queries
-- SQL generation/optimization
-- Data analysis/statistics
-- Save query results to files (CSV/JSON/Excel)
-
-**MCP Tools:** BigQuery MCP
-
-**Example:**
-```
-User: "Analyze last month's sales data in BigQuery and show top 10 products"
-
-Main Agent: Data analysis task → delegate to ndf:data-analyst
-
-Task(
-  subagent_type="ndf:data-analyst",
-  prompt="Analyze last month's sales data in BigQuery and extract top 10 products. Use sales_data.transactions dataset.",
-  description="Analyze sales data"
-)
-```
-
-#### 2. @corder - Coding Expert
-
-**Use Cases:**
-- Writing new code
-- Refactoring existing code
-- Code review/security check
-- Applying design patterns/architecture
-- Checking latest best practices
-
-**MCP Tools:** Codex CLI MCP, Serena MCP, Context7 MCP
-
-**Example:**
-```
-User: "Implement user authentication feature"
-
-Main Agent: Coding task → delegate to ndf:corder
-
-Task(
-  subagent_type="ndf:corder",
-  prompt="Implement user authentication feature using JWT. Include login/logout/token refresh endpoints. Follow security best practices and review with Codex.",
-  description="Implement user authentication"
-)
-```
-
-#### 3. @researcher - Research Expert
-
-**Use Cases:**
-- Research AWS official documentation
-- Collect information from websites
-- Investigate technical specifications/best practices
-- Research competitor site features
-- Capture screenshots/PDFs
-
-**MCP Tools:** AWS Documentation MCP, Chrome DevTools MCP, Codex CLI MCP
-
-**Example:**
-```
-User: "Research AWS Lambda best practices"
-
-Main Agent: Research task → delegate to ndf:researcher
-
-Task(
-  subagent_type="ndf:researcher",
-  prompt="Research AWS Lambda best practices. Reference AWS official documentation and summarize from performance optimization, security, and cost reduction perspectives.",
-  description="Research AWS Lambda best practices"
-)
-```
-
-#### 4. @scanner - File Reading Expert
-
-**Use Cases:**
-- Reading PDF files
-- Extracting text from images (OCR)
-- Reading PowerPoint/Excel files
-- Describing image content
-
-**MCP Tools:** Codex CLI MCP
-
-**Example:**
-```
-User: "Read document.pdf and summarize"
-
-Main Agent: File reading task → delegate to ndf:scanner
-
-Task(
-  subagent_type="ndf:scanner",
-  prompt="Read /path/to/document.pdf and summarize key points in 3-5 items.",
-  description="Read and summarize PDF"
-)
-```
-
-#### 5. @qa - Quality Assurance Expert
-
-**Use Cases:**
-- Code quality review
-- Security vulnerability check
-- Web application performance measurement
-- Test coverage verification
-- Documentation quality validation
-- Claude Code plugin specification compliance check
-
-**MCP Tools:** Codex CLI MCP, Serena MCP, Chrome DevTools MCP
-
-**Examples:**
-```
-User: "Review this code's quality and security"
-
-Main Agent: QA task → delegate to ndf:qa
-
-Task(
-  subagent_type="ndf:qa",
-  prompt="Review src/auth.js code. Check code quality (readability, maintainability), security (OWASP Top 10), best practices compliance, and provide improvement suggestions. Perform security scan with Codex.",
-  description="Code quality and security review"
-)
-```
-
-```
-User: "Measure web application performance"
-
-Main Agent: Performance test task → delegate to ndf:qa
-
-Task(
-  subagent_type="ndf:qa",
-  prompt="Measure performance of https://example.com. Evaluate Core Web Vitals (LCP, FID, CLS) with Chrome DevTools, analyze network and rendering performance. Include improvement suggestions if bottlenecks found.",
-  description="Performance testing with Chrome DevTools"
-)
-```
-
-## Task Classification
-
-**Quick Decision Flow:**
-
-1. **Data-related?** (SQL, database, data analysis) → `ndf:data-analyst`
-2. **Coding-related?** (implementation, refactoring, review) → `ndf:corder`
-3. **Research-related?** (documentation, web scraping) → `ndf:researcher`
-4. **File reading?** (PDF, images, Office docs) → `ndf:scanner`
-5. **QA-related?** (code review, security, performance) → `ndf:qa`
-6. **Simple coordination** → Handle by main agent
-
-## Multi-Agent Collaboration
-
-For complex tasks, use **multiple sub-agents sequentially or in parallel**.
-
-**Example 1: Data Analysis → Reporting**
-```
-User: "Analyze sales data in BigQuery and create PowerPoint report"
-
-Steps:
-1. Task(ndf:data-analyst) for data analysis
-2. Main agent receives results
-3. Main agent creates PowerPoint
-4. Task(ndf:scanner) to verify PowerPoint creation
-```
-
-**Example 2: Research → Implementation**
-```
-User: "Research AWS Lambda best practices and write code based on findings"
-
-Steps:
-1. Task(ndf:researcher) to research AWS Lambda best practices
-2. Main agent receives research results
-3. Task(ndf:corder) to implement code based on best practices
-```
-
-**Example 3: PDF Reading → Data Analysis**
-```
-User: "Read sales data from PDF, import to database, and analyze"
-
-Steps:
-1. Task(ndf:scanner) to read PDF and extract data
-2. Main agent verifies extracted data
-3. Task(ndf:data-analyst) to import to database
-4. Task(ndf:data-analyst) to perform data analysis
-```
-
-## Best Practices
-
-### DO (Recommended)
-
-✅ **Use specialized agents for each task type**
-✅ **Decompose complex tasks and delegate to multiple agents**
-✅ **Validate and integrate agent results**
-✅ **Start parallel tasks simultaneously when possible**
-
-### DON'T (Not Recommended)
-
-❌ **Handle specialized tasks with main agent** → Delegate to sub-agents
-❌ **Respond with guesses without sub-agents** → Research with appropriate agent
-❌ **Implement complex code without review** → Delegate to corder with Codex review
-❌ **Try to process PDFs/images directly** → Delegate to scanner
-
-## Available MCP Tools (Reference)
-
-Main agent can use these MCPs, but **delegating to specialized agents produces better quality**:
-
-**Core MCPs (frequently used):**
-- **Serena MCP**: Code structure understanding, symbol editing
-- **GitHub MCP**: PR/issue management, code search
-- **Codex CLI MCP**: → **Delegate to @corder or @scanner**
-- **Context7 MCP**: Latest library documentation → **Delegate to @corder**
-
-**Specialized MCPs (delegate to agents):**
-- **BigQuery MCP**: Database queries → **Delegate to @data-analyst**
-- **AWS Docs MCP**: AWS documentation → **Delegate to @researcher**
-- **Chrome DevTools MCP**: Web performance/debugging → **Delegate to @researcher or @qa**
-
-## Summary
-
-**Main Agent Role:**
-- Overall task management and coordination
-- Delegation decisions
-- Result integration
-- Final reporting to user
-
-**Sub-Agent Role:**
-- High-quality execution in specialized domains
-- Effective use of specialized MCP tools
-- Detailed analysis and implementation
-
-**Success Key:**
-Don't try to handle complex tasks alone. **Delegate to appropriate sub-agents** for higher quality and more specialized results.
-<!-- NDF_PLUGIN_GUIDE_END_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
-
-# Claude Code AIエージェント ガイドライン
-
-## 目的
-
-このドキュメントは、AI Agent Marketplaceリポジトリと対話するAIエージェント向けのガイドラインを提供します。
-
-## Important Notes
-* All AI agent interactions must be in Japanese.
-* Never commit/push directly to main branch. Always create a working branch.
-* Do not approve PRs without permission.
-
-
-## リポジトリ概要
-
-Claude Codeプラグインマーケットプレイスとして、以下を配布します：
-- MCP（Model Context Protocol）統合スキル
-- カスタムスラッシュコマンド
-- サブエージェント設定
-- プロジェクトフック
-
-## Serena MCPの積極的な活用
-
-このプロジェクトでの開発では、**Serena MCPを積極的に利用**してください。Serena MCPはセマンティックコード理解とシンボルベース編集を提供し、効率的なコード分析と編集を可能にします。
-
-### Serena MCPの基本ワークフロー
-
-#### 1. プロジェクトのアクティベート
-
-最初に必ずプロジェクトをアクティベートします：
-
-```bash
-# プロジェクトをアクティベート
-mcp__serena__activate_project /path/to/ai-agent-marketplace
-
-# オンボーディング状態を確認
-mcp__serena__check_onboarding_performed
-
-# 必要に応じてオンボーディング実行
-mcp__serena__onboarding
-```
-
-#### 2. メモリーの活用
-
-プロジェクト情報はSerenaメモリーに記録されています：
-
-```bash
-# 利用可能なメモリー一覧
-mcp__serena__list_memories
-
-# メモリーの読み込み
-mcp__serena__read_memory project-overview.md
-mcp__serena__read_memory plugin-mcp-integration.md
-mcp__serena__read_memory plugin-slack-notification.md
-```
-
-**重要**: タスク開始時に関連するメモリーを読み込んで、プロジェクトの文脈を理解してください。
-
-#### 3. コード構造の理解
-
-**ファイル全体を読む前に**、まずシンボル概要を取得します：
-
-```bash
-# ファイルのシンボル概要を取得（トップレベルのみ）
-mcp__serena__get_symbols_overview plugins/mcp-integration/skills/mcp-integration/SKILL.md
-
-# ディレクトリ構造の確認
-mcp__serena__list_dir plugins recursive=false
-```
-
-#### 4. ターゲットを絞ったコード探索
-
-シンボル検索を使って必要な部分だけを読み込みます：
-
-```bash
-# シンボルを名前で検索
-mcp__serena__find_symbol name_path="/class_name" relative_path="plugins/example/"
-
-# シンボルの本体を含めて読み込む
-mcp__serena__find_symbol name_path="function_name" include_body=true
-
-# 子要素も含めて取得（depth=1でメソッド等）
-mcp__serena__find_symbol name_path="/ClassName" depth=1 include_body=false
-```
-
-#### 5. パターン検索
-
-シンボル名が不明な場合は、パターン検索を使用します：
-
-```bash
-# 特定のパターンを検索
-mcp__serena__search_for_pattern substring_pattern="SKILL.md" relative_path="plugins/"
-
-# コードファイルのみに制限
-mcp__serena__search_for_pattern substring_pattern="version" restrict_search_to_code_files=true
-```
-
-#### 6. シンボルベース編集
-
-**推奨**: 可能な限りシンボルベース編集を使用します：
-
-```bash
-# シンボル本体の置き換え
-mcp__serena__replace_symbol_body name_path="/function_name" relative_path="file.md" body="新しいコード"
-
-# シンボルの後に挿入
-mcp__serena__insert_after_symbol name_path="/ClassName" relative_path="file.py" body="新しいメソッド"
-
-# シンボルの前に挿入（import文等）
-mcp__serena__insert_before_symbol name_path="/first_function" relative_path="file.py" body="import statement"
-
-# シンボルのリネーム（コードベース全体）
-mcp__serena__rename_symbol name_path="/OldName" relative_path="file.py" new_name="NewName"
-```
-
-#### 7. 参照の検索
-
-コード変更の影響範囲を理解します：
-
-```bash
-# シンボルを参照している箇所を検索
-mcp__serena__find_referencing_symbols name_path="function_name" relative_path="source.py"
-```
-
-#### 8. メモリーへの記録
-
-新しい情報や重要な発見をメモリーに記録します：
-
-```bash
-# 新しいメモリーを作成
-mcp__serena__write_memory memory_file_name="plugin-new-feature.md" content="詳細な説明..."
-
-# メモリーの編集
-mcp__serena__edit_memory memory_file_name="project-overview.md" regex="old text" repl="new text"
-```
-
-### Serenaを使うべき場面
-
-**必ず使用:**
-- ✅ プラグイン構造の理解
-- ✅ 既存のSKILL.mdファイルの編集
-- ✅ plugin.jsonの更新
-- ✅ 複数ファイルにまたがる参照の検索
-- ✅ シンボルのリネーム
-
-**使用を検討:**
-- 🔍 マークダウンファイルの構造把握
-- 🔍 設定ファイルの検索
-- 🔍 パターンマッチング
-
-**使用不要:**
-- ❌ 小さなテキストファイルの読み込み（Readツール使用）
-- ❌ JSON/YAMLの検証のみ（Readツール使用）
-- ❌ 新規ファイルの作成（Writeツール使用）
-
-### Serenaベストプラクティス
-
-1. **段階的な探索**
-   ```
-   list_dir → get_symbols_overview → find_symbol → 詳細読み込み
-   ```
-
-2. **メモリーファースト**
-   - タスク開始時に関連メモリーを読む
-   - 新しい発見は必ずメモリーに記録
-
-3. **シンボルベース編集優先**
-   - 正規表現より安全で正確
-   - リファクタリングにも対応
-
-4. **トークン効率**
-   - ファイル全体を読まない
-   - 必要なシンボルだけを取得
-   - `include_body=false`でメタデータのみ取得
-
-## AIエージェントの責任
-
-### 1. プラグイン開発
-
-プラグインを作成・修正する際：
-
-**実施すること:**
-- README.mdに記載されたディレクトリ構造に従う
-- `plugin.json`に完全なメタデータを含める
-- YAMLフロントマターを含む明確なSKILL.mdファイルを書く
-- 包括的なドキュメントを提供する
-- コミット前に設定をテストする
-- プラグイン追加時はmarketplace.jsonを更新する
-- **Serena MCPでコード構造を理解してから編集する**
-
-**してはいけないこと:**
-- 機密トークンや認証情報をコミットする
-- 適切なメタデータなしでプラグインを作成する
-- ドキュメントをスキップする
-- 一貫性のない命名規則を使用する
-- **ファイル全体を読んでからSerenaツールで重複読み込みする**
-
-### 2. MCP設定
-
-MCP設定を扱う際：
-
-**実施すること:**
-- 認証に環境変数を使用する
-- 明確なセットアップ手順を提供する
-- トラブルシューティングセクションを含める
-- 必要な権限をすべてドキュメント化する
-- 異なる環境で設定をテストする
-
-**してはいけないこと:**
-- `.mcp.json`テンプレートにトークンをハードコードする
-- 認証ドキュメントをスキップする
-- セキュリティベストプラクティスを省略する
-- ユーザー環境について仮定する
-
-### 3. ドキュメント
-
-ドキュメントを書く際：
-
-**実施すること:**
-- 明確で簡潔な言語で書く
-- ステップバイステップの手順を提供する
-- 使用例を含める
-- 公式ドキュメントへのリンクを含める
-- 一般的なトラブルシューティングシナリオをカバーする
-- シンタックスハイライト付きコードブロックを使用する
-- **Serenaメモリーで既存のドキュメントパターンを確認する**
-
-**してはいけないこと:**
-- 事前知識を前提とする
-- 検証手順をスキップする
-- 前提条件を省略する
-- 曖昧な指示を書く
-
-### 4. バージョン管理
-
-バージョンを管理する際：
-
-**実施すること:**
-- セマンティックバージョニング（MAJOR.MINOR.PATCH）に従う
-- plugin.jsonのバージョン番号を更新する
-- 破壊的変更をドキュメント化する
-- 以前のバージョンからのアップグレードをテストする
-
-**してはいけないこと:**
-- マイナーバージョンで破壊的変更を行う
-- バージョンインクリメントをスキップする
-- marketplace.jsonの更新を忘れる
-
-## ファイル構造リファレンス
+### 必須ファイル
 
 ```
 ai-agent-marketplace/
 ├── .claude-plugin/
-│   └── marketplace.json          # マーケットプレイスメタデータ
+│   └── marketplace.json          # マーケットプレイス定義（必須）
 ├── plugins/
-│   └── {plugin-name}/
-│       ├── .claude-plugin/
-│       │   └── plugin.json       # プラグインメタデータ
-│       ├── commands/             # スラッシュコマンド (*.md)
-│       ├── agents/               # サブエージェント (*.md)
-│       └── skills/               # プロジェクトスキル
-│           └── {skill-name}/
-│               ├── SKILL.md      # エントリポイント（必須）
-│               └── *.md          # サポートドキュメント
-├── README.md
-├── CLAUDE.md                     # このファイル
-└── .serena/                      # Serenaメモリー（自動生成）
-    └── memories/
-        ├── project-overview.md
-        ├── plugin-mcp-integration.md
-        └── plugin-slack-notification.md
+│   ├── ndf/                      # NDFプラグイン
+│   └── {plugin-name}/            # その他のプラグイン
+├── README.md                     # マーケットプレイス説明
+└── CLAUDE.md                     # このファイル
 ```
 
-## MCPインテグレーションプラグイン
+### marketplace.json
 
-### コンポーネント
+プラグインマーケットプレイスの中心となる設定ファイル：
 
-MCPインテグレーションプラグインの構成：
+```json
+{
+  "name": "ai-agent-marketplace",
+  "owner": {
+    "name": "takemi-ohama",
+    "url": "https://github.com/takemi-ohama"
+  },
+  "plugins": [
+    {
+      "name": "ndf",
+      "source": "./plugins/ndf"
+    }
+  ]
+}
+```
 
-1. **SKILL.md**: YAMLフロントマター付きエントリポイント
-2. **mcp-config-template.md**: 完全な`.mcp.json`テンプレート
-3. **mcp-authentication-guide.md**: トークンセットアップ手順
-4. **mcp-setup-guide.md**: ステップバイステップインストール
+## プラグイン開発ガイドライン
 
-### メンテナンスタスク
+### 1. プラグイン構造
 
-MCPインテグレーションを更新する際：
+各プラグインは以下の構造を持ちます：
 
-1. 新しいMCPサーバーを確認
-2. 設定テンプレートを更新
-3. 認証方法を検証
-4. 最新のClaude Codeバージョンでテスト
-5. ドキュメントを更新
-6. plugin.jsonのバージョンをインクリメント
-7. **Serenaメモリーを更新**
+```
+plugins/{plugin-name}/
+├── .claude-plugin/
+│   └── plugin.json              # プラグインメタデータ（必須）
+├── commands/                    # スラッシュコマンド（オプション）
+│   └── *.md
+├── agents/                      # サブエージェント（オプション）
+│   └── *.md
+├── skills/                      # プロジェクトスキル（オプション）
+│   └── {skill-name}/
+│       └── SKILL.md
+├── hooks/                       # プロジェクトフック（オプション）
+│   └── hooks.json
+└── README.md                    # プラグイン説明
+```
 
-### サポート対象のMCP
+### 2. plugin.json の作成
 
-現在統合されているMCP：
+**必須フィールド**:
+- `name`: プラグイン名（ケバブケース）
+- `version`: セマンティックバージョニング（MAJOR.MINOR.PATCH）
+- `description`: プラグインの説明
+- `author`: 作成者情報
 
-1. **GitHub MCP** (HTTP)
-   - ツール: PR管理、イシュートラッキング、コード検索
-   - 認証: GitHub Personal Access Token
-   - ドキュメント: https://github.com/github/github-mcp-server
+**例**:
+```json
+{
+  "name": "example-plugin",
+  "version": "1.0.0",
+  "description": "Example plugin for demonstration",
+  "author": {
+    "name": "Your Name",
+    "url": "https://github.com/yourname"
+  },
+  "keywords": ["example", "demo"],
+  "commands": ["./commands/example.md"],
+  "agents": ["./agents/example-agent.md"]
+}
+```
 
-2. **Notion MCP** (HTTP)
-   - ツール: 検索、ページ作成、データベース操作
-   - 認証: Notion統合トークン
-   - ドキュメント: https://mcp.notion.com
+### 3. バージョン管理
 
-3. **Serena MCP** (Local)
-   - ツール: コード分析、シンボル編集、メモリー管理
-   - 認証: 不要（ローカル）
-   - ドキュメント: https://github.com/oraios/serena
+**セマンティックバージョニング**:
+- **MAJOR**: 破壊的変更
+- **MINOR**: 後方互換性のある新機能
+- **PATCH**: バグフィックス
 
-4. **AWS Documentation MCP** (Local)
-   - ツール: ドキュメント検索、コンテンツ読み込み
-   - 認証: 不要（公開ドキュメント）
-   - ドキュメント: https://github.com/awslabs/aws-documentation-mcp-server
+**バージョン更新時の手順**:
+1. `plugin.json`のバージョンをインクリメント
+2. 変更内容をドキュメント化
+3. 破壊的変更がある場合は明示
+4. テストを実行
 
-5. **BigQuery MCP** (Local)
-   - ツール: クエリ実行、テーブル操作
-   - 認証: Google Cloud認証情報
-   - ドキュメント: https://github.com/ergut/mcp-server-bigquery
+### 4. ドキュメント要件
 
-## 一般的なタスク
+**各プラグインに必要なドキュメント**:
+- ✅ README.md: プラグインの概要、インストール方法、使用方法
+- ✅ 各機能の説明とサンプルコード
+- ✅ トラブルシューティングガイド
+- ✅ 必要な環境変数や認証情報の説明
 
-### 新しいMCPサーバーの追加
+## Serena MCPの活用
 
-**Serenaワークフロー:**
+このプロジェクトでは**Serena MCP**を積極的に活用してください。
 
-1. **既存の構造を理解**
+### 基本ワークフロー
+
+#### 1. プロジェクトのアクティベート
+```bash
+mcp__plugin_ndf_serena__activate_project /home/ubuntu/work/ai-agent-marketplace
+mcp__plugin_ndf_serena__check_onboarding_performed
+```
+
+#### 2. メモリーの活用
+```bash
+# メモリー一覧を確認
+mcp__plugin_ndf_serena__list_memories
+
+# プロジェクト概要を読む
+mcp__plugin_ndf_serena__read_memory project-overview.md
+
+# プラグイン情報を読む
+mcp__plugin_ndf_serena__read_memory plugin-ndf.md
+```
+
+#### 3. コード探索（ファイル全体を読む前に）
+```bash
+# ディレクトリ構造を確認
+mcp__plugin_ndf_serena__list_dir plugins/ndf recursive=false
+
+# シンボル概要を取得
+mcp__plugin_ndf_serena__get_symbols_overview relative_path="plugins/ndf/.claude-plugin/plugin.json"
+
+# パターン検索
+mcp__plugin_ndf_serena__search_for_pattern substring_pattern="version" relative_path="plugins/"
+```
+
+#### 4. 編集作業
+```bash
+# シンボルベース編集（推奨）
+mcp__plugin_ndf_serena__replace_symbol_body name_path="/symbol" relative_path="file.md" body="new content"
+
+# メモリー更新
+mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-example.md" content="詳細..."
+```
+
+## 一般的な開発タスク
+
+### 新しいプラグインの追加
+
+**手順**:
+
+1. **既存プラグインを参考に構造を理解**
    ```bash
-   mcp__serena__read_memory plugin-mcp-integration.md
-   mcp__serena__get_symbols_overview plugins/mcp-integration/skills/mcp-integration/mcp-config-template.md
+   mcp__plugin_ndf_serena__list_dir plugins/ndf recursive=true
+   mcp__plugin_ndf_serena__read_memory project-overview.md
    ```
 
-2. **設定ファイルを編集**
-   ```bash
-   # シンボルベースで既存の設定を確認
-   mcp__serena__find_symbol name_path="mcpServers" relative_path="plugins/mcp-integration/skills/mcp-integration/mcp-config-template.md"
-   ```
-
-3. 新しいMCP設定を`mcp-config-template.md`に追加
-4. 認証手順を`mcp-authentication-guide.md`に追加
-5. 使用例を`mcp-setup-guide.md`に含める
-6. SKILL.mdの説明を更新
-7. 設定をテスト
-8. プラグインバージョンをインクリメント
-9. **メモリーを更新**
-   ```bash
-   mcp__serena__edit_memory memory_file_name="plugin-mcp-integration.md" regex="含まれるMCPサーバー\n\n### 1\\." repl="含まれるMCPサーバー\n\n### 0. 新しいMCP\n詳細...\n\n### 1."
-   ```
-10. 変更をコミット
-
-### 新しいプラグインの作成
-
-**Serenaワークフロー:**
-
-1. **既存プラグインをパターンとして理解**
-   ```bash
-   mcp__serena__list_dir plugins/mcp-integration recursive=true
-   mcp__serena__read_memory project-overview.md
-   ```
-
-2. ディレクトリ構造を作成:
+2. **ディレクトリ構造を作成**
    ```bash
    mkdir -p plugins/{plugin-name}/{.claude-plugin,commands,agents,skills}
    ```
 
-3. メタデータ付きplugin.jsonを作成
+3. **plugin.jsonを作成**
+   - 必須フィールドをすべて含める
+   - セマンティックバージョニングに従う
 
-4. コンテンツを追加（スキル、コマンド、またはエージェント）
+4. **プラグインコンテンツを実装**
+   - スキル、コマンド、エージェントを追加
 
-5. marketplace.jsonに登録
+5. **marketplace.jsonに登録**
    ```bash
-   # Serenaで既存のmarketplace.jsonを読む
-   mcp__serena__find_symbol name_path="plugins" relative_path=".claude-plugin/marketplace.json"
+   # Serenaで既存の設定を確認
+   mcp__plugin_ndf_serena__read_memory project-overview.md
    ```
 
-6. ドキュメントを作成
+6. **ドキュメント作成**
+   - README.md
+   - 使用例
+   - トラブルシューティング
 
-7. インストールプロセスをテスト
-
-8. **新しいプラグインのメモリーを作成**
+7. **テスト**
    ```bash
-   mcp__serena__write_memory memory_file_name="plugin-{plugin-name}.md" content="詳細なドキュメント"
+   claude plugin validate
    ```
 
-9. コミット＆プッシュ
-
-### ドキュメントの更新
-
-**Serenaワークフロー:**
-
-1. **関連メモリーを確認**
+8. **Serenaメモリーに記録**
    ```bash
-   mcp__serena__list_memories
-   mcp__serena__read_memory plugin-{name}.md
+   mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-{name}.md" content="プラグイン情報..."
    ```
 
-2. 既存コンテンツの正確性をレビュー
+9. **コミット＆PR作成**
 
-3. **シンボル検索で構造を理解**
+### 既存プラグインの更新
+
+**手順**:
+
+1. **Serenaメモリーで現在の状態を確認**
    ```bash
-   mcp__serena__get_symbols_overview path/to/file.md
+   mcp__plugin_ndf_serena__read_memory plugin-{name}.md
    ```
 
-4. リンク切れを確認
+2. **変更対象ファイルの構造を理解**
+   ```bash
+   mcp__plugin_ndf_serena__get_symbols_overview relative_path="plugins/{name}/file.md"
+   ```
 
-5. バージョン固有情報を更新
+3. **変更を実施**
+   - Serenaのシンボルベース編集を活用
 
-6. 新しいトラブルシューティングシナリオを追加
+4. **plugin.jsonのバージョンをインクリメント**
 
-7. 明確さと完全性を向上
+5. **ドキュメント更新**
 
-@CLAUDE.ndf.md
+6. **Serenaメモリーを更新**
+   ```bash
+   mcp__plugin_ndf_serena__edit_memory memory_file_name="plugin-{name}.md" needle="old" repl="new" mode="literal"
+   ```
+
+7. **テスト**
+
+8. **コミット＆PR作成**
+
+## 検証とテスト
+
+### ローカルテスト
+
+```bash
+# マーケットプレイス追加
+/plugin marketplace add /path/to/ai-agent-marketplace
+
+# プラグインインストール
+/plugin install {plugin-name}@ai-agent-marketplace
+
+# プラグイン検証
+claude plugin validate
+```
+
+### 検証チェックリスト
+
+- [ ] marketplace.jsonが正しい形式
+- [ ] 各plugin.jsonが必須フィールドを含む
+- [ ] バージョン番号が適切
+- [ ] ドキュメントが完全
+- [ ] 機密情報が含まれていない
+- [ ] プラグインが正常にインストールできる
+- [ ] 各機能が動作する
+
+## セキュリティ要件
+
+### 禁止事項
+
+❌ **絶対にコミットしてはいけないもの**:
+- APIトークン、パスワード
+- 認証情報
+- 秘密鍵
+- 個人を特定できる情報
+
+### 推奨事項
+
+✅ **実施すべきこと**:
+- 認証情報は環境変数で管理
+- `.env.example`でテンプレートを提供
+- ドキュメントでセキュアな設定方法を説明
+- `.gitignore`に機密ファイルを追加
+
+## NDFプラグインについて
+
+**NDFプラグイン**は、このマーケットプレイスの主要プラグインです：
+- 10個のMCPサーバー統合
+- 6個のスラッシュコマンド
+- 6個の専門サブエージェント
+- 自動Slack通知
+
+詳細は`plugins/ndf/README.md`を参照してください。
+
+NDFプラグインを使用する場合は、`plugins/ndf/CLAUDE.ndf.md`にある詳細なガイドラインを参照してください。
+
+## ベストプラクティス
+
+### DO（推奨）
+
+✅ Serena MCPを活用してコード構造を理解
+✅ ファイル全体を読む前にシンボル概要を取得
+✅ 段階的な探索（list_dir → get_symbols_overview → find_symbol）
+✅ メモリーを活用してプロジェクト文脈を維持
+✅ シンボルベース編集で安全な変更
+✅ セマンティックバージョニングに従う
+✅ 包括的なドキュメントを提供
+✅ 変更前にテスト
+
+### DON'T（非推奨）
+
+❌ ファイル全体を無闇に読み込む
+❌ メモリーを確認せずに作業開始
+❌ mainブランチに直接コミット
+❌ バージョン番号の更新を忘れる
+❌ ドキュメントをスキップ
+❌ 機密情報をコミット
+❌ テストをスキップ
+
+## トラブルシューティング
+
+### よくある問題
+
+**Q: marketplace.jsonが認識されない**
+- A: `.claude-plugin/marketplace.json`の配置を確認
+- A: JSON形式の検証（`claude plugin validate`）
+
+**Q: プラグインがインストールできない**
+- A: plugin.jsonの必須フィールドを確認
+- A: パスが正しいか確認（相対パス）
+
+**Q: バージョン更新が反映されない**
+- A: plugin.jsonとmarketplace.jsonの両方を更新
+- A: Claude Codeを再起動
+
+## 参考リンク
+
+- [Claude Code公式ドキュメント](https://docs.claude.com/en/docs/claude-code)
+- [プラグインマーケットプレイス](https://code.claude.com/docs/ja/plugin-marketplaces)
+- [プラグインスキル](https://docs.claude.com/en/docs/claude-code/skills)
+- [MCP仕様](https://modelcontextprotocol.io)
+
+## NDFプラグインガイドライン
+
+NDFプラグインを使用する際の詳細なガイドラインは、以下のファイルに記載されています：
+
+@plugins/ndf/CLAUDE.ndf.md
