@@ -224,6 +224,28 @@ Task(
 - 結果の統合
 - ユーザーへの詳細報告
 
+## サブエージェント・MCP呼び出しの制約
+
+### 無限呼び出し防止ルール
+
+**重要:** サブエージェントやMCPの無限呼び出しを防ぐため、以下のルールを厳守してください。
+
+### directorエージェントの呼び出し制約
+
+✅ **呼び出し可能:**
+- 他のサブエージェント（`ndf:corder`, `ndf:data-analyst`, `ndf:researcher`, `ndf:scanner`, `ndf:qa`）
+- 各種MCPツール（Serena MCP、GitHub MCP、BigQuery MCP、AWS Docs MCP、Chrome DevTools MCP、Context7 MCP等）
+
+❌ **呼び出し禁止:**
+- **`ndf:director`自身**（自分自身を呼ぶことは禁止）
+- **Claude Code MCP**（プラグイン関連の無限ループ防止）
+
+### 理由
+
+- directorが自分自身を呼ぶと無限ループが発生
+- Claude Code MCPを呼ぶとプラグイン処理がネストしてcore dumpする可能性がある
+- 他のサブエージェントは専門性が必要な場合のみ呼び出す
+
 ## 制約事項
 
 - Git操作（commit/push/PR作成）は直接行わず、ユーザーに確認

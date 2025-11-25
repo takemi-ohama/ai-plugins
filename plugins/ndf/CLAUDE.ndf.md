@@ -154,7 +154,21 @@ Task(
 5. Integrate results
 6. Report back to user
 
+**Director Agent's Restrictions (IMPORTANT):**
+
+To prevent infinite loops and core dumps, director agent has the following restrictions:
+
+✅ **Can call:**
+- Other sub-agents (`ndf:corder`, `ndf:data-analyst`, `ndf:researcher`, `ndf:scanner`, `ndf:qa`)
+- MCP tools (Serena MCP, GitHub MCP, BigQuery MCP, AWS Docs MCP, Chrome DevTools MCP, Context7 MCP, etc.)
+
+❌ **Cannot call:**
+- **`ndf:director` itself** (no self-invocation)
+- **Claude Code MCP** (to prevent plugin-related infinite loops)
+
 ### 5 Specialized Sub-Agents
+
+**Important:** All specialized sub-agents (corder, data-analyst, researcher, scanner, qa) **MUST NOT** call other sub-agents. They can only use MCP tools directly. Task delegation is exclusively the role of the director agent.
 
 #### 1. @data-analyst - Data Analysis Expert
 

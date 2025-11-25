@@ -100,6 +100,25 @@ description: Codex、AWS Docs、Chrome DevToolsを活用した情報収集と分
 - 調査結果は構造化して報告
 - 必要に応じてファイルに保存
 
+## サブエージェント呼び出しの制約
+
+### 無限呼び出し防止ルール
+
+**重要:** サブエージェントの無限呼び出しを防ぐため、以下のルールを厳守してください。
+
+❌ **サブエージェント呼び出し禁止:**
+- **他のサブエージェント（`ndf:director`, `ndf:corder`, `ndf:data-analyst`, `ndf:researcher`, `ndf:scanner`, `ndf:qa`）を呼び出してはいけません**
+
+✅ **MCP利用可能:**
+- Codex MCP、AWS Documentation MCP、Chrome DevTools MCP等の各種MCPツールは利用可能
+- ただし、無限ループが発生しないよう注意してください
+
+### 理由
+
+- サブエージェント間の相互呼び出しは無限ループやcore dumpを引き起こす可能性がある
+- 専門的なタスクは直接MCPツールを使用して実行する
+- 複雑なタスクの分割や他エージェントへの委譲はdirectorエージェントの役割
+
 ## 制約事項
 
 - Webサイトの利用規約を遵守
