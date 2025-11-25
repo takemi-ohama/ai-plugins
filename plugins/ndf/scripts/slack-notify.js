@@ -378,32 +378,28 @@ async function main() {
   // Read transcript path from hook input
   const transcriptPath = await readHookInput();
 
-  // Step 1: Send message with mention to trigger notification
-  const mentionMessage = userMention 
-    ? `${userMention} Claude Codeの作業が完了しました`
-    : 'Claude Codeの作業が完了しました';
+  // Step 1: Generate work summary
+  const workSummary = transcriptPath
+    ? await generateSummaryWithClaude(transcriptPath)
+    : null;
+
+  const repoName = await getRepositoryName();
+
+  // Step 2: Send message with mention and summary to trigger notification
+  const mentionMessage = workSummary
+    ? (userMention
+        ? `${userMention} [${repoName}] ${workSummary}`
+        : `[${repoName}] ${workSummary}`)
+    : (userMention
+        ? `${userMention} [${repoName}] Claude Codeのセッションが終了しました(要約なし)`
+        : `[${repoName}] Claude Codeのセッションが終了しました(要約なし)`);
 
   const mentionResult = await sendSlackMessage(channelId, token, mentionMessage);
   if (!mentionResult) {
     process.exit(1);
   }
 
-  // Step 2: Generate work summary
-  const workSummary = transcriptPath 
-    ? await generateSummaryWithClaude(transcriptPath)
-    : null;
-
-  // Step 3: Delete mention message
-  if (mentionResult.ts) {
-    try {
-      await deleteSlackMessage(channelId, token, mentionResult.ts);
-    } catch (error) {
-      // Continue even if deletion fails
-    }
-  }
-
-  // Step 4: Send detailed message with repository name and work summary
-  const repoName = await getRepositoryName();
+  // Step 3: Send message without mention but with summary
   const detailedMessage = workSummary
     ? `[${repoName}] ${workSummary}`
     : `[${repoName}] Claude Codeのセッションが終了しました(要約なし)`;
@@ -411,7 +407,16 @@ async function main() {
   try {
     await sendSlackMessage(channelId, token, detailedMessage);
   } catch (error) {
-    // Exit silently even on error
+    // Continue even if second message fails
+  }
+
+  // Step 4: Delete mention message
+  if (mentionResult.ts) {
+    try {
+      await deleteSlackMessage(channelId, token, mentionResult.ts);
+    } catch (error) {
+      // Continue even if deletion fails
+    }
   }
 }
 
