@@ -29,24 +29,26 @@ NDF plugin provides **10 MCP servers, 6 commands, and 6 specialized sub-agents**
 
 ### 2. Sub-Agent Delegation
 
-**Main Agent Responsibilities (MINIMAL):**
+**Main Agent Responsibilities:**
 - Receive user requests
 - **Delegate ALL tasks to Director Agent** (ndf:director)
+- **Launch specialized sub-agents** as requested by Director
 - Pass through final results to user
 
-**Director Agent Responsibilities (NEW):**
+**Director Agent Responsibilities:**
 - **TodoList management**: Track overall task progress
-- **Result integration**: Consolidate results from sub-agents
-- **Task distribution**: Delegate to specialized sub-agents
 - Investigation and research
 - Planning and coordination
+- **Report required sub-agents to Main Agent** (cannot call them directly)
+- Direct execution of simple tasks
+- **Result integration**: Consolidate results from sub-agents
 
 **Core Principle:**
-- **ALL tasks (not just complex ones) should be delegated to Director**
-- Director is the primary working agent - Main Agent only handles delegation
-- Director handles investigation, planning, and coordinates other agents
-- Main agent focuses ONLY on delegation and result pass-through
-- Use specialized agents (corder, data-analyst, researcher, scanner, qa) for domain-specific work
+- **ALL tasks should be delegated to Director first**
+- Director performs investigation and planning
+- **Director CANNOT call other sub-agents directly** - must report needs to Main Agent
+- Main Agent launches specialized sub-agents as requested by Director
+- This prevents infinite loops and ensures predictable agent orchestration
 
 ### 3. Serena MCP Usage
 
@@ -126,12 +128,12 @@ Task(
 - Investigation and research
 - Planning and strategy
 - Result integration and reporting
-- Managing other sub-agents
+- **Identifying which specialized sub-agents are needed**
 
 **MCP Tools:** Serena MCP, GitHub MCP, basic tools (Read, Glob, Grep, Bash)
 
 **Important Note:**
-**Main Agent should delegate ALL tasks to Director Agent.** Director will then handle investigation, planning, and coordinating other sub-agents as needed. Main Agent's only role is to pass user requests to Director and return results.
+**Main Agent should delegate ALL tasks to Director Agent.** Director will investigate, plan, and **report back to Main Agent which specialized sub-agents are needed**. Director CANNOT call other sub-agents directly.
 
 **Example:**
 ```
@@ -141,34 +143,42 @@ Main Agent: Complex multi-step task → delegate to ndf:director
 
 Task(
   subagent_type="ndf:director",
-  prompt="Implement a new user profile management feature. This should include: 1) Database schema design, 2) Backend API implementation, 3) Code quality review. Please investigate the current codebase structure, create a plan, and coordinate with appropriate sub-agents (data-analyst, corder, qa) as needed.",
+  prompt="Implement a new user profile management feature. This should include: 1) Database schema design, 2) Backend API implementation, 3) Code quality review. Please investigate the current codebase structure, create a plan, and report which specialized sub-agents (data-analyst, corder, qa) are needed for each step.",
   description="User profile feature implementation"
 )
+
+# Director reports back to Main Agent:
+# "Investigation complete. We need:
+#  1. data-analyst for database schema design
+#  2. corder for API implementation
+#  3. qa for code quality review"
 ```
 
 **Director Agent's Workflow:**
 1. Understand user requirements
 2. Investigate codebase (using Serena MCP)
 3. Create execution plan
-4. Delegate specialized tasks to other sub-agents
-5. Integrate results
-6. Report back to user
+4. **Report to Main Agent which specialized sub-agents are needed**
+5. Integrate results from sub-agents (once Main Agent launches them)
+6. Report back to Main Agent with final results
 
 **Director Agent's Restrictions (IMPORTANT):**
 
 To prevent infinite loops and core dumps, director agent has the following restrictions:
 
 ✅ **Can call:**
-- Other sub-agents (`ndf:corder`, `ndf:data-analyst`, `ndf:researcher`, `ndf:scanner`, `ndf:qa`)
 - MCP tools (Serena MCP, GitHub MCP, BigQuery MCP, AWS Docs MCP, Chrome DevTools MCP, Context7 MCP, etc.)
 
 ❌ **Cannot call:**
+- **ANY sub-agents** (including `ndf:corder`, `ndf:data-analyst`, `ndf:researcher`, `ndf:scanner`, `ndf:qa`)
 - **`ndf:director` itself** (no self-invocation)
 - **Claude Code MCP** (to prevent plugin-related infinite loops)
 
+**Director must report required sub-agents to Main Agent instead of calling them directly.**
+
 ### 5 Specialized Sub-Agents
 
-**Important:** All specialized sub-agents (corder, data-analyst, researcher, scanner, qa) **MUST NOT** call other sub-agents. They can only use MCP tools directly. Task delegation is exclusively the role of the director agent.
+**Important:** All specialized sub-agents (corder, data-analyst, researcher, scanner, qa) **MUST NOT** call other sub-agents (including director). They can only use MCP tools directly. Task delegation is exclusively the role of the Main agent.
 
 #### 1. @data-analyst - Data Analysis Expert
 
@@ -305,74 +315,69 @@ Task(
 
 **Quick Decision Flow for Main Agent:**
 
-1. **ALL tasks** → `ndf:director` ⭐ **DEFAULT - ALWAYS USE DIRECTOR**
+1. **ALL tasks** → `ndf:director` ⭐ **DEFAULT - ALWAYS USE DIRECTOR FIRST**
 
-**Note:** Main Agent should NOT classify tasks by type. Simply delegate everything to Director. Director will then decide whether to handle directly or delegate to specialized agents (data-analyst, corder, researcher, scanner, qa).
+**Note:** Main Agent should NOT classify tasks by type. Simply delegate everything to Director first. Director will investigate, plan, and **report back which specialized sub-agents are needed**. Main Agent then launches those sub-agents as requested.
 
-**Important:** **Always delegate to Director first.** Main Agent should not attempt to classify or handle tasks directly. Director will handle investigation, planning, and coordinating other specialized agents.
+**Important:** **Always delegate to Director first.** Director performs investigation and planning, then reports required sub-agents to Main Agent. Main Agent launches specialized sub-agents and coordinates the workflow.
 
 ## Multi-Agent Collaboration
 
-For complex tasks, use **multiple sub-agents sequentially or in parallel**.
+For complex tasks, **Main Agent coordinates multiple sub-agents** based on Director's recommendations.
 
-**Example 0: Complex Feature Implementation (Using Director) - RECOMMENDED**
+**Example 0: Complex Feature Implementation - RECOMMENDED**
 ```
 User: "Add a new dashboard feature that fetches data from BigQuery and displays performance metrics"
 
-Main Agent: Complex multi-step task → delegate to ndf:director
-
+Step 1: Main Agent → Director
 Task(
   subagent_type="ndf:director",
-  prompt="Implement a new dashboard feature that: 1) Fetches data from BigQuery, 2) Displays performance metrics, 3) Has responsive UI. Please investigate the codebase, plan the implementation, and coordinate with data-analyst (for BigQuery queries), corder (for implementation), and qa (for code review).",
-  description="Dashboard feature implementation"
+  prompt="Investigate and plan a new dashboard feature that: 1) Fetches data from BigQuery, 2) Displays performance metrics, 3) Has responsive UI. Report which specialized sub-agents are needed for each step.",
+  description="Dashboard feature planning"
 )
 
-# Director then coordinates:
-# 1. Investigates current dashboard structure (Serena MCP)
-# 2. Delegates to data-analyst for query design
-# 3. Delegates to corder for UI implementation
-# 4. Delegates to qa for final review
-# 5. Integrates all results and reports back
+Step 2: Director reports back
+"Investigation complete. We need:
+ 1. data-analyst for BigQuery query design
+ 2. corder for UI implementation
+ 3. qa for code quality review"
+
+Step 3: Main Agent launches sub-agents based on Director's report
+Task(subagent_type="ndf:data-analyst", ...)
+Task(subagent_type="ndf:corder", ...)
+Task(subagent_type="ndf:qa", ...)
+
+Step 4: Main Agent integrates results and reports to user
 ```
 
-**Example 1: Data Analysis → Reporting (Director coordinates)**
+**Example 1: Data Analysis → Reporting**
 ```
 User: "Analyze sales data in BigQuery and create PowerPoint report"
 
-Main Agent → Director Agent
-
-Director then coordinates:
-1. Delegates to data-analyst for BigQuery analysis
-2. Creates PowerPoint from analysis results
-3. Delegates to scanner to verify PowerPoint
-4. Reports back to Main Agent
+Main Agent → Director → "We need data-analyst and scanner"
+Main Agent → data-analyst (BigQuery analysis)
+Main Agent → scanner (Verify PowerPoint creation if needed)
+Main Agent → User (Final report)
 ```
 
-**Example 2: Research → Implementation (Director coordinates)**
+**Example 2: Research → Implementation**
 ```
 User: "Research AWS Lambda best practices and write code based on findings"
 
-Main Agent → Director Agent
-
-Director then coordinates:
-1. Delegates to researcher for AWS Lambda best practices
-2. Reviews research results
-3. Delegates to corder for implementation based on findings
-4. Reports back to Main Agent
+Main Agent → Director → "We need researcher and corder"
+Main Agent → researcher (AWS Lambda best practices)
+Main Agent → corder (Implementation based on findings)
+Main Agent → User (Final code)
 ```
 
-**Example 3: PDF Reading → Data Analysis (Director coordinates)**
+**Example 3: PDF Reading → Data Analysis**
 ```
 User: "Read sales data from PDF, import to database, and analyze"
 
-Main Agent → Director Agent
-
-Director then coordinates:
-1. Delegates to scanner to read PDF and extract data
-2. Verifies extracted data
-3. Delegates to data-analyst to import to database
-4. Delegates to data-analyst for analysis
-5. Reports back to Main Agent
+Main Agent → Director → "We need scanner and data-analyst"
+Main Agent → scanner (Read PDF, extract data)
+Main Agent → data-analyst (Import to database and analyze)
+Main Agent → User (Analysis results)
 ```
 
 ## Best Practices
@@ -410,24 +415,26 @@ Main agent can use these MCPs, but **delegating to specialized agents produces b
 
 **Main Agent Role:**
 - Receive user requests
-- **Delegate ALL tasks to Director Agent** (do not classify or attempt to handle)
+- **Delegate ALL tasks to Director Agent first** (for investigation and planning)
+- **Launch specialized sub-agents** as requested by Director
+- Coordinate multi-agent workflows
 - Pass through final results to user
-- **ONLY delegation and result pass-through** - no investigation, planning, or execution
 
-**Director Agent Role (PRIMARY WORKING AGENT):**
+**Director Agent Role (INVESTIGATION & PLANNING):**
 - Task understanding and breakdown
-- Investigation and research
+- Investigation and research (using Serena MCP, GitHub MCP)
 - Planning and coordination
-- Managing other sub-agents
+- **Report required sub-agents to Main Agent** (cannot call them directly)
 - Direct execution of simple tasks
 - Result integration and detailed reporting
 
 **Specialized Sub-Agent Roles:**
 - High-quality execution in specialized domains (coding, data, research, scanning, QA)
-- Called by Director when domain expertise is needed
+- Called by Main Agent when Director requests them
 - Effective use of specialized MCP tools
 - Detailed analysis and implementation
+- **Cannot call other sub-agents** (including director)
 
 **Success Key:**
-**Main Agent delegates ALL tasks to Director Agent.** Director is the primary working agent that handles everything - from simple information requests to complex multi-step implementations. Main Agent's only job is to pass requests to Director and return results to user.
+**Main Agent delegates ALL tasks to Director first.** Director investigates and plans, then **reports which specialized sub-agents are needed**. Main Agent launches those sub-agents and coordinates the workflow. This architecture prevents infinite loops and ensures predictable, safe agent orchestration.
 <!-- NDF_PLUGIN_GUIDE_END_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
