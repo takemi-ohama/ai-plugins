@@ -325,6 +325,22 @@ Task(
 
 For complex tasks, **Main Agent coordinates multiple sub-agents** based on Director's recommendations.
 
+### Parallel Execution (Recommended)
+
+Director should identify tasks that can run in parallel and recommend parallel execution to Main Agent when:
+
+✅ **Parallel execution conditions:**
+- Target files do not overlap
+- Tasks are independent (no dependencies)
+- Memory usage is manageable
+
+**Benefits:**
+- Faster task completion
+- Better resource utilization
+- Improved user experience
+
+**Main Agent** launches multiple sub-agents simultaneously when Director recommends parallel execution.
+
 **Example 0: Complex Feature Implementation - RECOMMENDED**
 ```
 User: "Add a new dashboard feature that fetches data from BigQuery and displays performance metrics"
@@ -332,7 +348,7 @@ User: "Add a new dashboard feature that fetches data from BigQuery and displays 
 Step 1: Main Agent → Director
 Task(
   subagent_type="ndf:director",
-  prompt="Investigate and plan a new dashboard feature that: 1) Fetches data from BigQuery, 2) Displays performance metrics, 3) Has responsive UI. Report which specialized sub-agents are needed for each step.",
+  prompt="Investigate and plan a new dashboard feature that: 1) Fetches data from BigQuery, 2) Displays performance metrics, 3) Has responsive UI. Report which specialized sub-agents are needed for each step. Determine if any tasks can be executed in parallel.",
   description="Dashboard feature planning"
 )
 
@@ -340,12 +356,19 @@ Step 2: Director reports back
 "Investigation complete. We need:
  1. data-analyst for BigQuery query design
  2. corder for UI implementation
- 3. qa for code quality review"
+ 3. qa for code quality review
 
-Step 3: Main Agent launches sub-agents based on Director's report
-Task(subagent_type="ndf:data-analyst", ...)
-Task(subagent_type="ndf:corder", ...)
-Task(subagent_type="ndf:qa", ...)
+【Parallel Execution Recommendation】
+Tasks 2 and 3 can run in parallel after task 1 completes:
+- corder will modify src/dashboard/ui.js
+- qa will review tests/dashboard.test.js
+- No file overlap, no dependencies between them"
+
+Step 3: Main Agent launches task 1 first, then tasks 2 and 3 in parallel
+Task(subagent_type="ndf:data-analyst", ...)  # Sequential
+# Wait for data-analyst to complete
+Task(subagent_type="ndf:corder", ...)        # Parallel
+Task(subagent_type="ndf:qa", ...)            # Parallel
 
 Step 4: Main Agent integrates results and reports to user
 ```
