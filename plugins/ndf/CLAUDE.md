@@ -9,7 +9,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 1.0.6
+- **現在バージョン**: 1.2.1
 - **種類**: 統合プラグイン（MCP + Commands + Agents + Hooks）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-agent-marketplace
 
@@ -459,7 +459,15 @@ mcp__plugin_ndf_serena__write_memory \
 
 ## 開発履歴
 
-### v1.0.6 (最新)
+### v1.2.1 (最新)
+- MCP設定簡略化とディレクトリ再構成
+- devtoolsディレクトリの削除
+- researchディレクトリをdocsに移動
+
+### v1.2.0
+- Claude Code Skills導入（10個のモデル起動型機能モジュール）
+
+### v1.0.6
 - directorサブエージェント追加
 - Main Agent責務をdirectorに移譲
 - CLAUDE_plugin.md → CLAUDE.ndf.mdにリネーム
