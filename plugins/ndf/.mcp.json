@@ -9,39 +9,17 @@
         "--rm",
         "-e",
         "GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN}",
-        "-e",
-        "GITHUB_HOST=${GITHUB_HOST}",
-        "-e",
-        "GITHUB_TOOLSETS=${GITHUB_TOOLSETS}",
-        "-e",
-        "GITHUB_TOOLS=${GITHUB_TOOLS}",
-        "-e",
-        "GITHUB_READ_ONLY=${GITHUB_READ_ONLY}",
-        "-e",
-        "GITHUB_LOCKDOWN_MODE=${GITHUB_LOCKDOWN_MODE}",
-        "-e",
-        "GITHUB_DYNAMIC_TOOLSETS=${GITHUB_DYNAMIC_TOOLSETS}",
         "ghcr.io/github/github-mcp-server"
       ],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}",
-        "GITHUB_HOST": "${GITHUB_HOST}",
-        "GITHUB_TOOLSETS": "${GITHUB_TOOLSETS}",
-        "GITHUB_TOOLS": "${GITHUB_TOOLS}",
-        "GITHUB_READ_ONLY": "${GITHUB_READ_ONLY}",
-        "GITHUB_LOCKDOWN_MODE": "${GITHUB_LOCKDOWN_MODE}",
-        "GITHUB_DYNAMIC_TOOLSETS": "${GITHUB_DYNAMIC_TOOLSETS}"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       },
       "envFile": "${workspaceFolder}/.env"
     },
     "notion": {
       "type": "http",
       "url": "https://mcp.notion.com/mcp",
-      "env": {
-        "NOTION_TOKEN": "${NOTION_TOKEN}",
-        "OPENAPI_MCP_HEADERS": "${OPENAPI_MCP_HEADERS}",
-        "AUTH_TOKEN": "${AUTH_TOKEN}"
-      },
+      "env": {},
       "envFile": "${workspaceFolder}/.env",
       "disabled": true
     },
@@ -58,11 +36,7 @@
         "--enable-web-dashboard",
         "False"
       ],
-      "env": {
-        "SERENA_HOME": "${SERENA_HOME}",
-        "GOOGLE_API_KEY": "${GOOGLE_API_KEY}",
-        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
-      },
+      "env": {},
       "envFile": "${workspaceFolder}/.env"
     },
     "awslabs.aws-documentation-mcp-server": {
@@ -71,11 +45,7 @@
       "args": [
         "awslabs.aws-documentation-mcp-server@latest"
       ],
-      "env": {
-        "FASTMCP_LOG_LEVEL": "${FASTMCP_LOG_LEVEL:-ERROR}",
-        "AWS_DOCUMENTATION_PARTITION": "${AWS_DOCUMENTATION_PARTITION:-aws}",
-        "MCP_USER_AGENT": "${MCP_USER_AGENT}"
-      },
+      "env": {},
       "envFile": "${workspaceFolder}/.env",
       "disabled": true
     },
@@ -104,24 +74,7 @@
         "--port",
         "8080"
       ],
-      "env": {
-        "DSN": "${DSN}",
-        "DATABASE_DSN": "${DATABASE_DSN}",
-        "DB_TYPE": "${DB_TYPE}",
-        "DB_HOST": "${DB_HOST}",
-        "DB_PORT": "${DB_PORT}",
-        "DB_USER": "${DB_USER}",
-        "DB_PASSWORD": "${DB_PASSWORD}",
-        "DB_NAME": "${DB_NAME}",
-        "TRANSPORT": "${TRANSPORT:-http}",
-        "PORT": "${PORT:-8080}",
-        "SSH_HOST": "${SSH_HOST}",
-        "SSH_PORT": "${SSH_PORT}",
-        "SSH_USER": "${SSH_USER}",
-        "SSH_PRIVATE_KEY": "${SSH_PRIVATE_KEY}",
-        "SSH_PASSWORD": "${SSH_PASSWORD}",
-        "READONLY": "${READONLY}"
-      },
+      "env": {},
       "envFile": "${workspaceFolder}/.env",
       "disabled": true
     },
@@ -145,13 +98,7 @@
       "args": [
         "mcp-server"
       ],
-      "env": {
-        "CODEX_HOME": "${CODEX_HOME}",
-        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
-        "OPENAI_BASE_URL": "${OPENAI_BASE_URL}",
-        "AZURE_OPENAI_API_KEY": "${AZURE_OPENAI_API_KEY}",
-        "MISTRAL_API_KEY": "${MISTRAL_API_KEY}"
-      },
+      "env": {},
       "envFile": "${workspaceFolder}/.env",
       "disabled": false
     },
@@ -171,10 +118,7 @@
         "mcp",
         "serve"
       ],
-      "env": {
-        "MCP_TIMEOUT": "${MCP_TIMEOUT}",
-        "MAX_MCP_OUTPUT_TOKENS": "${MAX_MCP_OUTPUT_TOKENS}"
-      },
+      "env": {},
       "envFile": "${workspaceFolder}/.env",
       "disabled": true
     }
