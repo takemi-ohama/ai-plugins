@@ -95,9 +95,49 @@ mcp__plugin_ndf_serena__write_memory memory_file_name="feature.md" content="..."
 
 **For technically challenging tasks, research external resources instead of guessing.**
 
+- Static website content → **WebFetch tool** (fast, lightweight)
 - Cloud services (AWS, GCP) → **researcher agent** with AWS Docs MCP
 - Latest libraries/frameworks → **corder agent** with Context7 MCP
-- Website behavior → **researcher agent** with Chrome DevTools MCP
+- Dynamic content requiring JavaScript → **researcher agent** with Chrome DevTools MCP
+
+### 5. Skills Usage
+
+**Claude Code Skills are model-invoked**: Claude autonomously activates Skills based on request and Skill description.
+
+**10 Available Skills (v1.2.0):**
+
+**Director Skills (1):**
+- `director-project-planning` - Structured project plans with task breakdown, timeline, resource allocation, and risk assessment
+
+**Data Analyst Skills (2):**
+- `data-analyst-sql-optimization` - SQL optimization patterns and best practices
+- `data-analyst-export` - Export query results to CSV/JSON/Excel/Markdown formats
+
+**Corder Skills (2):**
+- `corder-code-templates` - Code generation templates (REST API, React, database models, authentication)
+- `corder-test-generation` - Automated unit/integration test generation with AAA pattern
+
+**Researcher Skills (1):**
+- `researcher-report-templates` - Structured research report templates with comparison tables and best practices
+
+**Scanner Skills (2):**
+- `scanner-pdf-analysis` - PDF text extraction, table detection, and summarization
+- `scanner-excel-extraction` - Excel data extraction and conversion to JSON/CSV
+
+**QA Skills (2):**
+- `qa-code-review-checklist` - Comprehensive code review checklist (readability, maintainability, security)
+- `qa-security-scan` - Security scanning with OWASP Top 10 checklist
+
+**How Skills Work:**
+- **Model-invoked**: Claude decides when to use based on request keywords and context
+- **Trigger keywords**: Each Skill description contains keywords (e.g., "plan", "optimize SQL", "code review")
+- **Progressive disclosure**: Main documentation ≤500 lines, detailed references loaded as needed
+- **Sub-agent specialization**: Skills complement each sub-agent's existing capabilities
+
+**Usage Tips:**
+✅ Use natural language with trigger keywords (e.g., "create a project plan", "optimize this SQL query")
+✅ Skills provide templates, scripts, and best practices for common tasks
+✅ Each sub-agent can leverage multiple Skills relevant to their domain
 
 ## Sub-Agent Invocation
 
@@ -236,7 +276,7 @@ Task(
 - Research competitor site features
 - Capture screenshots/PDFs
 
-**MCP Tools:** AWS Documentation MCP, Chrome DevTools MCP, Codex CLI MCP
+**MCP Tools:** WebFetch tool (priority), AWS Documentation MCP, Chrome DevTools MCP, Codex CLI MCP
 
 **Example:**
 ```
@@ -284,7 +324,7 @@ Task(
 - Documentation quality validation
 - Claude Code plugin specification compliance check
 
-**MCP Tools:** Codex CLI MCP, Serena MCP, Chrome DevTools MCP
+**MCP Tools:** WebFetch tool (priority), Codex CLI MCP, Serena MCP, Chrome DevTools MCP
 
 **Examples:**
 ```
@@ -423,6 +463,9 @@ Main Agent → User (Analysis results)
 
 Main agent can use these MCPs, but **delegating to specialized agents produces better quality**:
 
+**Built-in Tools:**
+- **WebFetch**: Fast web content retrieval, HTML to Markdown conversion, AI-based processing (15-min cache)
+
 **Core MCPs (frequently used):**
 - **Serena MCP**: Code structure understanding, symbol editing
 - **GitHub MCP**: PR/issue management, code search
@@ -432,7 +475,7 @@ Main agent can use these MCPs, but **delegating to specialized agents produces b
 **Specialized MCPs (delegate to agents):**
 - **BigQuery MCP**: Database queries → **Delegate to @data-analyst**
 - **AWS Docs MCP**: AWS documentation → **Delegate to @researcher**
-- **Chrome DevTools MCP**: Web performance/debugging → **Delegate to @researcher or @qa**
+- **Chrome DevTools MCP**: Web performance/debugging (dynamic content only) → **Delegate to @researcher or @qa**
 
 ## Summary
 

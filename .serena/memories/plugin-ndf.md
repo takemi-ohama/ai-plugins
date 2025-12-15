@@ -9,7 +9,7 @@ NDFプラグインは、3つの既存プラグインを統合したオールイ�
 2. `install-slack-hook` (v2.0.0) - Slack notifications
 3. `workflow-commands` (v1.0.0) - Development workflow commands
 
-**バージョン:** 1.0.6
+**バージョン:** 1.2.0
 
 **重要な変更 (v1.0.1):**
 - MCP-integration、install-slack-hook、workflow-commandsの3プラグインを削除
@@ -24,6 +24,13 @@ NDFプラグインは、3つの既存プラグインを統合したオールイ�
 - **Main Agentは指示出しのみに徹し、すべてのタスクをdirectorに委譲**
 - Directorが他のサブエージェント（data-analyst、corder、researcher、scanner、qa）を統括
 - 専門エージェント数: 5→6に更新
+
+**重要な変更 (v1.2.0):**
+- **Claude Code Skillsを導入** - 10個のモデル起動型機能モジュールを追加
+- 各サブエージェントが専門Skillsを自動活用
+- プロジェクト計画、SQL最適化、コードテンプレート、テスト生成、PDF解析、セキュリティスキャン等
+- Model-invoked方式: Claudeが自律的に判断してSkillsを起動
+- Progressive Disclosure: メインドキュメント≤500行、詳細情報は分離
 
 ## ディレクトリ構造
 
@@ -144,6 +151,75 @@ plugins/ndf/
 1. メンション付き投稿（通知音）
 2. メッセージ削除
 3. メンションなし再投稿（クリーンな履歴）
+
+### 5. Skills (10種類) - NEW v1.2.0
+
+`plugin.json`の`skills`フィールドで定義された10個のClaude Code Skills：
+
+**Director Skills (1個):**
+- `director-project-planning` - 構造化されたプロジェクト計画生成
+  - タスク分解、タイムライン、リソース配分、リスク評価
+  - 並列実行可能タスクの自動判断
+  - テンプレート: project-plan-template.md、task-breakdown-template.md、risk-assessment-template.md
+  - スクリプト: generate-plan.js
+
+**Data Analyst Skills (2個):**
+- `data-analyst-sql-optimization` - SQL最適化パターンとベストプラクティス
+  - N+1クエリ削減、インデックス活用、JOIN最適化、ウィンドウ関数活用
+  - リファレンス: sql-patterns.md（8パターン）、examples.md（Before/After実例）
+- `data-analyst-export` - クエリ結果のエクスポート
+  - CSV（UTF-8 BOM、Excel互換）、JSON、Excel（複数シート）、Markdownテーブル
+  - スクリプト: export-csv.js
+
+**Corder Skills (2個):**
+- `corder-code-templates` - コード生成テンプレート集
+  - REST API（Express.js、FastAPI）、React、データベースモデル、認証ミドルウェア
+  - テンプレート: rest-api-endpoint.js
+- `corder-test-generation` - テストコード自動生成
+  - ユニットテスト（Jest、Mocha、pytest）、統合テスト
+  - AAA（Arrange-Act-Assert）パターン
+
+**Researcher Skills (1個):**
+- `researcher-report-templates` - 調査レポートテンプレート集
+  - 構造化された調査レポート、技術比較テーブル、ベストプラクティスまとめ
+
+**Scanner Skills (2個):**
+- `scanner-pdf-analysis` - PDF解析とデータ抽出
+  - テキスト抽出、テーブル検出とCSV変換、セクション識別、要約
+- `scanner-excel-extraction` - Excelデータ抽出と構造化
+  - 複数シート読み込み、JSON/CSV変換、数式評価、大容量ファイル対応
+
+**QA Skills (2個):**
+- `qa-code-review-checklist` - 包括的なコードレビューチェックリスト
+  - 可読性、保守性、パフォーマンス、セキュリティ
+  - 言語別チェックリスト（JavaScript、Python、Java等）
+  - Codex CLI MCP統合
+- `qa-security-scan` - セキュリティスキャンと脆弱性評価
+  - OWASP Top 10チェックリスト（詳細な修正方法付き）
+  - 認証・認可テスト、データ保護確認
+  - Codex CLI MCP統合
+
+**Skillsの特徴:**
+- **Model-invoked**: Claudeが自律的に判断して呼び出す
+- **トリガーキーワード**: 各Skillの`description`にキーワード含む（"plan", "optimize SQL", "code review"等）
+- **Progressive Disclosure**: メインドキュメント≤500行、詳細はtemplates/、scripts/、reference.mdに分離
+- **Sub-agent specialization**: 各サブエージェントの既存機能を補完
+- **Templates & Scripts**: 実用的なテンプレートとスクリプトを提供
+
+**実装ファイル:**
+```
+plugins/ndf/skills/
+├── director-project-planning/
+├── data-analyst-sql-optimization/
+├── data-analyst-export/
+├── corder-code-templates/
+├── corder-test-generation/
+├── researcher-report-templates/
+├── scanner-pdf-analysis/
+├── scanner-excel-extraction/
+├── qa-code-review-checklist/
+└── qa-security-scan/
+```
 
 ## Stop Hook実装の重要な知見
 

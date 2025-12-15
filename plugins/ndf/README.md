@@ -9,7 +9,8 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 1. **MCP統合**: 10個の強力なMCPサーバー（GitHub、Serena、BigQuery、Notion、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Context7、Claude Code）
 2. **開発ワークフロー**: PR作成、レビュー、マージ、ブランチクリーンアップコマンド
 3. **専門エージェント**: 6つの特化型AIエージェント（タスク統括、データ分析、コーディング、調査、ファイル読み取り、品質管理）
-4. **自動フック**: Slack通知
+4. **Skills (NEW v1.2.0)**: 10個のモデル起動型機能モジュール（プロジェクト計画、SQL最適化、コードテンプレート、テスト生成、PDF解析等）
+5. **自動フック**: Slack通知
 
 ## インストール
 
@@ -691,6 +692,94 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 @qa Webアプリケーションのパフォーマンスを測定してください
 @qa プラグインがClaude Code仕様に準拠しているか確認してください
 ```
+
+### 4. Skills (10種類) - NEW v1.2.0 🎯
+
+**Claude Code Skills**は、Claudeが自律的に判断して起動する**モデル起動型**の機能モジュールです。各サブエージェントは、タスク内容に応じて適切なSkillsを自動的に活用します。
+
+#### Skills一覧
+
+**Director Skills (1個):**
+- 🎯 **director-project-planning** - 構造化されたプロジェクト計画を生成
+  - タスク分解、タイムライン、リソース配分、リスク評価
+  - 並列実行可能タスクの自動判断
+  - GitHub Issue/PR作成テンプレート
+
+**Data Analyst Skills (2個):**
+- ⚡ **data-analyst-sql-optimization** - SQL最適化パターンとベストプラクティス
+  - N+1クエリ削減、インデックス活用、JOIN最適化
+  - Before/After実例集（8パターン）
+- 💾 **data-analyst-export** - クエリ結果を様々な形式でエクスポート
+  - CSV（UTF-8 BOM、Excel互換）、JSON、Excel（複数シート）、Markdownテーブル
+
+**Corder Skills (2個):**
+- 📝 **corder-code-templates** - コード生成テンプレート集
+  - REST APIエンドポイント（Express.js、FastAPI）
+  - Reactコンポーネント（Hooks、状態管理）
+  - データベースモデル（Sequelize、TypeORM、Mongoose）
+  - 認証ミドルウェア（JWT、OAuth）
+- 🧪 **corder-test-generation** - テストコード自動生成
+  - ユニットテスト（Jest、Mocha、pytest）
+  - AAA（Arrange-Act-Assert）パターン
+  - テストフィクスチャ・モック生成
+
+**Researcher Skills (1個):**
+- 📊 **researcher-report-templates** - 調査レポートテンプレート集
+  - 構造化された調査レポート
+  - 技術比較テーブル
+  - ベストプラクティスまとめ
+  - エグゼクティブサマリー
+
+**Scanner Skills (2個):**
+- 📄 **scanner-pdf-analysis** - PDF解析とデータ抽出
+  - テキスト抽出、テーブル検出とCSV変換
+  - セクション・見出し識別、重要ポイント要約
+- 📊 **scanner-excel-extraction** - Excelデータ抽出と構造化
+  - 複数シート読み込み、JSON/CSV形式変換
+  - 数式評価、大容量ファイル対応
+
+**QA Skills (2個):**
+- ✔️ **qa-code-review-checklist** - 包括的なコードレビューチェックリスト
+  - 可読性、保守性、パフォーマンス、セキュリティ
+  - 言語別チェックリスト（JavaScript、Python、Java等）
+- 🔒 **qa-security-scan** - セキュリティスキャンと脆弱性評価
+  - OWASP Top 10チェックリスト（詳細な修正方法付き）
+  - 認証・認可テスト、データ保護確認
+
+#### Skillsの使い方
+
+**自動起動（推奨）:**
+Claudeは自然言語リクエストから適切なSkillsを自動判断して起動します。
+
+```
+プロジェクト計画を作成してください
+→ director-project-planningが自動起動
+
+このSQLクエリを最適化してください
+→ data-analyst-sql-optimizationが自動起動
+
+REST APIのテンプレートを使ってエンドポイントを作成してください
+→ corder-code-templatesが自動起動
+```
+
+**トリガーキーワード例:**
+- "plan", "roadmap", "task breakdown", "計画"
+- "optimize SQL", "slow query", "SQL最適化"
+- "export data", "save results", "データ出力"
+- "create API", "new component", "コードテンプレート"
+- "generate tests", "create unit test", "テスト生成"
+- "analyze PDF", "extract tables", "PDF解析"
+- "code review", "quality check", "コードレビュー"
+- "security scan", "OWASP", "セキュリティスキャン"
+
+#### Skillsの特徴
+
+- **Model-invoked**: Claudeが自律的に判断して呼び出す
+- **Progressive Disclosure**: メインドキュメント≤500行、詳細はテンプレート/スクリプトに分離
+- **Sub-agent specialization**: 各サブエージェントの既存機能を補完
+- **Templates & Scripts**: 実用的なテンプレートとスクリプトを提供
+
+詳細は各Skillの`SKILL.md`を参照してください。
 
 ### 2. MCP統合 (10サーバー)
 

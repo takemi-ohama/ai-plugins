@@ -1,6 +1,6 @@
 {
   "name": "ndf",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Integrated plugin combining MCP servers, development workflow commands, specialized agents, and Slack notifications",
   "author": {
     "name": "takemi-ohama",
@@ -22,5 +22,17 @@
     "./agents/researcher.md",
     "./agents/scanner.md",
     "./agents/qa.md"
+  ],
+  "skills": [
+    "./skills/director-project-planning",
+    "./skills/data-analyst-sql-optimization",
+    "./skills/data-analyst-export",
+    "./skills/corder-code-templates",
+    "./skills/corder-test-generation",
+    "./skills/researcher-report-templates",
+    "./skills/scanner-pdf-analysis",
+    "./skills/scanner-excel-extraction",
+    "./skills/qa-code-review-checklist",
+    "./skills/qa-security-scan"
   ]
 }
