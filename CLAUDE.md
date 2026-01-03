@@ -288,10 +288,13 @@ claude plugin validate
 ## NDFプラグインについて
 
 **NDFプラグイン**は、このマーケットプレイスの主要プラグインです：
-- 10個のMCPサーバー統合
+- 7個のMCPサーバー統合
 - 6個のスラッシュコマンド
-- 6個の専門サブエージェント
+- 5個の専門サブエージェント
+- 8個のClaude Code Skills
 - 自動Slack通知
+
+> **Note (v2.0.0)**: GitHub MCP, Serena MCP, Context7 MCPは`anthropics/claude-plugins-official`に移行しました。
 
 詳細は`plugins/ndf/README.md`を参照してください。
 

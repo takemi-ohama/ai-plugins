@@ -1,10 +1,12 @@
 <!-- NDF_PLUGIN_GUIDE_START_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
-<!-- VERSION: 2 -->
-# NDF Plugin - AI Agent Guidelines
+<!-- VERSION: 3 -->
+# NDF Plugin - AI Agent Guidelines (v2.0.0)
 
 ## Overview
 
-NDF plugin provides **10 MCP servers, 6 commands, and 6 specialized sub-agents**. Delegate complex tasks to appropriate sub-agents for better results.
+NDF plugin provides **7 MCP servers, 6 commands, and 5 specialized sub-agents**. Delegate complex tasks to appropriate sub-agents for better results.
+
+> **Note (v2.0.0)**: GitHub MCP, Serena MCP, Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。directorエージェントはClaude Code組み込み機能（Plan Mode、Explore Agent）と重複するため削除されました。
 
 ## Core Policies
 
@@ -31,83 +33,75 @@ NDF plugin provides **10 MCP servers, 6 commands, and 6 specialized sub-agents**
 
 **Main Agent Responsibilities:**
 - Receive user requests
-- **Delegate ALL tasks to Director Agent** (ndf:director)
-- **Launch specialized sub-agents** as requested by Director
+- **Classify tasks and delegate to appropriate specialized sub-agents**
+- Use Claude Code's **Plan Mode** for complex multi-step tasks
+- Use Claude Code's **Explore Agent** for codebase investigation
+- Coordinate multi-agent workflows
 - Pass through final results to user
 
-**Director Agent Responsibilities:**
-- **TodoList management**: Track overall task progress
-- Investigation and research
-- Planning and coordination
-- **Report required sub-agents to Main Agent** (cannot call them directly)
-- Direct execution of simple tasks
-- **Result integration**: Consolidate results from sub-agents
-
 **Core Principle:**
-- **ALL tasks should be delegated to Director first**
-- Director performs investigation and planning
-- **Director CANNOT call other sub-agents directly** - must report needs to Main Agent
-- Main Agent launches specialized sub-agents as requested by Director
-- This prevents infinite loops and ensures predictable agent orchestration
+- **Match task type to specialized sub-agent**
+- Use Plan Mode (EnterPlanMode) for implementation planning
+- Use Explore Agent for code exploration
+- Specialized sub-agents handle domain-specific tasks
 
-### 3. Serena MCP Usage
+### 3. Claude Code Built-in Features
 
-**Use Serena MCP actively** for efficient code exploration and editing.
+**Use Claude Code's built-in features** for planning and exploration:
+
+#### Plan Mode
+For complex implementation tasks requiring planning:
+```
+EnterPlanMode() → Explore codebase → Design approach → User approval → ExitPlanMode → Implement
+```
+
+#### Explore Agent
+For codebase investigation:
+```
+Task(subagent_type="Explore", prompt="Find how authentication is implemented", description="Explore auth code")
+```
+
+### 4. Serena MCP Usage (Official Plugin)
+
+**Serena MCP is now available via official plugin.** Install separately:
+```bash
+/plugin install serena@anthropics/claude-plugins-official
+```
 
 #### Key Commands
 
 **Read code progressively (not entire files):**
 ```bash
 # 1. Get symbol overview first
-mcp__plugin_ndf_serena__get_symbols_overview relative_path="path/to/file.py"
+mcp__plugin_official_serena__get_symbols_overview relative_path="path/to/file.py"
 
 # 2. Find specific symbol
-mcp__plugin_ndf_serena__find_symbol name_path="/ClassName" relative_path="src/" include_body=true
+mcp__plugin_official_serena__find_symbol name_path="/ClassName" relative_path="src/" include_body=true
 
 # 3. Search pattern if symbol name unknown
-mcp__plugin_ndf_serena__search_for_pattern substring_pattern="TODO" relative_path="src/"
-```
-
-**Edit code safely:**
-```bash
-# Replace symbol body (preferred)
-mcp__plugin_ndf_serena__replace_symbol_body name_path="/function_name" relative_path="file.py" body="new code"
-
-# Rename across codebase
-mcp__plugin_ndf_serena__rename_symbol name_path="/OldName" relative_path="file.py" new_name="NewName"
-
-# Find all references
-mcp__plugin_ndf_serena__find_referencing_symbols name_path="function_name" relative_path="source.py"
-```
-
-**Use memories:**
-```bash
-mcp__plugin_ndf_serena__read_memory project-overview.md
-mcp__plugin_ndf_serena__write_memory memory_file_name="feature.md" content="..."
+mcp__plugin_official_serena__search_for_pattern substring_pattern="TODO" relative_path="src/"
 ```
 
 #### Best Practices
 
-✅ **DO**: Get symbol overview before reading files, use symbol-based editing
-❌ **DON'T**: Read entire files, use for binary files (PDF/images)
+- Get symbol overview before reading files
+- Use symbol-based editing
+- Don't read entire files, don't use for binary files (PDF/images)
 
-### 4. Research Facts
+### 5. Research Facts
 
 **For technically challenging tasks, research external resources instead of guessing.**
 
-- Static website content → **WebFetch tool** (fast, lightweight)
-- Cloud services (AWS, GCP) → **researcher agent** with AWS Docs MCP
-- Latest libraries/frameworks → **corder agent** with Context7 MCP
-- Dynamic content requiring JavaScript → **researcher agent** with Chrome DevTools MCP
+- Static website content -> **WebFetch tool** (fast, lightweight)
+- Cloud services (AWS, GCP) -> **researcher agent** with AWS Docs MCP
+- Latest libraries/frameworks -> **corder agent** (Context7 via official plugin)
+- Dynamic content requiring JavaScript -> **researcher agent** with Chrome DevTools MCP
 
-### 5. Skills Usage
+### 6. Skills Usage
 
 **Claude Code Skills are model-invoked**: Claude autonomously activates Skills based on request and Skill description.
 
-**10 Available Skills (v1.2.0):**
-
-**Director Skills (1):**
-- `director-project-planning` - Structured project plans with task breakdown, timeline, resource allocation, and risk assessment
+**8 Available Skills (v2.0.0):**
 
 **Data Analyst Skills (2):**
 - `data-analyst-sql-optimization` - SQL optimization patterns and best practices
@@ -124,20 +118,14 @@ mcp__plugin_ndf_serena__write_memory memory_file_name="feature.md" content="..."
 - `scanner-pdf-analysis` - PDF text extraction, table detection, and summarization
 - `scanner-excel-extraction` - Excel data extraction and conversion to JSON/CSV
 
-**QA Skills (2):**
-- `qa-code-review-checklist` - Comprehensive code review checklist (readability, maintainability, security)
+**QA Skills (1):**
 - `qa-security-scan` - Security scanning with OWASP Top 10 checklist
 
 **How Skills Work:**
 - **Model-invoked**: Claude decides when to use based on request keywords and context
-- **Trigger keywords**: Each Skill description contains keywords (e.g., "plan", "optimize SQL", "code review")
-- **Progressive disclosure**: Main documentation ≤500 lines, detailed references loaded as needed
+- **Trigger keywords**: Each Skill description contains keywords (e.g., "optimize SQL", "security scan")
+- **Progressive disclosure**: Main documentation <=500 lines, detailed references loaded as needed
 - **Sub-agent specialization**: Skills complement each sub-agent's existing capabilities
-
-**Usage Tips:**
-✅ Use natural language with trigger keywords (e.g., "create a project plan", "optimize this SQL query")
-✅ Skills provide templates, scripts, and best practices for common tasks
-✅ Each sub-agent can leverage multiple Skills relevant to their domain
 
 ## Sub-Agent Invocation
 
@@ -152,73 +140,15 @@ Task(
 ```
 
 **Available subagent_type:**
-- `ndf:director` - Task orchestration and coordination expert
 - `ndf:corder` - Coding expert
 - `ndf:data-analyst` - Data analysis expert
 - `ndf:researcher` - Research expert
 - `ndf:scanner` - File reading expert
 - `ndf:qa` - Quality assurance expert
 
-### 6 Specialized Sub-Agents
-
-#### 0. @director - Task Orchestration Expert
-
-**Use Cases:**
-- Overall task understanding and breakdown
-- Investigation and research
-- Planning and strategy
-- Result integration and reporting
-- **Identifying which specialized sub-agents are needed**
-
-**MCP Tools:** Serena MCP, GitHub MCP, basic tools (Read, Glob, Grep, Bash)
-
-**Important Note:**
-**Main Agent should delegate ALL tasks to Director Agent.** Director will investigate, plan, and **report back to Main Agent which specialized sub-agents are needed**. Director CANNOT call other sub-agents directly.
-
-**Example:**
-```
-User: "Implement a new feature for user profile management with database integration"
-
-Main Agent: Complex multi-step task → delegate to ndf:director
-
-Task(
-  subagent_type="ndf:director",
-  prompt="Implement a new user profile management feature. This should include: 1) Database schema design, 2) Backend API implementation, 3) Code quality review. Please investigate the current codebase structure, create a plan, and report which specialized sub-agents (data-analyst, corder, qa) are needed for each step.",
-  description="User profile feature implementation"
-)
-
-# Director reports back to Main Agent:
-# "Investigation complete. We need:
-#  1. data-analyst for database schema design
-#  2. corder for API implementation
-#  3. qa for code quality review"
-```
-
-**Director Agent's Workflow:**
-1. Understand user requirements
-2. Investigate codebase (using Serena MCP)
-3. Create execution plan
-4. **Report to Main Agent which specialized sub-agents are needed**
-5. Integrate results from sub-agents (once Main Agent launches them)
-6. Report back to Main Agent with final results
-
-**Director Agent's Restrictions (IMPORTANT):**
-
-To prevent infinite loops and core dumps, director agent has the following restrictions:
-
-✅ **Can call:**
-- MCP tools (Serena MCP, GitHub MCP, BigQuery MCP, AWS Docs MCP, Chrome DevTools MCP, Context7 MCP, etc.)
-
-❌ **Cannot call:**
-- **ANY sub-agents** (including `ndf:corder`, `ndf:data-analyst`, `ndf:researcher`, `ndf:scanner`, `ndf:qa`)
-- **`ndf:director` itself** (no self-invocation)
-- **Claude Code MCP** (to prevent plugin-related infinite loops)
-
-**Director must report required sub-agents to Main Agent instead of calling them directly.**
-
 ### 5 Specialized Sub-Agents
 
-**Important:** All specialized sub-agents (corder, data-analyst, researcher, scanner, qa) **MUST NOT** call other sub-agents (including director). They can only use MCP tools directly. Task delegation is exclusively the role of the Main agent.
+**Important:** All specialized sub-agents **MUST NOT** call other sub-agents. They can only use MCP tools directly. Task delegation and coordination is exclusively the role of the Main agent.
 
 #### 1. @data-analyst - Data Analysis Expert
 
@@ -228,13 +158,13 @@ To prevent infinite loops and core dumps, director agent has the following restr
 - Data analysis/statistics
 - Save query results to files (CSV/JSON/Excel)
 
-**MCP Tools:** BigQuery MCP
+**MCP Tools:** BigQuery MCP, DBHub MCP
 
 **Example:**
 ```
 User: "Analyze last month's sales data in BigQuery and show top 10 products"
 
-Main Agent: Data analysis task → delegate to ndf:data-analyst
+Main Agent: Data analysis task -> delegate to ndf:data-analyst
 
 Task(
   subagent_type="ndf:data-analyst",
@@ -252,13 +182,15 @@ Task(
 - Applying design patterns/architecture
 - Checking latest best practices
 
-**MCP Tools:** Codex CLI MCP, Serena MCP, Context7 MCP
+**MCP Tools:** Codex CLI MCP
+
+> **Note**: Serena MCP and Context7 MCP are available via official plugins. Install separately to use with corder.
 
 **Example:**
 ```
 User: "Implement user authentication feature"
 
-Main Agent: Coding task → delegate to ndf:corder
+Main Agent: Coding task -> delegate to ndf:corder
 
 Task(
   subagent_type="ndf:corder",
@@ -282,7 +214,7 @@ Task(
 ```
 User: "Research AWS Lambda best practices"
 
-Main Agent: Research task → delegate to ndf:researcher
+Main Agent: Research task -> delegate to ndf:researcher
 
 Task(
   subagent_type="ndf:researcher",
@@ -305,7 +237,7 @@ Task(
 ```
 User: "Read document.pdf and summarize"
 
-Main Agent: File reading task → delegate to ndf:scanner
+Main Agent: File reading task -> delegate to ndf:scanner
 
 Task(
   subagent_type="ndf:scanner",
@@ -322,15 +254,14 @@ Task(
 - Web application performance measurement
 - Test coverage verification
 - Documentation quality validation
-- Claude Code plugin specification compliance check
 
-**MCP Tools:** WebFetch tool (priority), Codex CLI MCP, Serena MCP, Chrome DevTools MCP
+**MCP Tools:** WebFetch tool (priority), Codex CLI MCP, Chrome DevTools MCP
 
 **Examples:**
 ```
 User: "Review this code's quality and security"
 
-Main Agent: QA task → delegate to ndf:qa
+Main Agent: QA task -> delegate to ndf:qa
 
 Task(
   subagent_type="ndf:qa",
@@ -342,7 +273,7 @@ Task(
 ```
 User: "Measure web application performance"
 
-Main Agent: Performance test task → delegate to ndf:qa
+Main Agent: Performance test task -> delegate to ndf:qa
 
 Task(
   subagent_type="ndf:qa",
@@ -355,109 +286,69 @@ Task(
 
 **Quick Decision Flow for Main Agent:**
 
-1. **ALL tasks** → `ndf:director` ⭐ **DEFAULT - ALWAYS USE DIRECTOR FIRST**
-
-**Note:** Main Agent should NOT classify tasks by type. Simply delegate everything to Director first. Director will investigate, plan, and **report back which specialized sub-agents are needed**. Main Agent then launches those sub-agents as requested.
-
-**Important:** **Always delegate to Director first.** Director performs investigation and planning, then reports required sub-agents to Main Agent. Main Agent launches specialized sub-agents and coordinates the workflow.
+| Task Type | Action |
+|-----------|--------|
+| **Complex multi-step implementation** | Use **Plan Mode** (EnterPlanMode) |
+| **Codebase exploration/investigation** | Use **Explore Agent** |
+| **Data analysis/SQL** | Delegate to `ndf:data-analyst` |
+| **Coding/implementation** | Delegate to `ndf:corder` |
+| **Research/documentation** | Delegate to `ndf:researcher` |
+| **File reading (PDF/images)** | Delegate to `ndf:scanner` |
+| **Quality/security review** | Delegate to `ndf:qa` |
 
 ## Multi-Agent Collaboration
 
-For complex tasks, **Main Agent coordinates multiple sub-agents** based on Director's recommendations.
+For complex tasks, **Main Agent coordinates multiple sub-agents**.
 
 ### Parallel Execution (Recommended)
 
-Director should identify tasks that can run in parallel and recommend parallel execution to Main Agent when:
+Main Agent should identify tasks that can run in parallel when:
 
-✅ **Parallel execution conditions:**
 - Target files do not overlap
 - Tasks are independent (no dependencies)
 - Memory usage is manageable
 
-**Benefits:**
-- Faster task completion
-- Better resource utilization
-- Improved user experience
-
-**Main Agent** launches multiple sub-agents simultaneously when Director recommends parallel execution.
-
-**Example 0: Complex Feature Implementation - RECOMMENDED**
+**Example: Complex Feature Implementation**
 ```
 User: "Add a new dashboard feature that fetches data from BigQuery and displays performance metrics"
 
-Step 1: Main Agent → Director
-Task(
-  subagent_type="ndf:director",
-  prompt="Investigate and plan a new dashboard feature that: 1) Fetches data from BigQuery, 2) Displays performance metrics, 3) Has responsive UI. Report which specialized sub-agents are needed for each step. Determine if any tasks can be executed in parallel.",
-  description="Dashboard feature planning"
-)
+Step 1: Main Agent uses Plan Mode to design approach
+EnterPlanMode() -> Investigate codebase -> Create plan -> Get user approval
 
-Step 2: Director reports back
-"Investigation complete. We need:
- 1. data-analyst for BigQuery query design
- 2. corder for UI implementation
- 3. qa for code quality review
+Step 2: Main Agent delegates to specialized agents
+Task(subagent_type="ndf:data-analyst", ...)  # BigQuery query design
+Task(subagent_type="ndf:corder", ...)        # UI implementation (can run in parallel with qa)
+Task(subagent_type="ndf:qa", ...)            # Code quality review (parallel)
 
-【Parallel Execution Recommendation】
-Tasks 2 and 3 can run in parallel after task 1 completes:
-- corder will modify src/dashboard/ui.js
-- qa will review tests/dashboard.test.js
-- No file overlap, no dependencies between them"
-
-Step 3: Main Agent launches task 1 first, then tasks 2 and 3 in parallel
-Task(subagent_type="ndf:data-analyst", ...)  # Sequential
-# Wait for data-analyst to complete
-Task(subagent_type="ndf:corder", ...)        # Parallel
-Task(subagent_type="ndf:qa", ...)            # Parallel
-
-Step 4: Main Agent integrates results and reports to user
+Step 3: Main Agent integrates results and reports to user
 ```
 
-**Example 1: Data Analysis → Reporting**
-```
-User: "Analyze sales data in BigQuery and create PowerPoint report"
-
-Main Agent → Director → "We need data-analyst and scanner"
-Main Agent → data-analyst (BigQuery analysis)
-Main Agent → scanner (Verify PowerPoint creation if needed)
-Main Agent → User (Final report)
-```
-
-**Example 2: Research → Implementation**
+**Example: Research -> Implementation**
 ```
 User: "Research AWS Lambda best practices and write code based on findings"
 
-Main Agent → Director → "We need researcher and corder"
-Main Agent → researcher (AWS Lambda best practices)
-Main Agent → corder (Implementation based on findings)
-Main Agent → User (Final code)
-```
-
-**Example 3: PDF Reading → Data Analysis**
-```
-User: "Read sales data from PDF, import to database, and analyze"
-
-Main Agent → Director → "We need scanner and data-analyst"
-Main Agent → scanner (Read PDF, extract data)
-Main Agent → data-analyst (Import to database and analyze)
-Main Agent → User (Analysis results)
+Main Agent -> researcher (AWS Lambda best practices)
+Main Agent -> corder (Implementation based on findings)
+Main Agent -> User (Final code)
 ```
 
 ## Best Practices
 
 ### DO (Recommended)
 
-✅ **Use specialized agents for each task type**
-✅ **Decompose complex tasks and delegate to multiple agents**
-✅ **Validate and integrate agent results**
-✅ **Start parallel tasks simultaneously when possible**
+- **Use Plan Mode for complex multi-step implementations**
+- **Use Explore Agent for codebase investigation**
+- **Use specialized agents for each task type**
+- **Decompose complex tasks and delegate to multiple agents**
+- **Validate and integrate agent results**
+- **Start parallel tasks simultaneously when possible**
 
 ### DON'T (Not Recommended)
 
-❌ **Handle specialized tasks with main agent** → Delegate to sub-agents
-❌ **Respond with guesses without sub-agents** → Research with appropriate agent
-❌ **Implement complex code without review** → Delegate to corder with Codex review
-❌ **Try to process PDFs/images directly** → Delegate to scanner
+- **Handle specialized tasks with main agent** -> Delegate to sub-agents
+- **Respond with guesses without research** -> Research with appropriate agent
+- **Implement complex code without review** -> Delegate to corder with Codex review
+- **Try to process PDFs/images directly** -> Delegate to scanner
 
 ## Available MCP Tools (Reference)
 
@@ -466,41 +357,33 @@ Main agent can use these MCPs, but **delegating to specialized agents produces b
 **Built-in Tools:**
 - **WebFetch**: Fast web content retrieval, HTML to Markdown conversion, AI-based processing (15-min cache)
 
-**Core MCPs (frequently used):**
-- **Serena MCP**: Code structure understanding, symbol editing
-- **GitHub MCP**: PR/issue management, code search
-- **Codex CLI MCP**: → **Delegate to @corder or @scanner**
-- **Context7 MCP**: Latest library documentation → **Delegate to @corder**
+**Official Plugins (install separately):**
+- **GitHub MCP**: PR/issue management, code search (`/plugin install github@anthropics/claude-plugins-official`)
+- **Serena MCP**: Code structure understanding, symbol editing (`/plugin install serena@anthropics/claude-plugins-official`)
+- **Context7 MCP**: Latest library documentation (`/plugin install context7@anthropics/claude-plugins-official`)
 
-**Specialized MCPs (delegate to agents):**
-- **BigQuery MCP**: Database queries → **Delegate to @data-analyst**
-- **AWS Docs MCP**: AWS documentation → **Delegate to @researcher**
-- **Chrome DevTools MCP**: Web performance/debugging (dynamic content only) → **Delegate to @researcher or @qa**
+**NDF Plugin MCPs:**
+- **Codex CLI MCP**: -> **Delegate to @corder or @scanner**
+- **BigQuery MCP**: Database queries -> **Delegate to @data-analyst**
+- **AWS Docs MCP**: AWS documentation -> **Delegate to @researcher**
+- **Chrome DevTools MCP**: Web performance/debugging -> **Delegate to @researcher or @qa**
 
 ## Summary
 
 **Main Agent Role:**
 - Receive user requests
-- **Delegate ALL tasks to Director Agent first** (for investigation and planning)
-- **Launch specialized sub-agents** as requested by Director
+- **Use Plan Mode for complex implementation planning**
+- **Use Explore Agent for codebase investigation**
+- **Classify tasks and delegate to appropriate specialized sub-agents**
 - Coordinate multi-agent workflows
 - Pass through final results to user
 
-**Director Agent Role (INVESTIGATION & PLANNING):**
-- Task understanding and breakdown
-- Investigation and research (using Serena MCP, GitHub MCP)
-- Planning and coordination
-- **Report required sub-agents to Main Agent** (cannot call them directly)
-- Direct execution of simple tasks
-- Result integration and detailed reporting
-
 **Specialized Sub-Agent Roles:**
 - High-quality execution in specialized domains (coding, data, research, scanning, QA)
-- Called by Main Agent when Director requests them
 - Effective use of specialized MCP tools
 - Detailed analysis and implementation
-- **Cannot call other sub-agents** (including director)
+- **Cannot call other sub-agents**
 
 **Success Key:**
-**Main Agent delegates ALL tasks to Director first.** Director investigates and plans, then **reports which specialized sub-agents are needed**. Main Agent launches those sub-agents and coordinates the workflow. This architecture prevents infinite loops and ensures predictable, safe agent orchestration.
+**Main Agent uses Claude Code built-in features (Plan Mode, Explore Agent) for planning and investigation, then delegates domain-specific tasks to specialized sub-agents.** This architecture leverages both Claude Code's powerful built-in capabilities and NDF's specialized agents for optimal results.
 <!-- NDF_PLUGIN_GUIDE_END_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->

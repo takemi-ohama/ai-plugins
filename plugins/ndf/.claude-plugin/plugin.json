@@ -1,12 +1,12 @@
 {
   "name": "ndf",
-  "version": "1.2.1",
-  "description": "Integrated plugin combining MCP servers, development workflow commands, specialized agents, and Slack notifications",
+  "version": "2.0.0",
+  "description": "Integrated plugin with specialized agents, workflow commands, skills, and Slack notifications. Core MCP servers (GitHub, Serena, Context7) moved to official plugins.",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
   },
-  "keywords": ["mcp", "github", "serena", "bigquery", "notion", "database", "chrome-devtools", "code-review", "workflow", "slack", "notifications", "agents", "context7"],
+  "keywords": ["mcp", "bigquery", "notion", "database", "chrome-devtools", "codex", "workflow", "slack", "notifications", "agents", "skills"],
   "commands": [
     "./commands/serena.md",
     "./commands/pr.md",
@@ -16,7 +16,6 @@
     "./commands/clean.md"
   ],
   "agents": [
-    "./agents/director.md",
     "./agents/data-analyst.md",
     "./agents/corder.md",
     "./agents/researcher.md",
@@ -24,7 +23,6 @@
     "./agents/qa.md"
   ],
   "skills": [
-    "./skills/director-project-planning",
     "./skills/data-analyst-sql-optimization",
     "./skills/data-analyst-export",
     "./skills/corder-code-templates",
@@ -32,7 +30,6 @@
     "./skills/researcher-report-templates",
     "./skills/scanner-pdf-analysis",
     "./skills/scanner-excel-extraction",
-    "./skills/qa-code-review-checklist",
     "./skills/qa-security-scan"
   ]
 }

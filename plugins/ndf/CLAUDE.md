@@ -9,7 +9,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 1.2.1
+- **現在バージョン**: 2.0.0
 - **種類**: 統合プラグイン（MCP + Commands + Agents + Hooks）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-agent-marketplace
 
@@ -49,8 +49,7 @@ plugins/ndf/
 │   ├── review.md
 │   ├── merged.md
 │   └── clean.md
-├── agents/                      # サブエージェント（6個）
-│   ├── director.md
+├── agents/                      # サブエージェント（5個）
 │   ├── data-analyst.md
 │   ├── corder.md
 │   ├── researcher.md
@@ -268,15 +267,15 @@ mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
 ```json
 {
   "name": "ndf",
-  "version": "1.0.6",
-  "description": "Integrated plugin combining MCP servers, development workflow commands, specialized agents, and Slack notifications",
+  "version": "2.0.0",
+  "description": "Integrated plugin with specialized agents, workflow commands, skills, and Slack notifications",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
   },
-  "keywords": ["mcp", "github", "serena", ...],
+  "keywords": ["mcp", "bigquery", "notion", ...],
   "commands": ["./commands/serena.md", ...],
-  "agents": ["./agents/director.md", ...]
+  "agents": ["./agents/data-analyst.md", ...]
 }
 ```
 
@@ -459,7 +458,13 @@ mcp__plugin_ndf_serena__write_memory \
 
 ## 開発履歴
 
-### v1.2.1 (最新)
+### v2.0.0 (最新)
+- **破壊的変更**: GitHub MCP, Serena MCP, Context7 MCPを公式プラグインに移行
+- directorサブエージェントを削除（Claude Code組み込み機能と重複）
+- director-project-planning, qa-code-review-checklistスキルを削除
+- MCP: 10個→7個、エージェント: 6個→5個、スキル: 10個→8個
+
+### v1.2.1
 - MCP設定簡略化とディレクトリ再構成
 - devtoolsディレクトリの削除
 - researchディレクトリをdocsに移動

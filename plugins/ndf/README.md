@@ -6,21 +6,34 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 
 このプラグイン1つで、以下の**すべて**の機能を利用できます：
 
-1. **MCP統合**: 10個の強力なMCPサーバー（GitHub、Serena、BigQuery、Notion、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Context7、Claude Code）
+1. **MCP統合**: 7個のMCPサーバー（Notion、BigQuery、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Claude Code）
 2. **開発ワークフロー**: PR作成、レビュー、マージ、ブランチクリーンアップコマンド
-3. **専門エージェント**: 6つの特化型AIエージェント（タスク統括、データ分析、コーディング、調査、ファイル読み取り、品質管理）
-4. **Skills (NEW v1.2.0)**: 10個のモデル起動型機能モジュール（プロジェクト計画、SQL最適化、コードテンプレート、テスト生成、PDF解析等）
+3. **専門エージェント**: 5つの特化型AIエージェント（データ分析、コーディング、調査、ファイル読み取り、品質管理）
+4. **Skills**: 8個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、PDF解析等）
 5. **自動フック**: Slack通知
+
+> **Note (v2.0.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。必要に応じて個別にインストールしてください。
 
 ## インストール
 
 ### 前提条件
 
 - Claude Code がインストール済み
-- Python 3.10以上（Serena、BigQuery MCP用）
+- Python 3.10以上（BigQuery MCP用）
 - `uvx` がインストール済み（`pip install uv`）
 - Node.js（DBHub、Chrome DevTools MCP用）
 - Codex CLI（Codex CLI MCP用）- オプション
+
+### 公式プラグインのインストール（推奨）
+
+GitHub、Serena、Context7 MCPは公式プラグインとして提供されています：
+
+```bash
+# Claude Codeで実行
+/plugin install github@anthropics/claude-plugins-official
+/plugin install serena@anthropics/claude-plugins-official
+/plugin install context7@anthropics/claude-plugins-official
+```
 
 ### ステップ1: マーケットプレイスの追加
 
@@ -41,11 +54,6 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 プロジェクトルートに `.env` ファイルを作成し、必要な認証情報を設定します。
 
 ```bash
-# GitHub MCP (必須 - 基本機能用)
-# トークン取得: https://github.com/settings/tokens
-# 必要なスコープ: repo, read:org, workflow
-GITHUB_PERSONAL_ACCESS_TOKEN=
-
 # Notion MCP (オプション - Notion使用時のみ)
 # Integration Token取得: https://www.notion.so/my-integrations
 NOTION_TOKEN=
@@ -66,14 +74,11 @@ SLACK_BOT_TOKEN=
 SLACK_CHANNEL_ID=
 SLACK_USER_MENTION=  # 例: <@U0123456789>
 
-# Context7 MCP (オプション - 最新コード例とドキュメント取得用)
-# API Key取得: https://context7.com
-CONTEXT7_API_KEY=
-
 # 注意:
-# - Serena MCP、AWS Docs MCP、Chrome DevTools MCPは認証不要
+# - AWS Docs MCP、Chrome DevTools MCPは認証不要
 # - Codex CLI MCPはインストール必要: https://github.com/openai/codex/releases
 #   インストール後、'codex login'を実行
+# - GitHub MCP、Serena MCP、Context7 MCPは公式プラグインを使用してください
 ```
 
 #### .envファイルの保護
@@ -199,33 +204,6 @@ SLACK_USER_MENTION="<@U0123456789>"  # オプション
 
 </details>
 
-<details>
-<summary><strong>Context7 API Keyの取得方法</strong></summary>
-
-Context7 MCPは最新のコード例とドキュメントを取得します。API Keyは任意ですが、設定すると高速化されます。
-
-**ステップ1: アカウント作成**
-
-1. https://context7.com にアクセス
-2. アカウントを作成またはログイン
-
-**ステップ2: API Keyの取得**
-
-1. ダッシュボードまたは設定ページにアクセス
-2. API Keyセクションを探す
-3. 新しいKeyを生成
-4. Keyをコピーして `.env` に設定
-
-```bash
-CONTEXT7_API_KEY="your-api-key-here"
-```
-
-**注意:**
-- Context7 MCPはAPI Key無しでも動作しますが、レート制限があります
-- プライベートリポジトリへのアクセスにはAPI Keyが必要
-
-</details>
-
 ### ステップ4: Claude Codeを再起動
 
 `.env` ファイルに値を入力したら、Claude Codeを再起動してMCPサーバーとフックをロードします。
@@ -240,27 +218,6 @@ CONTEXT7_API_KEY="your-api-key-here"
 
 ```bash
 # ============================================
-# GitHub MCP - PR/イシュー管理（必須）
-# ============================================
-GITHUB_PERSONAL_ACCESS_TOKEN=your-github-token-here
-
-# オプション設定
-# GITHUB_HOST=github.com
-# GITHUB_TOOLSETS=default
-# GITHUB_TOOLS=all
-# GITHUB_READ_ONLY=false
-# GITHUB_LOCKDOWN_MODE=false
-# GITHUB_DYNAMIC_TOOLSETS=false
-
-# ============================================
-# Serena MCP - コード分析（推奨）
-# ============================================
-# すべてオプション - 基本機能に認証不要
-# SERENA_HOME=/path/to/serena/home
-# GOOGLE_API_KEY=your-google-api-key
-# ANTHROPIC_API_KEY=your-anthropic-api-key
-
-# ============================================
 # Chrome DevTools MCP - Web調査
 # ============================================
 # 専用環境変数なし - envFileのみ
@@ -274,12 +231,6 @@ GITHUB_PERSONAL_ACCESS_TOKEN=your-github-token-here
 # OPENAI_BASE_URL=https://api.openai.com/v1
 # AZURE_OPENAI_API_KEY=your-azure-openai-key
 # MISTRAL_API_KEY=your-mistral-api-key
-
-# ============================================
-# Context7 MCP - 最新ライブラリドキュメント
-# ============================================
-# オプション - APIキーなしでも動作
-# CONTEXT7_API_KEY=your-context7-api-key
 
 # ============================================
 # Notion MCP - Notionドキュメント管理
@@ -351,33 +302,13 @@ SLACK_USER_MENTION=<@U0123456789>
 
 ### 📊 MCPサーバー別環境変数詳細
 
-#### 1. GitHub MCP
+> **Note (v2.0.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。環境変数設定は各公式プラグインのドキュメントを参照してください。
 
-| 環境変数 | 必須/オプション | デフォルト値 | 説明 |
-|---------|--------------|------------|------|
-| **GITHUB_PERSONAL_ACCESS_TOKEN** | **必須** | - | GitHubパーソナルアクセストークン（`repo`, `read:org`, `workflow`スコープ）<br>取得: https://github.com/settings/tokens |
-| GITHUB_HOST | オプション | `github.com` | GitHub Enterpriseサーバーのホスト名 |
-| GITHUB_TOOLSETS | オプション | `default` | 利用可能なツールセット |
-| GITHUB_TOOLS | オプション | `all` | 有効化するツール |
-| GITHUB_READ_ONLY | オプション | `false` | 読み取り専用モード |
-| GITHUB_LOCKDOWN_MODE | オプション | `false` | ロックダウンモード |
-| GITHUB_DYNAMIC_TOOLSETS | オプション | `false` | 動的ツールセット有効化 |
-
-#### 2. Serena MCP
-
-| 環境変数 | 必須/オプション | デフォルト値 | 説明 |
-|---------|--------------|------------|------|
-| SERENA_HOME | オプション | `~/.serena` | Serenaのホームディレクトリ |
-| GOOGLE_API_KEY | オプション | - | Google AI（Gemini）APIキー |
-| ANTHROPIC_API_KEY | オプション | - | Anthropic Claude APIキー |
-
-**注意:** Serena MCPの基本機能は認証不要です。高度な機能（AI支援検索等）を使う場合のみAPIキーが必要です。
-
-#### 3. Chrome DevTools MCP
+#### 1. Chrome DevTools MCP
 
 **専用環境変数なし** - `.env`ファイルの`envFile`設定のみ使用。
 
-#### 4. Codex CLI MCP
+#### 2. Codex CLI MCP
 
 | 環境変数 | 必須/オプション | デフォルト値 | 説明 |
 |---------|--------------|------------|------|
@@ -391,15 +322,7 @@ SLACK_USER_MENTION=<@U0123456789>
 
 インストール: https://github.com/openai/codex/releases
 
-#### 5. Context7 MCP
-
-| 環境変数 | 必須/オプション | デフォルト値 | 説明 |
-|---------|--------------|------------|------|
-| CONTEXT7_API_KEY | オプション | - | Context7 APIキー<br>取得: https://context7.com |
-
-**注意:** APIキーなしでも動作しますが、レート制限があります。プライベートリポジトリへのアクセスにはAPIキーが必要です。
-
-#### 6. Notion MCP
+#### 3. Notion MCP
 
 | 環境変数 | 必須/オプション | デフォルト値 | 説明 |
 |---------|--------------|------------|------|
@@ -407,7 +330,7 @@ SLACK_USER_MENTION=<@U0123456789>
 | OPENAPI_MCP_HEADERS | オプション | - | カスタムHTTPヘッダー（JSON形式） |
 | AUTH_TOKEN | オプション | - | 追加の認証トークン |
 
-#### 7. AWS Docs MCP
+#### 4. AWS Docs MCP
 
 | 環境変数 | 必須/オプション | デフォルト値 | 説明 |
 |---------|--------------|------------|------|
@@ -417,7 +340,7 @@ SLACK_USER_MENTION=<@U0123456789>
 
 **注意:** 認証不要でAWS公式ドキュメントにアクセスできます。
 
-#### 8. BigQuery MCP
+#### 5. BigQuery MCP
 
 | 環境変数 | 必須/オプション | デフォルト値 | 説明 |
 |---------|--------------|------------|------|
@@ -436,7 +359,7 @@ SLACK_USER_MENTION=<@U0123456789>
 
 サービスアカウント作成: https://console.cloud.google.com/iam-admin/serviceaccounts
 
-#### 9. DBHub MCP
+#### 6. DBHub MCP
 
 | 環境変数 | 必須/オプション | デフォルト値 | 説明 |
 |---------|--------------|------------|------|
@@ -461,7 +384,7 @@ SLACK_USER_MENTION=<@U0123456789>
 - **Method 1（推奨）**: `DSN`または`DATABASE_DSN`のみ指定
 - **Method 2**: `DB_TYPE`, `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`を個別指定
 
-#### 10. Claude Code MCP
+#### 7. Claude Code MCP
 
 | 環境変数 | 必須/オプション | デフォルト値 | 説明 |
 |---------|--------------|------------|------|
@@ -553,44 +476,18 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 **使用タイミング:** ローカルに不要なブランチが溜まってきたとき  
 リモートで削除済みのブランチをローカルからも削除します。
 
-### 3. 専門エージェント (6種類)
+### 3. 専門エージェント (5種類)
 
 **重要**: このプラグインには`CLAUDE.ndf.md`が含まれており、メインエージェント（Claude）に対してサブエージェントの積極的な活用を促す指示が記載されています。
 
 **サブエージェントの活用方針:**
-- **すべてのタスクは最初にdirectorエージェントに委譲（推奨）**
-- Directorがタスクの統括、調査、計画、他のサブエージェントへの指示出しを担当
-- Main Agentは最小限の調整のみに徹する
+- **タスクの種類に応じて適切なサブエージェントに委譲**
+- Claude Code組み込み機能（Plan Mode、Explore Agent）と連携
 - 各サブエージェントは専門MCPツールを効果的に活用
 
 詳細は `plugins/ndf/CLAUDE.ndf.md` を参照してください。
 
-#### `director` エージェント（NEW v1.0.6）
-**専門領域:** タスク統括と調整
-
-**使用MCPツール:**
-- Serena MCP（コードベース理解）
-- GitHub MCP（PR/Issue管理）
-- 基本ツール（Read, Glob, Grep, Bash）
-
-**機能:**
-- タスク全体の理解と分解
-- 情報収集と調査
-- 計画立案と実行戦略
-- 他のサブエージェントへの指示出し
-- 結果の統合と取りまとめ
-- ユーザーへの詳細報告
-
-**使用例:**
-```
-@director ユーザー認証機能を実装してください。データベーススキーマ設計、バックエンドAPI実装、コード品質レビューを含みます。現在のコードベース構造を調査し、計画を立て、適切なサブエージェント（data-analyst, corder, qa）と連携してください。
-```
-
-**重要な役割:**
-- **Main Agentが担っていた責務をすべて引き継ぎ**
-- Main Agentは指示出しのみに徹し、directorがすべての作業を統括
-- 複雑なタスクの分解と段階的実行
-- サブエージェント間の連携調整
+> **Note (v2.0.0)**: directorエージェントはClaude Code組み込み機能（Plan Mode、Explore Agent）と重複するため削除されました。タスク統括にはClaude CodeのPlan Modeを使用してください。
 
 #### `data-analyst` エージェント
 **専門領域:** データ分析とSQL操作
@@ -616,8 +513,8 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 
 **使用MCPツール:**
 - Codex CLI MCP（コードレビュー）
-- Serena MCP（コード構造理解）
-- Context7 MCP（最新ベストプラクティス）
+
+> **Note (v2.0.0)**: Serena MCP、Context7 MCPは公式プラグインに移行しました。これらは引き続きcorderエージェントで使用可能ですが、別途インストールが必要です。
 
 **機能:**
 - クリーンで読みやすいコードの作成
@@ -693,17 +590,13 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 @qa プラグインがClaude Code仕様に準拠しているか確認してください
 ```
 
-### 4. Skills (10種類) - NEW v1.2.0 🎯
+### 4. Skills (8種類) 🎯
 
 **Claude Code Skills**は、Claudeが自律的に判断して起動する**モデル起動型**の機能モジュールです。各サブエージェントは、タスク内容に応じて適切なSkillsを自動的に活用します。
 
-#### Skills一覧
+> **Note (v2.0.0)**: `director-project-planning`と`qa-code-review-checklist`は重複機能のため削除されました。プロジェクト計画にはClaude CodeのPlan Modeを、コードレビューチェックには公式プラグイン（`pr-review-toolkit`等）を使用してください。
 
-**Director Skills (1個):**
-- 🎯 **director-project-planning** - 構造化されたプロジェクト計画を生成
-  - タスク分解、タイムライン、リソース配分、リスク評価
-  - 並列実行可能タスクの自動判断
-  - GitHub Issue/PR作成テンプレート
+#### Skills一覧
 
 **Data Analyst Skills (2個):**
 - ⚡ **data-analyst-sql-optimization** - SQL最適化パターンとベストプラクティス
@@ -738,10 +631,7 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
   - 複数シート読み込み、JSON/CSV形式変換
   - 数式評価、大容量ファイル対応
 
-**QA Skills (2個):**
-- ✔️ **qa-code-review-checklist** - 包括的なコードレビューチェックリスト
-  - 可読性、保守性、パフォーマンス、セキュリティ
-  - 言語別チェックリスト（JavaScript、Python、Java等）
+**QA Skills (1個):**
 - 🔒 **qa-security-scan** - セキュリティスキャンと脆弱性評価
   - OWASP Top 10チェックリスト（詳細な修正方法付き）
   - 認証・認可テスト、データ保護確認
@@ -752,24 +642,22 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 Claudeは自然言語リクエストから適切なSkillsを自動判断して起動します。
 
 ```
-プロジェクト計画を作成してください
-→ director-project-planningが自動起動
-
 このSQLクエリを最適化してください
 → data-analyst-sql-optimizationが自動起動
 
 REST APIのテンプレートを使ってエンドポイントを作成してください
 → corder-code-templatesが自動起動
+
+セキュリティスキャンを実行してください
+→ qa-security-scanが自動起動
 ```
 
 **トリガーキーワード例:**
-- "plan", "roadmap", "task breakdown", "計画"
 - "optimize SQL", "slow query", "SQL最適化"
 - "export data", "save results", "データ出力"
 - "create API", "new component", "コードテンプレート"
 - "generate tests", "create unit test", "テスト生成"
 - "analyze PDF", "extract tables", "PDF解析"
-- "code review", "quality check", "コードレビュー"
 - "security scan", "OWASP", "セキュリティスキャン"
 
 #### Skillsの特徴
@@ -781,22 +669,21 @@ REST APIのテンプレートを使ってエンドポイントを作成してく
 
 詳細は各Skillの`SKILL.md`を参照してください。
 
-### 2. MCP統合 (10サーバー)
+### 2. MCP統合 (7サーバー)
 
-このプラグインは10個の強力なMCPサーバーを統合しています。各MCPの詳細な使用方法やベストプラクティスは、エージェント向けガイド `plugins/ndf/CLAUDE.md` を参照してください。
+このプラグインは7個の強力なMCPサーバーを統合しています。各MCPの詳細な使用方法やベストプラクティスは、エージェント向けガイド `plugins/ndf/CLAUDE.md` を参照してください。
 
-**GitHub、Serena、Notion** などの基本MCP、**BigQuery、DBHub** などのデータベースMCP、**Chrome DevTools、AWS Docs、Codex CLI、Context7、Claude Code** など専門MCPを含みます。
+> **Note (v2.0.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。
+
+**Notion** などの基本MCP、**BigQuery、DBHub** などのデータベースMCP、**Chrome DevTools、AWS Docs、Codex CLI、Claude Code** など専門MCPを含みます。
 
 #### MCPのデフォルト状態
 
 コンテキスト使用量を最適化するため、よく使うMCPのみがデフォルトで有効化されています。
 
-**デフォルトで有効（5つ）:**
-- ✅ **GitHub MCP** - PR/イシュー管理（必須）
-- ✅ **Serena MCP** - コード分析（必須）
+**デフォルトで有効（2つ）:**
 - ✅ **Chrome DevTools MCP** - Web調査、パフォーマンステスト
 - ✅ **Codex CLI MCP** - コードレビュー、ファイル読み取り
-- ✅ **Context7 MCP** - 最新ライブラリドキュメント
 
 **デフォルトで無効（5つ）:**
 - ⏸️ **Notion MCP** - コンテキストが大きいため無効
@@ -804,6 +691,13 @@ REST APIのテンプレートを使ってエンドポイントを作成してく
 - ⏸️ **BigQuery MCP** - 利用するプロジェクトが限られるため無効
 - ⏸️ **DBHub MCP** - 利用するプロジェクトが限られるため無効
 - ⏸️ **Claude Code MCP** - コンテキストが大きいため無効
+
+> **Tip**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグインからインストールして使用してください：
+> ```bash
+> /plugin install github@anthropics/claude-plugins-official
+> /plugin install serena@anthropics/claude-plugins-official
+> /plugin install context7@anthropics/claude-plugins-official
+> ```
 
 #### 無効化されているMCPを有効にする方法
 
@@ -911,17 +805,13 @@ REST APIのテンプレートを使ってエンドポイントを作成してく
 
 | MCP | 無効化を検討すべきケース |
 |-----|---------------------|
-| **Context7** | 最新ライブラリドキュメントが不要な場合（約5k tokens削減） |
 | **Chrome DevTools** | Webスクレイピングやパフォーマンステストが不要な場合（約10k tokens削減） |
 | **Codex CLI** | AIコードレビュー機能が不要な場合（約3k tokens削減） |
-| **GitHub** | GitHub連携が不要な場合（非推奨 - PRコマンド等が使えなくなります） |
-| **Serena** | コード分析機能が不要な場合（非推奨 - エージェントの効率が低下します） |
 
 **補足:**
 - MCPの有効化/無効化は各プロジェクトごとに設定されます
 - 設定は`.claude/settings.json`または`.mcp.json`に保存されます
 - 変更後、Claude Codeを再起動すると設定が反映されます
-- **GitHub MCPとSerena MCPは必須に近い**ため、無効化は推奨しません
 
 ### 3. 自動フック
 
