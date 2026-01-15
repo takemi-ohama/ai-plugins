@@ -88,6 +88,36 @@ function extractTextFromContent(content) {
 }
 
 /**
+ * Read latest summary from transcript file
+ * Claude Code automatically generates summaries during the session
+ */
+function readLatestSummary(transcriptPath) {
+  if (!fs.existsSync(transcriptPath)) {
+    return null;
+  }
+
+  try {
+    const content = fs.readFileSync(transcriptPath, 'utf8');
+    const lines = content.trim().split('\n');
+
+    // Search from the end to find the latest summary
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const data = JSON.parse(lines[i]);
+        if (data.type === 'summary' && data.summary) {
+          return data.summary;
+        }
+      } catch (e) {
+        // Skip invalid JSON lines
+      }
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
  * Read and parse recent messages from transcript
  */
 function readTranscriptMessages(transcriptPath, lineCount = 30, messageCount = 10) {
@@ -181,12 +211,13 @@ function callClaudeCLI(prompt) {
       '--print',
       '--no-session-persistence',
       '--model', 'haiku',
-      '--tools', '',  // Disable all tools (empty string is valid per CLI help)
+      '--tools', '',  // ツールを無効化（要約生成のみのため）
       prompt
     ];
 
     const claude = spawn('claude', args, {
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: process.env
     });
 
     let output = '';
@@ -255,9 +286,24 @@ function parseSummaryResponse(summary) {
 }
 
 /**
- * Generate summary using Claude CLI
+ * Generate summary - first tries transcript summary, then falls back to Claude CLI
  */
-async function generateSummaryWithClaude(transcriptPath) {
+async function generateSummary(transcriptPath) {
+  // First, try to get the latest summary from the transcript
+  // Claude Code automatically generates these during the session
+  const existingSummary = readLatestSummary(transcriptPath);
+  if (existingSummary) {
+    if (process.env.DEBUG_SLACK_NOTIFY === 'true') {
+      console.error('Using existing transcript summary:', existingSummary);
+    }
+    return existingSummary;
+  }
+
+  // Fallback: Generate summary using Claude CLI
+  if (process.env.DEBUG_SLACK_NOTIFY === 'true') {
+    console.error('No transcript summary found, trying Claude CLI...');
+  }
+
   const messages = readTranscriptMessages(transcriptPath);
   if (!messages) return null;
 
@@ -415,7 +461,7 @@ async function main() {
 
   // Step 1: Generate work summary
   const workSummary = transcriptPath
-    ? await generateSummaryWithClaude(transcriptPath)
+    ? await generateSummary(transcriptPath)
     : null;
 
   const repoName = await getRepositoryName();
