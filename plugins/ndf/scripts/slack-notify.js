@@ -2,6 +2,9 @@
 /**
  * Slack notification script for Claude Code completion
  * Reads transcript_path from stdin (hook input JSON) and generates summary
+ *
+ * Uses Claude CLI with --no-session-persistence for summarization
+ * (inherits Claude Code's authentication settings automatically)
  */
 
 const fs = require('fs');
@@ -38,7 +41,7 @@ function loadEnvFile() {
  */
 function parseEnvFile(envFile) {
   const content = fs.readFileSync(envFile, 'utf8');
-  
+
   content.split('\n').forEach(line => {
     line = line.trim();
     if (!line || line.startsWith('#')) return;
@@ -73,14 +76,14 @@ function extractTextFromContent(content) {
   if (typeof content === 'string') {
     return content;
   }
-  
+
   if (Array.isArray(content)) {
-    const textItem = content.find(item => 
+    const textItem = content.find(item =>
       item && typeof item === 'object' && item.type === 'text' && item.text
     );
     return textItem?.text || null;
   }
-  
+
   return null;
 }
 
@@ -169,54 +172,86 @@ ${conversationText.substring(0, 2000)}
 // ============================================================================
 
 /**
- * Call Claude CLI and get response
+ * Call Claude CLI with --no-session-persistence to generate summary
+ * This inherits Claude Code's authentication (API key or Bedrock) automatically
  */
 function callClaudeCLI(prompt) {
   return new Promise((resolve) => {
-    const claude = spawn('claude', [
-      '-p',
-      '--settings', '{"disableAllHooks": true, "disableAllPlugins": true}',
-      '--output-format', 'json'
-    ], {
+    const args = [
+      '--print',
+      '--no-session-persistence',
+      '--model', 'haiku',
+      '--tools', '',  // Disable all tools (empty string is valid per CLI help)
+      prompt
+    ];
+
+    const claude = spawn('claude', args, {
       stdio: ['pipe', 'pipe', 'pipe']
     });
 
     let output = '';
+    let errorOutput = '';
+    let resolved = false;
 
     claude.stdout.on('data', (data) => {
       output += data.toString();
     });
 
+    claude.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
     claude.on('close', (code) => {
+      if (resolved) return;
+      resolved = true;
+
       if (code === 0 && output.trim()) {
         resolve(output.trim());
       } else {
+        // Log error output for debugging if available
+        if (errorOutput && process.env.DEBUG_SLACK_NOTIFY === 'true') {
+          console.error('Claude CLI stderr:', errorOutput);
+        }
         resolve(null);
       }
     });
 
-    claude.on('error', () => resolve(null));
+    claude.on('error', (err) => {
+      if (resolved) return;
+      resolved = true;
+      if (process.env.DEBUG_SLACK_NOTIFY === 'true') {
+        console.error('Claude CLI error:', err.message);
+      }
+      resolve(null);
+    });
 
-    claude.stdin.write(prompt);
-    claude.stdin.end();
+    // Set timeout (30 seconds)
+    setTimeout(() => {
+      if (resolved) return;
+      resolved = true;
+      claude.kill();
+      if (process.env.DEBUG_SLACK_NOTIFY === 'true') {
+        console.error('Claude CLI timeout after 30 seconds');
+      }
+      resolve(null);
+    }, 30000);
   });
 }
 
 /**
- * Parse Claude CLI response and extract summary
+ * Parse summary response and clean it up
  */
-function parseSummaryResponse(output) {
-  if (!output) return null;
+function parseSummaryResponse(summary) {
+  if (!summary) return null;
 
-  try {
-    const response = JSON.parse(output);
-    const summary = (response.result || response.content || '').trim();
-    return summary.length >= 5 ? summary : null;
-  } catch (e) {
-    // If JSON parsing fails, fallback to raw text
-    const summary = output.split('\n')[0].trim();
-    return summary.length >= 5 ? summary : null;
-  }
+  // Clean up the summary - remove any prefixes/labels
+  let cleaned = summary
+    .replace(/^(要約[:：]?\s*|作業内容[:：]?\s*)/i, '')
+    .replace(/^[\s\n]+/, '')
+    .split('\n')[0]
+    .trim();
+
+  return cleaned.length >= 5 ? cleaned : null;
 }
 
 /**
@@ -231,7 +266,7 @@ async function generateSummaryWithClaude(transcriptPath) {
 
   const prompt = createSummarizationPrompt(conversationText);
   const output = await callClaudeCLI(prompt);
-  
+
   return parseSummaryResponse(output);
 }
 

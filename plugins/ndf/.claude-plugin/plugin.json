@@ -1,12 +1,12 @@
 {
   "name": "ndf",
-  "version": "2.0.0",
-  "description": "Integrated plugin with specialized agents, workflow commands, skills, and Slack notifications. Core MCP servers (GitHub, Serena, Context7) moved to official plugins.",
+  "version": "2.1.0",
+  "description": "Integrated plugin with director orchestrator, specialized agents, workflow commands, skills, and Slack notifications. Core MCP servers (GitHub, Serena, Context7) moved to official plugins.",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
   },
-  "keywords": ["mcp", "bigquery", "notion", "database", "chrome-devtools", "codex", "workflow", "slack", "notifications", "agents", "skills"],
+  "keywords": ["mcp", "bigquery", "notion", "database", "chrome-devtools", "codex", "workflow", "slack", "notifications", "agents", "skills", "director", "orchestrator"],
   "commands": [
     "./commands/serena.md",
     "./commands/pr.md",
@@ -16,6 +16,7 @@
     "./commands/clean.md"
   ],
   "agents": [
+    "./agents/director.md",
     "./agents/data-analyst.md",
     "./agents/corder.md",
     "./agents/researcher.md",

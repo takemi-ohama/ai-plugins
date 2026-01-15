@@ -8,11 +8,11 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 
 1. **MCP統合**: 7個のMCPサーバー（Notion、BigQuery、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Claude Code）
 2. **開発ワークフロー**: PR作成、レビュー、マージ、ブランチクリーンアップコマンド
-3. **専門エージェント**: 5つの特化型AIエージェント（データ分析、コーディング、調査、ファイル読み取り、品質管理）
+3. **専門エージェント**: 6つの特化型AIエージェント（**director指揮者**、データ分析、コーディング、調査、ファイル読み取り、品質管理）
 4. **Skills**: 8個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、PDF解析等）
 5. **自動フック**: Slack通知
 
-> **Note (v2.0.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。必要に応じて個別にインストールしてください。
+> **Note (v2.1.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。**directorエージェント**がClaude Code機能を活用する指揮者として再定義されました。
 
 ## インストール
 
@@ -476,18 +476,40 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 **使用タイミング:** ローカルに不要なブランチが溜まってきたとき  
 リモートで削除済みのブランチをローカルからも削除します。
 
-### 3. 専門エージェント (5種類)
+### 3. 専門エージェント (6種類)
 
 **重要**: このプラグインには`CLAUDE.ndf.md`が含まれており、メインエージェント（Claude）に対してサブエージェントの積極的な活用を促す指示が記載されています。
 
 **サブエージェントの活用方針:**
-- **タスクの種類に応じて適切なサブエージェントに委譲**
-- Claude Code組み込み機能（Plan Mode、Explore Agent）と連携
-- 各サブエージェントは専門MCPツールを効果的に活用
+- **複雑なタスクは`director`に委譲** - directorがMain Agentに報告し、Main Agentが他のエージェントを起動
+- **単純なタスクは専門エージェントに直接委譲**
+- **directorはMain Agentに報告する** - メモリエラー防止のため直接呼び出しは行わない
 
 詳細は `plugins/ndf/CLAUDE.ndf.md` を参照してください。
 
-> **Note (v2.0.0)**: directorエージェントはClaude Code組み込み機能（Plan Mode、Explore Agent）と重複するため削除されました。タスク統括にはClaude CodeのPlan Modeを使用してください。
+#### `director` エージェント（指揮者）⭐ NEW in v2.1.0
+**専門領域:** タスク統括・設計立案・エージェント調整
+
+**特徴:**
+- **Main Agentに報告** - 必要なエージェントをMain Agentに報告し、Main Agentがサブエージェントを起動（メモリエラー防止）
+- Claude Code機能（Plan Mode、Explore Agent、TodoWrite）を活用
+- タスク規模に応じた適切な対応（小規模→直接処理、大規模→Plan Mode）
+- Main agentのコンテキスト消費を最小化
+- **計画・調査結果をファイルに保存** - 途中停止からの復帰を可能に
+
+**機能:**
+- タスク分析と規模判定（小/中/大）
+- 複数エージェントの並列/順次実行の計画立案
+- 進捗管理（TodoWrite）
+- 設計計画の策定と**ファイル保存**（`issues/`, `docs/`, `specs/`）
+- **Main Agentへの報告** - 必要なエージェントと実行順序を明示
+
+**使用例:**
+```
+@director ユーザー認証機能を追加してください。ベストプラクティスを調査し、実装してセキュリティレビューも行ってください
+```
+→ directorが調査・計画後、Main Agentに「researcher → corder → qaの順次実行が必要」と報告
+→ Main Agentが報告に基づきエージェントを起動
 
 #### `data-analyst` エージェント
 **専門領域:** データ分析とSQL操作
@@ -823,7 +845,9 @@ Claude Code終了時に自動的に以下が実行されます：
 
 **機能:**
 - Claude Codeとのやり取りをAIが自動要約（40文字）
-- 会話履歴、transcript、git diffから最適な情報源を自動選択
+- Claude CLI + `--no-session-persistence`を使用（要約生成時に追加のセッションログを作成しない）
+- Claude Codeの認証設定を自動継承（API KeyでもBedrockでも対応）
+- 会話履歴、transcriptから最適な情報源を自動選択
 - リポジトリ名とタイムスタンプも含めて通知
 
 **設定:**
