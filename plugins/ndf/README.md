@@ -845,7 +845,7 @@ Claude Code終了時に自動的に以下が実行されます：
 
 **機能:**
 - Claude Codeとのやり取りをAIが自動要約（40文字）
-- Claude CLI + `--no-session-persistence`を使用（セッションログを残さない）
+- Claude CLI + `--no-session-persistence`を使用（要約生成時に追加のセッションログを作成しない）
 - Claude Codeの認証設定を自動継承（API KeyでもBedrockでも対応）
 - 会話履歴、transcriptから最適な情報源を自動選択
 - リポジトリ名とタイムスタンプも含めて通知
