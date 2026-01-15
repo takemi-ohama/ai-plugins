@@ -181,17 +181,17 @@ function callClaudeCLI(prompt) {
       '--print',
       '--no-session-persistence',
       '--model', 'haiku',
-      '--tools', '',  // Disable all tools for simple text generation
+      '--tools', '',  // Disable all tools (empty string is valid per CLI help)
       prompt
     ];
 
     const claude = spawn('claude', args, {
-      timeout: 30000,
       stdio: ['pipe', 'pipe', 'pipe']
     });
 
     let output = '';
     let errorOutput = '';
+    let resolved = false;
 
     claude.stdout.on('data', (data) => {
       output += data.toString();
@@ -202,18 +202,37 @@ function callClaudeCLI(prompt) {
     });
 
     claude.on('close', (code) => {
+      if (resolved) return;
+      resolved = true;
+
       if (code === 0 && output.trim()) {
         resolve(output.trim());
       } else {
+        // Log error output for debugging if available
+        if (errorOutput && process.env.DEBUG_SLACK_NOTIFY === 'true') {
+          console.error('Claude CLI stderr:', errorOutput);
+        }
         resolve(null);
       }
     });
 
-    claude.on('error', () => resolve(null));
+    claude.on('error', (err) => {
+      if (resolved) return;
+      resolved = true;
+      if (process.env.DEBUG_SLACK_NOTIFY === 'true') {
+        console.error('Claude CLI error:', err.message);
+      }
+      resolve(null);
+    });
 
-    // Set timeout
+    // Set timeout (30 seconds)
     setTimeout(() => {
+      if (resolved) return;
+      resolved = true;
       claude.kill();
+      if (process.env.DEBUG_SLACK_NOTIFY === 'true') {
+        console.error('Claude CLI timeout after 30 seconds');
+      }
       resolve(null);
     }, 30000);
   });

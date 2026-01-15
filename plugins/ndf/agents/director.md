@@ -218,7 +218,7 @@ Main Agentは上記順序でエージェントを起動してください。
 
 | 内容の種類 | 出力先 | ファイル名規則 |
 |-----------|--------|---------------|
-| タスク計画・設計 | `issues/` | `i{3桁}.md`（例: `i001.md`） |
+| タスク計画・設計 | `issues/` | `i{3桁}.md`（`i001.md`から開始、連番で`i002.md`, `i003.md`...。外部Issue番号との一致は不要） |
 | 技術調査結果 | `docs/research/` | `{YYYYMMDD}-{topic}.md` |
 | 仕様・設計書 | `specs/` | `{feature-name}.md` |
 | 議事録・決定事項 | `docs/decisions/` | `{YYYYMMDD}-{topic}.md` |
