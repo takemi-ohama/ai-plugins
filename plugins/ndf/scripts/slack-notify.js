@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 /**
- * Slack notification script for Claude Code completion
- * Reads transcript_path from stdin (hook input JSON) and generates summary
+ * Slack notification script for Claude Code session completion
  *
- * Uses Claude CLI with --no-session-persistence for summarization
- * (inherits Claude Code's authentication settings automatically)
+ * Reads transcript_path from stdin (hook input JSON) and generates
+ * a session-specific summary using Claude CLI.
  */
 
 const fs = require('fs');
@@ -13,12 +12,55 @@ const https = require('https');
 const { spawn } = require('child_process');
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+const CONFIG = {
+  CLI_TIMEOUT_MS: 30000,
+  MAX_RESPONSES: 5,
+  MIN_TEXT_LENGTH: 5,
+  MIN_RESPONSE_LENGTH: 10,
+  MAX_CONTENT_LENGTH: 500,
+  MAX_CONTEXT_LENGTH: 2500,
+  FALLBACK_REPO_NAME: 'unknown',
+  NO_SUMMARY_MESSAGE: 'Claude Codeのセッションが終了しました(要約なし)'
+};
+
+const META_CONTENT_PREFIXES = ['Caveat:', '<local-command', '<command-name>'];
+
+// ============================================================================
+// Utilities
+// ============================================================================
+
+const isDebugMode = () => process.env.DEBUG_SLACK_NOTIFY === 'true';
+
+const debugLog = (message, ...args) => {
+  if (isDebugMode()) {
+    console.error(message, ...args);
+  }
+};
+
+const safeJsonParse = (str) => {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return null;
+  }
+};
+
+const readFileLines = (filePath) => {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    return fs.readFileSync(filePath, 'utf8').trim().split('\n');
+  } catch {
+    return null;
+  }
+};
+
+// ============================================================================
 // Environment Management
 // ============================================================================
 
-/**
- * Load .env file from project root by traversing up directory tree
- */
 function loadEnvFile() {
   let currentDir = __dirname;
 
@@ -30,271 +72,234 @@ function loadEnvFile() {
       parseEnvFile(envFile);
       break;
     }
-
-    // Stop at git repository root
     if (fs.existsSync(path.join(currentDir, '.git'))) break;
   }
 }
 
-/**
- * Parse .env file and set environment variables
- */
 function parseEnvFile(envFile) {
   const content = fs.readFileSync(envFile, 'utf8');
 
-  content.split('\n').forEach(line => {
-    line = line.trim();
-    if (!line || line.startsWith('#')) return;
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
 
     const match = line.match(/^([^=]+)=(.*)$/);
-    if (!match) return;
+    if (!match) continue;
 
     const key = match[1].trim();
     let value = match[2].trim();
 
-    // Remove quotes
+    // Remove surrounding quotes
     if ((value.startsWith('"') && value.endsWith('"')) ||
         (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     }
 
-    // Only set if not already in environment
-    if (!process.env[key]) {
-      process.env[key] = value;
-    }
-  });
+    process.env[key] ??= value;
+  }
 }
 
 // ============================================================================
 // Transcript Processing
 // ============================================================================
 
-/**
- * Extract text from content (string or array format)
- */
+function isMetaContent(content) {
+  return typeof content === 'string' &&
+    META_CONTENT_PREFIXES.some(prefix => content.startsWith(prefix));
+}
+
 function extractTextFromContent(content) {
   if (typeof content === 'string') {
-    return content;
+    return isMetaContent(content) ? null : content.substring(0, CONFIG.MAX_CONTENT_LENGTH);
   }
 
   if (Array.isArray(content)) {
     const textItem = content.find(item =>
-      item && typeof item === 'object' && item.type === 'text' && item.text
+      item?.type === 'text' && typeof item.text === 'string'
     );
-    return textItem?.text || null;
+    return textItem?.text?.substring(0, CONFIG.MAX_CONTENT_LENGTH) ?? null;
   }
 
   return null;
 }
 
-/**
- * Read and parse recent messages from transcript
- */
-function readTranscriptMessages(transcriptPath, lineCount = 30, messageCount = 10) {
-  if (!fs.existsSync(transcriptPath)) {
-    return null;
-  }
+function parseTranscriptData(transcriptPath) {
+  const lines = readFileLines(transcriptPath);
+  if (!lines) return { firstRequest: null, assistantResponses: [] };
 
-  try {
-    const content = fs.readFileSync(transcriptPath, 'utf8');
-    const allLines = content.trim().split('\n');
-    const recentLines = allLines.slice(-lineCount);
+  let firstRequest = null;
+  const assistantResponses = [];
 
-    // Extract user and assistant messages
-    const messages = [];
-    for (const line of recentLines) {
-      try {
-        const data = JSON.parse(line);
-        if (data.message?.role && ['user', 'assistant'].includes(data.message.role)) {
-          const text = extractTextFromContent(data.message.content);
-          if (text) {
-            messages.push({ role: data.message.role, text });
-          }
-        }
-      } catch (e) {
-        // Skip invalid JSON lines
-      }
+  for (const line of lines) {
+    const data = safeJsonParse(line);
+    if (!data?.message?.role) continue;
+
+    const { role, content } = data.message;
+    const text = extractTextFromContent(content);
+
+    // Get first valid user request
+    if (!firstRequest &&
+        role === 'user' &&
+        data.type === 'user' &&
+        !data.isMeta &&
+        text?.length >= CONFIG.MIN_TEXT_LENGTH) {
+      firstRequest = text;
     }
 
-    return messages.slice(-messageCount);
-  } catch (error) {
-    return null;
-  }
-}
-
-/**
- * Format messages for Claude summarization
- */
-function formatConversationForSummary(messages) {
-  if (!messages || messages.length === 0) {
-    return null;
+    // Collect assistant responses
+    if (role === 'assistant' && text?.length >= CONFIG.MIN_RESPONSE_LENGTH) {
+      assistantResponses.push(text);
+    }
   }
 
-  const conversationText = messages
-    .map(m => `${m.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${m.text}`)
-    .join('\n\n');
-
-  return conversationText.length >= 10 ? conversationText : null;
+  return {
+    firstRequest,
+    assistantResponses: assistantResponses.slice(-CONFIG.MAX_RESPONSES)
+  };
 }
 
-/**
- * Create summarization prompt for Claude
- */
-function createSummarizationPrompt(conversationText) {
-  return `以下の会話から実施した作業を**日本語で**40文字以内で要約してください。
+function formatContextForSummary({ firstRequest, assistantResponses }) {
+  if (!firstRequest && assistantResponses.length === 0) return null;
 
-出力形式: 日本語の要約文のみ（1行、40文字以内）
+  const parts = [];
+  if (firstRequest) {
+    parts.push(`【ユーザーのリクエスト】\n${firstRequest}`);
+  }
+  if (assistantResponses.length > 0) {
+    parts.push(`【アシスタントの応答】\n${assistantResponses.join('\n\n')}`);
+  }
 
-必須事項:
+  const context = parts.join('\n\n');
+  return context.length >= CONFIG.MIN_RESPONSE_LENGTH ? context : null;
+}
+
+function createSummarizationPrompt(context) {
+  return `以下の情報から、**このセッションで実施した作業**を日本語で40文字以内で要約してください。
+
+## 重要
+- ユーザーのリクエストとアシスタントの応答から、このセッション固有の作業内容を特定してください
+- 「調査」「確認」などの一般的な表現より、具体的な作業内容（例：「Slack通知の要約生成を修正」）を優先してください
+
+## 出力形式
+日本語の要約文のみ（1行、40文字以内）
+
+## 必須事項
 - 必ず日本語で出力すること
-- 会話の内容から実際に行った作業を要約すること
+- このセッションで実際に行った具体的な作業を要約すること
+- 技術的な作業内容を含めること（ファイル名、機能名など）
 
-禁止事項:
+## 禁止事項
 - 英語での出力
 - 「ユーザーさん」「調査結果」などの前置き
 - 「要約：」「作業内容：」などのラベル
+- 「〜を確認しました」「〜を調査しました」などの曖昧な表現（具体的な結果を書く）
 - 挨拶文や説明文
 - 複数行の出力
 
-良い例:
-- Claude Code MCPサーバーを追加
-- 要約生成プロンプトを改善
-- PRマージ後のクリーンアップを実行
-- Slack通知スクリプトをCLI生成に変更
+## 良い例
+- Slack通知の要約生成ロジックを修正
+- BigQueryクエリのパフォーマンスを最適化
+- JWT認証のセキュリティレビューを実施
+- PRマージ後のブランチクリーンアップを実行
 
-悪い例:
+## 悪い例
 - Added new MCP server（英語は禁止）
+- コードを調査しました（曖昧すぎる）
 - ユーザーさん、調査結果をまとめます：
 - 要約：〜を実施しました
-- 以下の要約です
 
-会話内容:
-${conversationText.substring(0, 2000)}
+## セッション情報
+${context.substring(0, CONFIG.MAX_CONTEXT_LENGTH)}
 
-日本語の要約:`;
+## 日本語の要約（40文字以内）:`;
 }
 
 // ============================================================================
 // Claude CLI Integration
 // ============================================================================
 
-/**
- * Call Claude CLI with --no-session-persistence to generate summary
- * This inherits Claude Code's authentication (API key or Bedrock) automatically
- */
 function callClaudeCLI(prompt) {
   return new Promise((resolve) => {
-    const args = [
+    const claude = spawn('claude', [
       '--print',
       '--no-session-persistence',
       '--model', 'haiku',
-      '--tools', '',  // ツールを無効化（要約生成のみのため）
+      '--tools', '',
       prompt
-    ];
-
-    const claude = spawn('claude', args, {
+    ], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env
     });
 
-    let output = '';
-    let errorOutput = '';
+    let stdout = '';
+    let stderr = '';
     let resolved = false;
 
-    claude.stdout.on('data', (data) => {
-      output += data.toString();
-    });
-
-    claude.stderr.on('data', (data) => {
-      errorOutput += data.toString();
-    });
-
-    claude.on('close', (code) => {
+    const finish = (result) => {
       if (resolved) return;
       resolved = true;
+      resolve(result);
+    };
 
-      if (code === 0 && output.trim()) {
-        resolve(output.trim());
+    claude.stdout.on('data', (data) => { stdout += data; });
+    claude.stderr.on('data', (data) => { stderr += data; });
+
+    claude.on('close', (code) => {
+      if (code === 0 && stdout.trim()) {
+        finish(stdout.trim());
       } else {
-        // Log error output for debugging if available
-        if (errorOutput && process.env.DEBUG_SLACK_NOTIFY === 'true') {
-          console.error('Claude CLI stderr:', errorOutput);
-        }
-        resolve(null);
+        debugLog('Claude CLI failed:', stderr || `exit code ${code}`);
+        finish(null);
       }
     });
 
     claude.on('error', (err) => {
-      if (resolved) return;
-      resolved = true;
-      if (process.env.DEBUG_SLACK_NOTIFY === 'true') {
-        console.error('Claude CLI error:', err.message);
-      }
-      resolve(null);
+      debugLog('Claude CLI error:', err.message);
+      finish(null);
     });
 
-    // Set timeout (30 seconds)
     setTimeout(() => {
-      if (resolved) return;
-      resolved = true;
+      debugLog('Claude CLI timeout after', CONFIG.CLI_TIMEOUT_MS, 'ms');
       claude.kill();
-      if (process.env.DEBUG_SLACK_NOTIFY === 'true') {
-        console.error('Claude CLI timeout after 30 seconds');
-      }
-      resolve(null);
-    }, 30000);
+      finish(null);
+    }, CONFIG.CLI_TIMEOUT_MS);
   });
 }
 
-/**
- * Parse summary response and clean it up
- */
-function parseSummaryResponse(summary) {
+function cleanSummaryResponse(summary) {
   if (!summary) return null;
 
-  // Clean up the summary - remove any prefixes/labels
-  let cleaned = summary
+  const cleaned = summary
     .replace(/^(要約[:：]?\s*|作業内容[:：]?\s*)/i, '')
     .replace(/^[\s\n]+/, '')
     .split('\n')[0]
     .trim();
 
-  return cleaned.length >= 5 ? cleaned : null;
+  return cleaned.length >= CONFIG.MIN_TEXT_LENGTH ? cleaned : null;
 }
 
-/**
- * Generate summary using Claude CLI
- * Always generates a new summary in Japanese from conversation messages
- */
 async function generateSummary(transcriptPath) {
-  if (process.env.DEBUG_SLACK_NOTIFY === 'true') {
-    console.error('Generating summary using Claude CLI...');
-  }
+  debugLog('Generating summary using Claude CLI...');
 
-  const messages = readTranscriptMessages(transcriptPath);
-  if (!messages) return null;
+  const transcriptData = parseTranscriptData(transcriptPath);
+  const context = formatContextForSummary(transcriptData);
+  if (!context) return null;
 
-  const conversationText = formatConversationForSummary(messages);
-  if (!conversationText) return null;
-
-  const prompt = createSummarizationPrompt(conversationText);
+  const prompt = createSummarizationPrompt(context);
   const output = await callClaudeCLI(prompt);
 
-  return parseSummaryResponse(output);
+  return cleanSummaryResponse(output);
 }
 
 // ============================================================================
 // Slack API Integration
 // ============================================================================
 
-/**
- * Make HTTPS request to Slack API
- */
 function makeSlackApiRequest(apiPath, data, token) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(data);
 
-    const options = {
+    const req = https.request({
       hostname: 'slack.com',
       port: 443,
       path: apiPath,
@@ -304,22 +309,12 @@ function makeSlackApiRequest(apiPath, data, token) {
         'Content-Type': 'application/json; charset=utf-8',
         'Content-Length': Buffer.byteLength(payload)
       }
-    };
-
-    const req = https.request(options, (res) => {
+    }, (res) => {
       let body = '';
-
-      res.on('data', (chunk) => {
-        body += chunk;
-      });
-
+      res.on('data', (chunk) => { body += chunk; });
       res.on('end', () => {
-        try {
-          const result = JSON.parse(body);
-          resolve(result.ok ? result : null);
-        } catch (e) {
-          resolve(null);
-        }
+        const result = safeJsonParse(body);
+        resolve(result?.ok ? result : null);
       });
     });
 
@@ -329,51 +324,29 @@ function makeSlackApiRequest(apiPath, data, token) {
   });
 }
 
-/**
- * Send message to Slack
- */
-function sendSlackMessage(channelId, token, text) {
-  return makeSlackApiRequest('/api/chat.postMessage', {
-    channel: channelId,
-    text: text
-  }, token);
-}
+const sendSlackMessage = (channelId, token, text) =>
+  makeSlackApiRequest('/api/chat.postMessage', { channel: channelId, text }, token);
 
-/**
- * Delete Slack message
- */
-function deleteSlackMessage(channelId, token, messageTs) {
-  return makeSlackApiRequest('/api/chat.delete', {
-    channel: channelId,
-    ts: messageTs
-  }, token).then(result => result !== null);
-}
+const deleteSlackMessage = (channelId, token, ts) =>
+  makeSlackApiRequest('/api/chat.delete', { channel: channelId, ts }, token)
+    .then(result => result !== null);
 
 // ============================================================================
 // Git Integration
 // ============================================================================
 
-/**
- * Get repository name from git
- */
 function getRepositoryName() {
   return new Promise((resolve) => {
-    const gitShow = spawn('git', ['rev-parse', '--show-toplevel']);
+    const git = spawn('git', ['rev-parse', '--show-toplevel']);
     let output = '';
 
-    gitShow.stdout.on('data', (data) => {
-      output += data.toString();
+    git.stdout.on('data', (data) => { output += data; });
+    git.on('close', (code) => {
+      resolve(code === 0 && output.trim()
+        ? path.basename(output.trim())
+        : process.env.GIT_REPO || CONFIG.FALLBACK_REPO_NAME);
     });
-
-    gitShow.on('close', (code) => {
-      if (code === 0 && output.trim()) {
-        resolve(path.basename(output.trim()));
-      } else {
-        resolve(process.env.GIT_REPO || 'unknown');
-      }
-    });
-
-    gitShow.on('error', () => resolve(process.env.GIT_REPO || 'unknown'));
+    git.on('error', () => resolve(process.env.GIT_REPO || CONFIG.FALLBACK_REPO_NAME));
   });
 }
 
@@ -381,94 +354,62 @@ function getRepositoryName() {
 // Hook Input Processing
 // ============================================================================
 
-/**
- * Read and parse hook input from stdin
- */
 async function readHookInput() {
-  if (process.stdin.isTTY) {
-    return null;
-  }
+  if (process.stdin.isTTY) return null;
 
-  let hookInput = '';
+  let input = '';
   for await (const chunk of process.stdin) {
-    hookInput += chunk;
+    input += chunk;
   }
 
-  try {
-    const hookData = JSON.parse(hookInput);
-    return hookData.transcript_path || null;
-  } catch (e) {
-    return null;
-  }
+  return safeJsonParse(input)?.transcript_path ?? null;
+}
+
+// ============================================================================
+// Message Formatting
+// ============================================================================
+
+function formatNotificationMessage(repoName, summary, includeMention = false) {
+  const userMention = process.env.SLACK_USER_MENTION;
+  const content = summary || CONFIG.NO_SUMMARY_MESSAGE;
+  const message = `[${repoName}] ${content}`;
+
+  return includeMention && userMention ? `${userMention} ${message}` : message;
 }
 
 // ============================================================================
 // Main Flow
 // ============================================================================
 
-/**
- * Main notification flow
- */
 async function main() {
-  // Load environment variables
   loadEnvFile();
 
-  // Get configuration from environment
-  const channelId = process.env.SLACK_CHANNEL_ID;
-  const token = process.env.SLACK_BOT_TOKEN;
-  const userMention = process.env.SLACK_USER_MENTION;
-
-  // Exit silently if required variables are not set
+  const { SLACK_CHANNEL_ID: channelId, SLACK_BOT_TOKEN: token } = process.env;
   if (!channelId || !token) {
     process.exit(0);
   }
 
-  // Read transcript path from hook input
-  const transcriptPath = await readHookInput();
+  const [transcriptPath, repoName] = await Promise.all([
+    readHookInput(),
+    getRepositoryName()
+  ]);
 
-  // Step 1: Generate work summary
-  const workSummary = transcriptPath
-    ? await generateSummary(transcriptPath)
-    : null;
+  const summary = transcriptPath ? await generateSummary(transcriptPath) : null;
 
-  const repoName = await getRepositoryName();
-
-  // Step 2: Send message with mention and summary to trigger notification
-  const mentionMessage = workSummary
-    ? (userMention
-        ? `${userMention} [${repoName}] ${workSummary}`
-        : `[${repoName}] ${workSummary}`)
-    : (userMention
-        ? `${userMention} [${repoName}] Claude Codeのセッションが終了しました(要約なし)`
-        : `[${repoName}] Claude Codeのセッションが終了しました(要約なし)`);
-
+  // Send message with mention to trigger notification
+  const mentionMessage = formatNotificationMessage(repoName, summary, true);
   const mentionResult = await sendSlackMessage(channelId, token, mentionMessage);
   if (!mentionResult) {
     process.exit(1);
   }
 
-  // Step 3: Send message without mention but with summary
-  const detailedMessage = workSummary
-    ? `[${repoName}] ${workSummary}`
-    : `[${repoName}] Claude Codeのセッションが終了しました(要約なし)`;
+  // Send clean message without mention, then delete the mention message
+  const cleanMessage = formatNotificationMessage(repoName, summary, false);
+  await sendSlackMessage(channelId, token, cleanMessage).catch(() => {});
 
-  try {
-    await sendSlackMessage(channelId, token, detailedMessage);
-  } catch (error) {
-    // Continue even if second message fails
-  }
-
-  // Step 4: Delete mention message
   if (mentionResult.ts) {
-    try {
-      await deleteSlackMessage(channelId, token, mentionResult.ts);
-    } catch (error) {
-      // Continue even if deletion fails
-    }
+    await deleteSlackMessage(channelId, token, mentionResult.ts).catch(() => {});
   }
 }
 
-main().catch(() => {
-  // Exit silently even on error
-  process.exit(1);
-});
+main().catch(() => process.exit(1));
