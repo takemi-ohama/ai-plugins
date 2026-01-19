@@ -34,15 +34,17 @@ ai-agent-marketplace/
 
 ## 現在提供されているプラグイン
 
-### 1. ndf (v1.0.6) ⭐ オールインワン
-- **説明**: 3つのプラグイン統合版（MCP統合、Slack通知、ワークフローコマンド）に加え、directorエージェントを追加
-- **タイプ**: 複合プラグイン（MCPサーバー + フック + コマンド + エージェント）
+### 1. ndf (v2.1.3) ⭐ オールインワン
+- **説明**: 専門エージェント、ワークフローコマンド、Slack通知を統合したプラグイン
+- **タイプ**: 複合プラグイン（MCPサーバー + フック + コマンド + エージェント + スキル）
 - **パス**: `./plugins/ndf`
 - **含まれる機能**:
-  - 10つのMCPサーバー（GitHub、Serena、BigQuery、Notion、AWS Docs、DBHub、Chrome DevTools、Codex、Context7、Claude Code）
+  - 7つのMCPサーバー（BigQuery、Notion、AWS Docs、DBHub、Chrome DevTools、Codex、Playwright）
   - 6つのスラッシュコマンド（/ndf:serena、/ndf:pr、/ndf:fix、/ndf:review、/ndf:merge、/ndf:clean）
   - 6つの専門エージェント（director、data-analyst、corder、researcher、scanner、qa）
+  - 8つのClaude Code Skills
   - 自動Slack通知（Stop hookによる作業要約送信）
+- **注意**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグインに移行済み
 
 ### 2. mcp-integration (v2.0.0)
 - **説明**: MCPサーバーの統合設定（単体利用可能）

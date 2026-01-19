@@ -9,7 +9,7 @@ NDFプラグインは、3つの既存プラグインを統合したオールイ�
 2. `install-slack-hook` (v2.0.0) - Slack notifications
 3. `workflow-commands` (v1.0.0) - Development workflow commands
 
-**バージョン:** 1.2.0
+**バージョン:** 2.1.3
 
 **重要な変更 (v1.0.1):**
 - MCP-integration、install-slack-hook、workflow-commandsの3プラグインを削除
@@ -31,6 +31,18 @@ NDFプラグインは、3つの既存プラグインを統合したオールイ�
 - プロジェクト計画、SQL最適化、コードテンプレート、テスト生成、PDF解析、セキュリティスキャン等
 - Model-invoked方式: Claudeが自律的に判断してSkillsを起動
 - Progressive Disclosure: メインドキュメント≤500行、詳細情報は分離
+
+**重要な変更 (v2.0.0):**
+- **破壊的変更**: GitHub MCP, Serena MCP, Context7 MCPを公式プラグインに移行
+- これらのMCPはNDFから削除し、`anthropics/claude-plugins-official`から個別インストールを推奨
+- MCP: 10個→7個に削減
+- directorエージェントをClaude Code組み込み機能と併用する設計に変更
+
+**重要な変更 (v2.1.0-v2.1.3):**
+- **directorエージェントの再定義**: Claude Code機能を活用する指揮者として最適化
+- **エージェントのプロアクティブ利用促進**: 各エージェント説明に「Use proactively for:」を追加
+- **Slack通知の安定化**: Claude CLIによる要約生成を標準化、spawnタイムアウト処理の改善
+- **サブエージェント間の直接呼び出し禁止**: メモリエラー防止のためMain Agentが中継する設計
 
 ## ディレクトリ構造
 
@@ -63,7 +75,14 @@ plugins/ndf/
 
 ## 機能
 
-### 1. MCP統合 (10サーバー)
+### 1. MCP統合 (7サーバー - v2.0.0以降)
+
+**注意**: GitHub MCP, Serena MCP, Context7 MCPは公式プラグインに移行しました。
+```bash
+/plugin install github@anthropics/claude-plugins-official
+/plugin install serena@anthropics/claude-plugins-official
+/plugin install context7@anthropics/claude-plugins-official
+```
 
 `.mcp.json`で定義されたMCPサーバー：
 
