@@ -1,6 +1,6 @@
 <!-- NDF_PLUGIN_GUIDE_START_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
-<!-- VERSION: 5 -->
-# NDF Plugin - AI Agent Guidelines (v2.1.0)
+<!-- VERSION: 6 -->
+# NDF Plugin - AI Agent Guidelines (v2.1.3)
 
 ## Overview
 
@@ -151,21 +151,23 @@ Task(
 )
 ```
 
-**Available subagent_type:**
-- `ndf:director` - **Orchestrator** (reports to Main Agent for sub-agent coordination)
-- `ndf:corder` - Coding expert
-- `ndf:data-analyst` - Data analysis expert
-- `ndf:researcher` - Research expert
-- `ndf:scanner` - File reading expert
-- `ndf:qa` - Quality assurance expert
+**Available subagent_type (with proactive triggers):**
+- `ndf:director` - **Orchestrator** | Use proactively for: complex multi-step tasks, planning/design decisions, multi-agent coordination
+- `ndf:corder` - Coding expert | Use proactively for: code implementation, refactoring, code review, design patterns
+- `ndf:data-analyst` - Data analysis expert | Use proactively for: SQL queries, BigQuery, data analysis, data export
+- `ndf:researcher` - Research expert | Use proactively for: AWS docs research, technical investigation, web scraping
+- `ndf:scanner` - File reading expert | Use proactively for: PDF reading, image OCR, Office file extraction
+- `ndf:qa` - QA expert | Use proactively for: security review (OWASP), code quality, performance testing
 
 ### 6 Specialized Sub-Agents
 
-#### 1. @director - Orchestrator (NEW in v2.1.0)
+#### 1. @director - Orchestrator
 
 **Reports to Main Agent for sub-agent coordination (does NOT call sub-agents directly).**
 
 > メモリエラー防止のため、directorは他のサブエージェントを直接呼び出しません。
+
+**Use proactively for:** complex multi-step tasks, planning/design decisions, multi-agent coordination
 
 **Use Cases:**
 - Complex multi-step tasks requiring coordination
@@ -219,6 +221,8 @@ Main Agentは上記順序でエージェントを起動してください。
 
 #### 2. @data-analyst - Data Analysis Expert
 
+**Use proactively for:** SQL queries, BigQuery operations, data analysis, statistics, data export (CSV/JSON/Excel)
+
 **Use Cases:**
 - Database queries
 - SQL generation/optimization
@@ -237,6 +241,8 @@ Task(
 ```
 
 #### 3. @corder - Coding Expert
+
+**Use proactively for:** code implementation, refactoring, code review, design patterns, writing new features
 
 **Use Cases:**
 - Writing new code
@@ -257,6 +263,8 @@ Task(
 
 #### 4. @researcher - Research Expert
 
+**Use proactively for:** AWS documentation research, technical investigation, web scraping, best practices research, external API documentation
+
 **Use Cases:**
 - Research AWS official documentation
 - Collect information from websites
@@ -275,6 +283,8 @@ Task(
 
 #### 5. @scanner - File Reading Expert
 
+**Use proactively for:** reading PDF files, image OCR, PowerPoint/Excel/Word file extraction, document summarization
+
 **Use Cases:**
 - Reading PDF files
 - Extracting text from images (OCR)
@@ -292,6 +302,8 @@ Task(
 ```
 
 #### 6. @qa - Quality Assurance Expert
+
+**Use proactively for:** security review (OWASP Top 10), code quality review, performance testing, test coverage analysis
 
 **Use Cases:**
 - Code quality review
