@@ -17,6 +17,9 @@ const crypto = require('crypto');
 // Constants
 // ============================================================================
 
+// Generate unique run ID for this execution to trace logs
+const RUN_ID = crypto.randomBytes(4).toString('hex');
+
 const CONFIG = {
   CLI_TIMEOUT_MS: 60000,
   MAX_RESPONSES: 5,
@@ -44,7 +47,7 @@ const isDebugMode = () => process.env.DEBUG_SLACK_NOTIFY === 'true';
 const debugLog = (message, ...args) => {
   if (isDebugMode()) {
     const timestamp = new Date().toISOString();
-    console.error(`[${timestamp}] ${message}`, ...args);
+    console.error(`[${timestamp}] [RUN:${RUN_ID}] [PID:${process.pid}] ${message}`, ...args);
   }
 };
 
@@ -64,13 +67,19 @@ const readFileLines = (filePath) => {
   }
   try {
     const stats = fs.statSync(filePath);
+    debugLog('Transcript file stats:', {
+      path: filePath,
+      size: stats.size,
+      mtime: stats.mtime.toISOString(),
+      mtimeMs: stats.mtimeMs
+    });
     if (stats.size > CONFIG.MAX_FILE_SIZE_BYTES) {
       debugLog('Transcript file too large:', stats.size, 'bytes');
       return null;
     }
     const content = fs.readFileSync(filePath, 'utf8').trim();
     const lines = content.split('\n');
-    debugLog('Read', lines.length, 'lines from transcript');
+    debugLog('Read', lines.length, 'lines from transcript | File size:', stats.size);
     return lines;
   } catch (error) {
     debugLog('Error reading transcript file:', error.message);
@@ -96,32 +105,41 @@ function acquireLock() {
   const lockFile = getLockFilePath();
   const now = Date.now();
 
+  debugLog('Attempting to acquire lock:', lockFile);
+
   try {
     // Check if lock exists
     if (fs.existsSync(lockFile)) {
       const lockData = safeJsonParse(fs.readFileSync(lockFile, 'utf8'));
+      debugLog('Existing lock found:', lockData);
       if (lockData) {
         // Check if notification was sent recently (cooldown period)
         if (lockData.completedAt && (now - lockData.completedAt) < CONFIG.NOTIFICATION_COOLDOWN_MS) {
-          debugLog('Notification sent recently at:', lockData.completedAt, '| Cooldown active');
+          const elapsed = now - lockData.completedAt;
+          debugLog('LOCK REJECTED: Notification sent recently | Elapsed:', elapsed, 'ms | Cooldown:', CONFIG.NOTIFICATION_COOLDOWN_MS, 'ms | Previous PID:', lockData.pid);
           return false;
         }
         // Check if another process is still holding the lock
         if (!lockData.completedAt && (now - lockData.timestamp) < CONFIG.LOCK_TIMEOUT_MS) {
-          debugLog('Lock already held by PID:', lockData.pid, 'acquired at:', lockData.timestamp);
+          const elapsed = now - lockData.timestamp;
+          debugLog('LOCK REJECTED: Lock held by another process | PID:', lockData.pid, '| Elapsed:', elapsed, 'ms | Timeout:', CONFIG.LOCK_TIMEOUT_MS, 'ms');
           return false;
         }
       }
       debugLog('Lock expired or cooldown ended, proceeding');
+    } else {
+      debugLog('No existing lock file found');
     }
 
     // Create lock
-    fs.writeFileSync(lockFile, JSON.stringify({
+    const lockData = {
       pid: process.pid,
+      runId: RUN_ID,
       timestamp: now,
       completedAt: null
-    }));
-    debugLog('Lock acquired by PID:', process.pid);
+    };
+    fs.writeFileSync(lockFile, JSON.stringify(lockData));
+    debugLog('LOCK ACQUIRED:', lockData);
     return true;
   } catch (error) {
     debugLog('Lock acquisition error:', error.message);
@@ -137,8 +155,11 @@ function releaseLock() {
       // This enables cooldown period to prevent duplicate notifications
       const lockData = safeJsonParse(fs.readFileSync(lockFile, 'utf8')) || {};
       lockData.completedAt = Date.now();
+      lockData.releasedByRunId = RUN_ID;
       fs.writeFileSync(lockFile, JSON.stringify(lockData));
-      debugLog('Lock released with completion timestamp:', lockData.completedAt);
+      debugLog('LOCK RELEASED:', lockData);
+    } else {
+      debugLog('Lock file not found during release');
     }
   } catch (error) {
     debugLog('Lock release error:', error.message);
@@ -330,7 +351,7 @@ ${context.substring(0, CONFIG.MAX_CONTEXT_LENGTH)}
 
 function callClaudeCLI(prompt) {
   return new Promise((resolve) => {
-    debugLog('Calling Claude CLI...');
+    debugLog('=== Calling Claude CLI for summary generation ===');
 
     const args = [
       '--print',
@@ -343,10 +364,15 @@ function callClaudeCLI(prompt) {
     ];
 
     debugLog('CLI args:', args.join(' '));
+    debugLog('Parent process env - CLAUDE_SESSION_ID:', process.env.CLAUDE_SESSION_ID || 'not set');
 
     const claude = spawn('claude', args, {
       stdio: ['ignore', 'pipe', 'pipe']
     });
+
+    if (claude.pid) {
+      debugLog('Claude CLI spawned with PID:', claude.pid);
+    }
 
     let stdout = '';
     let stderr = '';
@@ -514,8 +540,9 @@ function getRepositoryName() {
 // ============================================================================
 
 async function readHookInput() {
+  debugLog('=== Reading hook input from stdin ===');
   if (process.stdin.isTTY) {
-    debugLog('stdin is TTY, no hook input');
+    debugLog('stdin is TTY, no hook input available');
     return { transcriptPath: null, stopHookActive: false };
   }
 
@@ -524,14 +551,21 @@ async function readHookInput() {
     input += chunk;
   }
 
-  debugLog('Raw hook input:', input.substring(0, 200));
+  debugLog('Raw hook input length:', input.length, '| Preview:', input.substring(0, 200));
   const parsed = safeJsonParse(input);
-  debugLog('Parsed hook input keys:', parsed ? Object.keys(parsed) : 'null');
+  if (parsed) {
+    debugLog('Parsed hook input:', JSON.stringify(parsed, null, 2));
+  } else {
+    debugLog('Failed to parse hook input');
+  }
 
-  return {
+  const result = {
     transcriptPath: parsed?.transcript_path ?? null,
     stopHookActive: parsed?.stop_hook_active === true
   };
+  debugLog('Extracted hook input values:', result);
+
+  return result;
 }
 
 // ============================================================================
@@ -541,7 +575,13 @@ async function readHookInput() {
 function formatNotificationMessage(repoName, summary, includeMention = false) {
   const userMention = process.env.SLACK_USER_MENTION;
   const content = summary || CONFIG.NO_SUMMARY_MESSAGE;
-  const message = `[${repoName}] ${content}`;
+
+  // Add debug info to message if in debug mode
+  const debugInfo = isDebugMode()
+    ? ` [RUN:${RUN_ID}|PID:${process.pid}]`
+    : '';
+
+  const message = `[${repoName}] ${content}${debugInfo}`;
 
   return includeMention && userMention ? `${userMention} ${message}` : message;
 }
@@ -552,8 +592,11 @@ function formatNotificationMessage(repoName, summary, includeMention = false) {
 
 async function main() {
   debugLog('=== Slack notify script started ===');
+  debugLog('RUN_ID:', RUN_ID);
   debugLog('PID:', process.pid);
-  debugLog('CLAUDE_SESSION_ID:', process.env.CLAUDE_SESSION_ID || 'not set');
+  debugLog('CWD:', process.cwd());
+  debugLog('ENV - CLAUDE_SESSION_ID:', process.env.CLAUDE_SESSION_ID || 'not set');
+  debugLog('ENV - DEBUG_SLACK_NOTIFY:', process.env.DEBUG_SLACK_NOTIFY || 'not set');
 
   loadEnvFile();
 
@@ -565,7 +608,7 @@ async function main() {
 
   // Prevent duplicate execution
   if (!acquireLock()) {
-    debugLog('Could not acquire lock, another instance may be running. Exiting.');
+    debugLog('EXITING: Could not acquire lock');
     process.exit(0);
   }
 
@@ -577,9 +620,15 @@ async function main() {
 
     const { transcriptPath, stopHookActive } = hookInput;
 
+    debugLog('Hook input received:', {
+      transcriptPath,
+      stopHookActive,
+      hasTranscriptPath: !!transcriptPath
+    });
+
     // Skip if this is a recursive hook call (e.g., from internal Claude CLI for summary generation)
     if (stopHookActive) {
-      debugLog('stop_hook_active is true, skipping to prevent recursive execution');
+      debugLog('EXITING: stop_hook_active is true (preventing recursive execution)');
       releaseLock();
       process.exit(0);
     }
@@ -587,44 +636,50 @@ async function main() {
     debugLog('Transcript path:', transcriptPath);
     debugLog('Repository name:', repoName);
 
+    const summaryStartTime = Date.now();
     const summary = transcriptPath ? await generateSummary(transcriptPath) : null;
-    debugLog('Final summary:', summary);
+    const summaryDuration = Date.now() - summaryStartTime;
+    debugLog('Final summary:', summary, '| Generation time:', summaryDuration, 'ms');
 
     // Send message with mention to trigger notification
     const mentionMessage = formatNotificationMessage(repoName, summary, true);
-    debugLog('Sending mention message:', mentionMessage.substring(0, 100));
+    debugLog('=== Sending mention message ===', mentionMessage.substring(0, 100));
+    const mentionSendTime = Date.now();
     const mentionResult = await sendSlackMessage(channelId, token, mentionMessage);
     if (!mentionResult) {
-      debugLog('Failed to send mention message');
+      debugLog('FAILED to send mention message');
       process.exit(1);
     }
-    debugLog('Mention message sent, ts:', mentionResult.ts);
+    debugLog('Mention message sent | ts:', mentionResult.ts, '| Duration:', Date.now() - mentionSendTime, 'ms');
 
     // Wait a bit before sending clean message and deleting
+    debugLog('Waiting', CONFIG.DELETE_DELAY_MS, 'ms before cleanup');
     await sleep(CONFIG.DELETE_DELAY_MS);
 
     // Send clean message without mention
     const cleanMessage = formatNotificationMessage(repoName, summary, false);
-    debugLog('Sending clean message:', cleanMessage.substring(0, 100));
+    debugLog('=== Sending clean message ===', cleanMessage.substring(0, 100));
+    const cleanSendTime = Date.now();
     const cleanResult = await sendSlackMessage(channelId, token, cleanMessage);
     if (!cleanResult) {
-      debugLog('Failed to send clean message');
+      debugLog('FAILED to send clean message');
     } else {
-      debugLog('Clean message sent, ts:', cleanResult.ts);
+      debugLog('Clean message sent | ts:', cleanResult.ts, '| Duration:', Date.now() - cleanSendTime, 'ms');
     }
 
     // Delete the mention message
     if (mentionResult.ts) {
-      debugLog('Deleting mention message, ts:', mentionResult.ts);
+      debugLog('=== Deleting mention message | ts:', mentionResult.ts, '===');
+      const deleteStartTime = Date.now();
       const deleteResult = await deleteSlackMessage(channelId, token, mentionResult.ts);
       if (deleteResult) {
-        debugLog('Mention message deleted successfully');
+        debugLog('Mention message deleted successfully | Duration:', Date.now() - deleteStartTime, 'ms');
       } else {
-        debugLog('Failed to delete mention message');
+        debugLog('FAILED to delete mention message');
       }
     }
 
-    debugLog('=== Slack notify script completed successfully ===');
+    debugLog('=== Slack notify script completed successfully | Total runtime:', Date.now() - summaryStartTime + summaryDuration, 'ms ===');
   } finally {
     releaseLock();
   }
