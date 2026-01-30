@@ -1,4 +1,4 @@
-# AI Agent Marketplace プロジェクト概要
+# AI Plugins プロジェクト概要
 
 ## プロジェクトの目的
 

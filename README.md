@@ -1,4 +1,4 @@
-# AI Agent Marketplace
+# AI Plugins
 
 Claude Codeプラグイン、プロジェクトスキル、MCP（Model Context Protocol）設定を共有するための内部マーケットプレイスです。
 

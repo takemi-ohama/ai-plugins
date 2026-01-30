@@ -1,4 +1,4 @@
-# AI Agent Marketplace - 開発ガイドライン
+# AI Plugins - 開発ガイドライン
 
 ## プロジェクト概要
 
