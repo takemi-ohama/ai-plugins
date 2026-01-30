@@ -352,8 +352,8 @@ const claude = spawn('claude', [
 
 ```bash
 # Claude Codeで実行
-/plugin marketplace add https://github.com/takemi-ohama/claude-plugins
-/plugin install ndf@claude-plugins
+/plugin marketplace add https://github.com/takemi-ohama/ai-plugins
+/plugin install ndf@ai-plugins
 ```
 
 その後、`.env`ファイルを作成してClaude Codeを再起動。

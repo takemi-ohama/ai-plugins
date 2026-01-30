@@ -39,14 +39,14 @@ GitHub、Serena、Context7 MCPは公式プラグインとして提供されて�
 
 ```bash
 # Claude Codeで実行
-/plugin marketplace add https://github.com/takemi-ohama/claude-plugins
+/plugin marketplace add https://github.com/takemi-ohama/ai-plugins
 ```
 
 ### ステップ2: プラグインのインストール
 
 ```bash
 # Claude Codeで実行
-/plugin install ndf@claude-plugins
+/plugin install ndf@ai-plugins
 ```
 
 ### ステップ3: .envファイルの作成
@@ -887,7 +887,7 @@ Claude Codeが自動的に適切なMCPツールを選択・利用します。
 
 問題が発生した場合：
 1. 上記のトラブルシューティングセクションを確認
-2. GitHubリポジトリでイシューを作成: https://github.com/takemi-ohama/claude-plugins/issues
+2. GitHubリポジトリでイシューを作成: https://github.com/takemi-ohama/ai-plugins/issues
 
 ## ライセンス
 
