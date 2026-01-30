@@ -1,8 +1,8 @@
 {
-  "name": "claude-plugins",
+  "name": "ai-plugins",
   "owner": {
     "name": "takemi-ohama",
-    "email": "takemi.ohama+claude-plugins@gmail.com"
+    "email": "takemi.ohama+ai-plugins@gmail.com"
   },
   "plugins": [
     {

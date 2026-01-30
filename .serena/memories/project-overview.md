@@ -1,4 +1,4 @@
-# AI Agent Marketplace プロジェクト概要
+# AI Plugins プロジェクト概要
 
 ## プロジェクトの目的
 
@@ -6,10 +6,10 @@ Claude Codeプラグインマーケットプレイス（内部用）として、
 
 ## リポジトリ情報
 
-- **リポジトリ名**: claude-plugins
+- **リポジトリ名**: ai-plugins
 - **オーナー**: takemi-ohama
 - **ライセンス**: MIT
-- **マーケットプレイスURL**: https://github.com/takemi-ohama/claude-plugins
+- **マーケットプレイスURL**: https://github.com/takemi-ohama/ai-plugins
 
 ## 配布コンポーネント
 
@@ -21,7 +21,7 @@ Claude Codeプラグインマーケットプレイス（内部用）として、
 ## ディレクトリ構造
 
 ```
-claude-plugins/
+ai-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json          # マーケットプレイスメタデータ
 ├── plugins/
@@ -71,13 +71,13 @@ claude-plugins/
 ### マーケットプレイスの追加
 ```bash
 /plugin marketplace add
-# URL: https://github.com/takemi-ohama/claude-plugins
+# URL: https://github.com/takemi-ohama/ai-plugins
 ```
 
 ### プラグインのインストール
 ```bash
-/plugin install mcp-integration@claude-plugins
-/plugin install slack-notification@claude-plugins
+/plugin install mcp-integration@ai-plugins
+/plugin install slack-notification@ai-plugins
 ```
 
 ## プラグイン開発ガイドライン
