@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const { spawn } = require('child_process');
+const os = require('os');
 
 // ============================================================================
 // Constants
@@ -25,7 +26,9 @@ const CONFIG = {
   MAX_CONTENT_LENGTH: 500,
   MAX_CONTEXT_LENGTH: 2500,
   FALLBACK_REPO_NAME: 'unknown',
-  NO_SUMMARY_MESSAGE: 'Claude Codeのセッションが終了しました(要約なし)'
+  NO_SUMMARY_MESSAGE: 'Claude Codeのセッションが終了しました(要約なし)',
+  LOCK_TIMEOUT_MS: 30000, // Lock expires after 30 seconds
+  DELETE_DELAY_MS: 500 // Wait before deleting mention message
 };
 
 const META_CONTENT_PREFIXES = ['Caveat:', '<local-command', '<command-name>'];
@@ -38,32 +41,91 @@ const isDebugMode = () => process.env.DEBUG_SLACK_NOTIFY === 'true';
 
 const debugLog = (message, ...args) => {
   if (isDebugMode()) {
-    console.error(message, ...args);
+    const timestamp = new Date().toISOString();
+    console.error(`[${timestamp}] ${message}`, ...args);
   }
 };
 
 const safeJsonParse = (str) => {
   try {
     return JSON.parse(str);
-  } catch {
+  } catch (e) {
+    debugLog('JSON parse error:', e.message, 'Input:', str?.substring(0, 100));
     return null;
   }
 };
 
 const readFileLines = (filePath) => {
-  if (!fs.existsSync(filePath)) return null;
+  if (!fs.existsSync(filePath)) {
+    debugLog('File does not exist:', filePath);
+    return null;
+  }
   try {
     const stats = fs.statSync(filePath);
     if (stats.size > CONFIG.MAX_FILE_SIZE_BYTES) {
       debugLog('Transcript file too large:', stats.size, 'bytes');
       return null;
     }
-    return fs.readFileSync(filePath, 'utf8').trim().split('\n');
+    const content = fs.readFileSync(filePath, 'utf8').trim();
+    const lines = content.split('\n');
+    debugLog('Read', lines.length, 'lines from transcript');
+    return lines;
   } catch (error) {
     debugLog('Error reading transcript file:', error.message);
     return null;
   }
 };
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// ============================================================================
+// Lock Management (prevent duplicate execution)
+// ============================================================================
+
+function getLockFilePath() {
+  const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
+  return path.join(os.tmpdir(), `slack-notify-${sessionId}.lock`);
+}
+
+function acquireLock() {
+  const lockFile = getLockFilePath();
+  const now = Date.now();
+
+  try {
+    // Check if lock exists and is still valid
+    if (fs.existsSync(lockFile)) {
+      const lockData = safeJsonParse(fs.readFileSync(lockFile, 'utf8'));
+      if (lockData && (now - lockData.timestamp) < CONFIG.LOCK_TIMEOUT_MS) {
+        debugLog('Lock already held by PID:', lockData.pid, 'acquired at:', lockData.timestamp);
+        return false;
+      }
+      debugLog('Stale lock found, removing');
+    }
+
+    // Create lock
+    fs.writeFileSync(lockFile, JSON.stringify({
+      pid: process.pid,
+      timestamp: now
+    }));
+    debugLog('Lock acquired by PID:', process.pid);
+    return true;
+  } catch (error) {
+    debugLog('Lock acquisition error:', error.message);
+    return false;
+  }
+}
+
+function releaseLock() {
+  const lockFile = getLockFilePath();
+  try {
+    if (fs.existsSync(lockFile)) {
+      fs.unlinkSync(lockFile);
+      debugLog('Lock released');
+    }
+  } catch (error) {
+    debugLog('Lock release error:', error.message);
+  }
+}
 
 // ============================================================================
 // Environment Management
@@ -77,6 +139,7 @@ function loadEnvFile() {
     const envFile = path.join(currentDir, '.env');
 
     if (fs.existsSync(envFile)) {
+      debugLog('Loading env file:', envFile);
       parseEnvFile(envFile);
       break;
     }
@@ -132,18 +195,27 @@ function extractTextFromContent(content) {
 }
 
 function parseTranscriptData(transcriptPath) {
+  debugLog('Parsing transcript:', transcriptPath);
   const allLines = readFileLines(transcriptPath);
-  if (!allLines) return { firstRequest: null, assistantResponses: [] };
+  if (!allLines) {
+    debugLog('No lines read from transcript');
+    return { firstRequest: null, assistantResponses: [] };
+  }
 
   // Process only recent lines to avoid memory issues with large files
   const lines = allLines.slice(-CONFIG.MAX_TRANSCRIPT_LINES);
+  debugLog('Processing', lines.length, 'recent lines');
 
   let firstRequest = null;
   const assistantResponses = [];
+  let parsedCount = 0;
+  let userCount = 0;
+  let assistantCount = 0;
 
   for (const line of lines) {
     const data = safeJsonParse(line);
     if (!data?.message?.role) continue;
+    parsedCount++;
 
     const { role, content } = data.message;
     const text = extractTextFromContent(content);
@@ -155,13 +227,18 @@ function parseTranscriptData(transcriptPath) {
         !data.isMeta &&
         text?.length >= CONFIG.MIN_TEXT_LENGTH) {
       firstRequest = text;
+      userCount++;
+      debugLog('Found user request:', text.substring(0, 50) + '...');
     }
 
     // Collect assistant responses
     if (role === 'assistant' && text?.length >= CONFIG.MIN_RESPONSE_LENGTH) {
       assistantResponses.push(text);
+      assistantCount++;
     }
   }
+
+  debugLog('Parsed messages:', parsedCount, '| User:', userCount, '| Assistant:', assistantCount);
 
   return {
     firstRequest,
@@ -170,7 +247,10 @@ function parseTranscriptData(transcriptPath) {
 }
 
 function formatContextForSummary({ firstRequest, assistantResponses }) {
-  if (!firstRequest && assistantResponses.length === 0) return null;
+  if (!firstRequest && assistantResponses.length === 0) {
+    debugLog('No content for summary context');
+    return null;
+  }
 
   const parts = [];
   if (firstRequest) {
@@ -181,6 +261,7 @@ function formatContextForSummary({ firstRequest, assistantResponses }) {
   }
 
   const context = parts.join('\n\n');
+  debugLog('Context length:', context.length);
   return context.length >= CONFIG.MIN_RESPONSE_LENGTH ? context : null;
 }
 
@@ -231,7 +312,7 @@ ${context.substring(0, CONFIG.MAX_CONTEXT_LENGTH)}
 
 function callClaudeCLI(prompt) {
   return new Promise((resolve) => {
-    debugLog('Calling Claude CLI without tools...');
+    debugLog('Calling Claude CLI...');
 
     const args = [
       '--print',
@@ -243,6 +324,8 @@ function callClaudeCLI(prompt) {
       '-p', prompt
     ];
 
+    debugLog('CLI args:', args.join(' '));
+
     const claude = spawn('claude', args, {
       stdio: ['ignore', 'pipe', 'pipe']
     });
@@ -251,10 +334,11 @@ function callClaudeCLI(prompt) {
     let stderr = '';
     let resolved = false;
 
-    const safeResolve = (value) => {
+    const safeResolve = (value, reason) => {
       if (!resolved) {
         resolved = true;
         clearTimeout(timeoutId);
+        debugLog('CLI resolved:', reason, '| Output length:', value?.length || 0);
         resolve(value);
       }
     };
@@ -263,37 +347,44 @@ function callClaudeCLI(prompt) {
     claude.stderr.on('data', (data) => { stderr += data; });
 
     const timeoutId = setTimeout(() => {
-      debugLog('Claude CLI timeout');
+      debugLog('Claude CLI timeout after', CONFIG.CLI_TIMEOUT_MS, 'ms');
       claude.kill('SIGTERM');
-      safeResolve(null);
+      safeResolve(null, 'timeout');
     }, CONFIG.CLI_TIMEOUT_MS);
 
     claude.on('close', (code, signal) => {
       if (signal) {
         debugLog('Claude CLI killed by signal:', signal);
-        safeResolve(null);
+        safeResolve(null, 'signal:' + signal);
         return;
       }
 
       debugLog('Claude CLI exit code:', code);
+      debugLog('CLI stdout:', stdout.substring(0, 200));
+      debugLog('CLI stderr:', stderr.substring(0, 200));
 
       if (code === 0 && stdout.trim()) {
-        safeResolve(stdout.trim());
+        safeResolve(stdout.trim(), 'success');
       } else {
-        debugLog('Claude CLI error:', stderr || 'No output');
-        safeResolve(null);
+        debugLog('Claude CLI error - code:', code, '| stderr:', stderr || 'none');
+        safeResolve(null, 'error:' + code);
       }
     });
 
     claude.on('error', (err) => {
       debugLog('Claude CLI spawn error:', err.message);
-      safeResolve(null);
+      safeResolve(null, 'spawn-error');
     });
   });
 }
 
 function cleanSummaryResponse(summary) {
-  if (!summary) return null;
+  if (!summary) {
+    debugLog('No summary to clean');
+    return null;
+  }
+
+  debugLog('Raw summary:', summary);
 
   const cleaned = summary
     .replace(/^(要約[:：]?\s*|作業内容[:：]?\s*)/i, '')
@@ -301,20 +392,33 @@ function cleanSummaryResponse(summary) {
     .split('\n')[0]
     .trim();
 
+  debugLog('Cleaned summary:', cleaned);
   return cleaned.length >= CONFIG.MIN_TEXT_LENGTH ? cleaned : null;
 }
 
 async function generateSummary(transcriptPath) {
-  debugLog('Generating summary using Claude CLI...');
+  debugLog('=== Starting summary generation ===');
 
   const transcriptData = parseTranscriptData(transcriptPath);
+  debugLog('Transcript data:', {
+    hasFirstRequest: !!transcriptData.firstRequest,
+    responseCount: transcriptData.assistantResponses.length
+  });
+
   const context = formatContextForSummary(transcriptData);
-  if (!context) return null;
+  if (!context) {
+    debugLog('No context available for summary');
+    return null;
+  }
 
   const prompt = createSummarizationPrompt(context);
-  const output = await callClaudeCLI(prompt);
+  debugLog('Prompt length:', prompt.length);
 
-  return cleanSummaryResponse(output);
+  const output = await callClaudeCLI(prompt);
+  const result = cleanSummaryResponse(output);
+
+  debugLog('=== Summary generation complete:', result ? 'SUCCESS' : 'FAILED', '===');
+  return result;
 }
 
 // ============================================================================
@@ -324,6 +428,7 @@ async function generateSummary(transcriptPath) {
 function makeSlackApiRequest(apiPath, data, token) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(data);
+    debugLog('Slack API request:', apiPath, '| Payload size:', payload.length);
 
     const req = https.request({
       hostname: 'slack.com',
@@ -340,11 +445,20 @@ function makeSlackApiRequest(apiPath, data, token) {
       res.on('data', (chunk) => { body += chunk; });
       res.on('end', () => {
         const result = safeJsonParse(body);
-        resolve(result?.ok ? result : null);
+        debugLog('Slack API response:', apiPath, '| ok:', result?.ok, '| error:', result?.error || 'none');
+        if (result?.ok) {
+          resolve(result);
+        } else {
+          debugLog('Slack API error details:', result);
+          resolve(null);
+        }
       });
     });
 
-    req.on('error', reject);
+    req.on('error', (error) => {
+      debugLog('Slack API network error:', error.message);
+      reject(error);
+    });
     req.write(payload);
     req.end();
   });
@@ -354,8 +468,7 @@ const sendSlackMessage = (channelId, token, text) =>
   makeSlackApiRequest('/api/chat.postMessage', { channel: channelId, text }, token);
 
 const deleteSlackMessage = (channelId, token, ts) =>
-  makeSlackApiRequest('/api/chat.delete', { channel: channelId, ts }, token)
-    .then(result => result !== null);
+  makeSlackApiRequest('/api/chat.delete', { channel: channelId, ts }, token);
 
 // ============================================================================
 // Git Integration
@@ -368,9 +481,11 @@ function getRepositoryName() {
 
     git.stdout.on('data', (data) => { output += data; });
     git.on('close', (code) => {
-      resolve(code === 0 && output.trim()
+      const repoName = code === 0 && output.trim()
         ? path.basename(output.trim())
-        : process.env.GIT_REPO || CONFIG.FALLBACK_REPO_NAME);
+        : process.env.GIT_REPO || CONFIG.FALLBACK_REPO_NAME;
+      debugLog('Repository name:', repoName);
+      resolve(repoName);
     });
     git.on('error', () => resolve(process.env.GIT_REPO || CONFIG.FALLBACK_REPO_NAME));
   });
@@ -381,14 +496,20 @@ function getRepositoryName() {
 // ============================================================================
 
 async function readHookInput() {
-  if (process.stdin.isTTY) return null;
+  if (process.stdin.isTTY) {
+    debugLog('stdin is TTY, no hook input');
+    return null;
+  }
 
   let input = '';
   for await (const chunk of process.stdin) {
     input += chunk;
   }
 
-  return safeJsonParse(input)?.transcript_path ?? null;
+  debugLog('Raw hook input:', input.substring(0, 200));
+  const parsed = safeJsonParse(input);
+  debugLog('Parsed hook input keys:', parsed ? Object.keys(parsed) : 'null');
+  return parsed?.transcript_path ?? null;
 }
 
 // ============================================================================
@@ -408,34 +529,78 @@ function formatNotificationMessage(repoName, summary, includeMention = false) {
 // ============================================================================
 
 async function main() {
+  debugLog('=== Slack notify script started ===');
+  debugLog('PID:', process.pid);
+  debugLog('CLAUDE_SESSION_ID:', process.env.CLAUDE_SESSION_ID || 'not set');
+
   loadEnvFile();
 
   const { SLACK_CHANNEL_ID: channelId, SLACK_BOT_TOKEN: token } = process.env;
   if (!channelId || !token) {
+    debugLog('Missing required env vars - SLACK_CHANNEL_ID:', !!channelId, '| SLACK_BOT_TOKEN:', !!token);
     process.exit(0);
   }
 
-  const [transcriptPath, repoName] = await Promise.all([
-    readHookInput(),
-    getRepositoryName()
-  ]);
-
-  const summary = transcriptPath ? await generateSummary(transcriptPath) : null;
-
-  // Send message with mention to trigger notification
-  const mentionMessage = formatNotificationMessage(repoName, summary, true);
-  const mentionResult = await sendSlackMessage(channelId, token, mentionMessage);
-  if (!mentionResult) {
-    process.exit(1);
+  // Prevent duplicate execution
+  if (!acquireLock()) {
+    debugLog('Could not acquire lock, another instance may be running. Exiting.');
+    process.exit(0);
   }
 
-  // Send clean message without mention, then delete the mention message
-  const cleanMessage = formatNotificationMessage(repoName, summary, false);
-  await sendSlackMessage(channelId, token, cleanMessage).catch(() => {});
+  try {
+    const [transcriptPath, repoName] = await Promise.all([
+      readHookInput(),
+      getRepositoryName()
+    ]);
 
-  if (mentionResult.ts) {
-    await deleteSlackMessage(channelId, token, mentionResult.ts).catch(() => {});
+    debugLog('Transcript path:', transcriptPath);
+    debugLog('Repository name:', repoName);
+
+    const summary = transcriptPath ? await generateSummary(transcriptPath) : null;
+    debugLog('Final summary:', summary);
+
+    // Send message with mention to trigger notification
+    const mentionMessage = formatNotificationMessage(repoName, summary, true);
+    debugLog('Sending mention message:', mentionMessage.substring(0, 100));
+    const mentionResult = await sendSlackMessage(channelId, token, mentionMessage);
+    if (!mentionResult) {
+      debugLog('Failed to send mention message');
+      process.exit(1);
+    }
+    debugLog('Mention message sent, ts:', mentionResult.ts);
+
+    // Wait a bit before sending clean message and deleting
+    await sleep(CONFIG.DELETE_DELAY_MS);
+
+    // Send clean message without mention
+    const cleanMessage = formatNotificationMessage(repoName, summary, false);
+    debugLog('Sending clean message:', cleanMessage.substring(0, 100));
+    const cleanResult = await sendSlackMessage(channelId, token, cleanMessage);
+    if (!cleanResult) {
+      debugLog('Failed to send clean message');
+    } else {
+      debugLog('Clean message sent, ts:', cleanResult.ts);
+    }
+
+    // Delete the mention message
+    if (mentionResult.ts) {
+      debugLog('Deleting mention message, ts:', mentionResult.ts);
+      const deleteResult = await deleteSlackMessage(channelId, token, mentionResult.ts);
+      if (deleteResult) {
+        debugLog('Mention message deleted successfully');
+      } else {
+        debugLog('Failed to delete mention message');
+      }
+    }
+
+    debugLog('=== Slack notify script completed successfully ===');
+  } finally {
+    releaseLock();
   }
 }
 
-main().catch(() => process.exit(1));
+main().catch((error) => {
+  debugLog('Fatal error:', error.message, error.stack);
+  releaseLock();
+  process.exit(1);
+});
