@@ -11,6 +11,7 @@ const path = require('path');
 const https = require('https');
 const { spawn } = require('child_process');
 const os = require('os');
+const crypto = require('crypto');
 
 // ============================================================================
 // Constants
@@ -28,6 +29,7 @@ const CONFIG = {
   FALLBACK_REPO_NAME: 'unknown',
   NO_SUMMARY_MESSAGE: 'Claude Codeのセッションが終了しました(要約なし)',
   LOCK_TIMEOUT_MS: 30000, // Lock expires after 30 seconds
+  NOTIFICATION_COOLDOWN_MS: 5000, // Prevent duplicate notifications within 5 seconds
   DELETE_DELAY_MS: 500 // Wait before deleting mention message
 };
 
@@ -83,8 +85,11 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // ============================================================================
 
 function getLockFilePath() {
-  const sessionId = process.env.CLAUDE_SESSION_ID || 'default';
-  return path.join(os.tmpdir(), `slack-notify-${sessionId}.lock`);
+  // Use working directory hash instead of session ID for robust deduplication
+  // This prevents multiple Claude Code instances in the same project from sending duplicate notifications
+  const cwd = process.cwd();
+  const hash = crypto.createHash('md5').update(cwd).digest('hex').substring(0, 8);
+  return path.join(os.tmpdir(), `slack-notify-${hash}.lock`);
 }
 
 function acquireLock() {
@@ -92,20 +97,29 @@ function acquireLock() {
   const now = Date.now();
 
   try {
-    // Check if lock exists and is still valid
+    // Check if lock exists
     if (fs.existsSync(lockFile)) {
       const lockData = safeJsonParse(fs.readFileSync(lockFile, 'utf8'));
-      if (lockData && (now - lockData.timestamp) < CONFIG.LOCK_TIMEOUT_MS) {
-        debugLog('Lock already held by PID:', lockData.pid, 'acquired at:', lockData.timestamp);
-        return false;
+      if (lockData) {
+        // Check if notification was sent recently (cooldown period)
+        if (lockData.completedAt && (now - lockData.completedAt) < CONFIG.NOTIFICATION_COOLDOWN_MS) {
+          debugLog('Notification sent recently at:', lockData.completedAt, '| Cooldown active');
+          return false;
+        }
+        // Check if another process is still holding the lock
+        if (!lockData.completedAt && (now - lockData.timestamp) < CONFIG.LOCK_TIMEOUT_MS) {
+          debugLog('Lock already held by PID:', lockData.pid, 'acquired at:', lockData.timestamp);
+          return false;
+        }
       }
-      debugLog('Stale lock found, removing');
+      debugLog('Lock expired or cooldown ended, proceeding');
     }
 
     // Create lock
     fs.writeFileSync(lockFile, JSON.stringify({
       pid: process.pid,
-      timestamp: now
+      timestamp: now,
+      completedAt: null
     }));
     debugLog('Lock acquired by PID:', process.pid);
     return true;
@@ -119,8 +133,12 @@ function releaseLock() {
   const lockFile = getLockFilePath();
   try {
     if (fs.existsSync(lockFile)) {
-      fs.unlinkSync(lockFile);
-      debugLog('Lock released');
+      // Update lock with completion time instead of deleting
+      // This enables cooldown period to prevent duplicate notifications
+      const lockData = safeJsonParse(fs.readFileSync(lockFile, 'utf8')) || {};
+      lockData.completedAt = Date.now();
+      fs.writeFileSync(lockFile, JSON.stringify(lockData));
+      debugLog('Lock released with completion timestamp:', lockData.completedAt);
     }
   } catch (error) {
     debugLog('Lock release error:', error.message);
@@ -498,7 +516,7 @@ function getRepositoryName() {
 async function readHookInput() {
   if (process.stdin.isTTY) {
     debugLog('stdin is TTY, no hook input');
-    return null;
+    return { transcriptPath: null, stopHookActive: false };
   }
 
   let input = '';
@@ -509,7 +527,11 @@ async function readHookInput() {
   debugLog('Raw hook input:', input.substring(0, 200));
   const parsed = safeJsonParse(input);
   debugLog('Parsed hook input keys:', parsed ? Object.keys(parsed) : 'null');
-  return parsed?.transcript_path ?? null;
+
+  return {
+    transcriptPath: parsed?.transcript_path ?? null,
+    stopHookActive: parsed?.stop_hook_active === true
+  };
 }
 
 // ============================================================================
@@ -548,10 +570,19 @@ async function main() {
   }
 
   try {
-    const [transcriptPath, repoName] = await Promise.all([
+    const [hookInput, repoName] = await Promise.all([
       readHookInput(),
       getRepositoryName()
     ]);
+
+    const { transcriptPath, stopHookActive } = hookInput;
+
+    // Skip if this is a recursive hook call (e.g., from internal Claude CLI for summary generation)
+    if (stopHookActive) {
+      debugLog('stop_hook_active is true, skipping to prevent recursive execution');
+      releaseLock();
+      process.exit(0);
+    }
 
     debugLog('Transcript path:', transcriptPath);
     debugLog('Repository name:', repoName);
