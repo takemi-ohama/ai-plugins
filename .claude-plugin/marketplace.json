@@ -1,8 +1,8 @@
 {
-  "name": "ai-agent-marketplace",
+  "name": "claude-plugins",
   "owner": {
     "name": "takemi-ohama",
-    "email": "takemi.ohama+ai-agent-marketplace@gmail.com"
+    "email": "takemi.ohama+claude-plugins@gmail.com"
   },
   "plugins": [
     {
@@ -11,8 +11,8 @@
       "description": "All-in-one plugin combining 10 MCP servers, 6 development workflow commands, 6 specialized agents, and Slack notifications with AI-generated summaries"
     },
     {
-      "name": "add-playwrightmcp",
-      "source": "./plugins/add-playwrightmcp",
+      "name": "playwright",
+      "source": "./plugins/playwright",
       "description": "Playwright MCP auto-setup plugin with Chromium browser installation and configuration"
     }
   ]

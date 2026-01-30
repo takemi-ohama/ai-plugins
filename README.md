@@ -20,7 +20,7 @@ Claude Codeプラグイン、プロジェクトスキル、MCP（Model Context P
 Claude Codeでマーケットプレイスを追加します：
 
 ```bash
-/plugin marketplace add https://github.com/takemi-ohama/ai-agent-marketplace
+/plugin marketplace add https://github.com/takemi-ohama/claude-plugins
 ```
 
 ### 2. プラグインのインストール
@@ -29,7 +29,7 @@ Claude Codeでマーケットプレイスを追加します：
 
 ```bash
 # NDFプラグイン（オールインワン統合プラグイン）
-/plugin install ndf@ai-agent-marketplace
+/plugin install ndf@claude-plugins
 ```
 
 このプラグイン1つで、MCP統合、開発ワークフロー、専門エージェント、自動フックのすべてが利用可能です。
@@ -47,7 +47,7 @@ Claude Codeでマーケットプレイスを追加します：
 #### ディレクトリ構造
 
 ```
-ai-agent-marketplace/
+claude-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json          # マーケットプレイスメタデータ
 ├── plugins/
@@ -111,7 +111,7 @@ description: スキルの説明（自動起動のキーワードを含める）
 
 ```json
 {
-  "name": "ai-agent-marketplace",
+  "name": "claude-plugins",
   "owner": {
     "name": "takemi-ohama",
     "email": "takemi.ohama@example.com"
@@ -138,8 +138,8 @@ description: スキルの説明（自動起動のキーワードを含める）
 
 ```bash
 # ローカルでテスト
-/plugin marketplace add file:///path/to/ai-agent-marketplace
-/plugin install plugin-name@ai-agent-marketplace
+/plugin marketplace add file:///path/to/claude-plugins
+/plugin install plugin-name@claude-plugins
 
 # 動作確認後、コミット
 git add .

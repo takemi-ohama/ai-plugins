@@ -4,7 +4,7 @@
 
 このリポジトリは**Claude Codeプラグインマーケットプレイス**の開発プロジェクトです。チーム全体でClaude Codeの導入を加速するための事前設定されたプラグインを提供します。
 
-**リポジトリ**: https://github.com/takemi-ohama/ai-agent-marketplace
+**リポジトリ**: https://github.com/takemi-ohama/claude-plugins
 
 ## 重要な注意事項
 
@@ -23,7 +23,7 @@
 ### 必須ファイル
 
 ```
-ai-agent-marketplace/
+claude-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json          # マーケットプレイス定義（必須）
 ├── plugins/
@@ -39,7 +39,7 @@ ai-agent-marketplace/
 
 ```json
 {
-  "name": "ai-agent-marketplace",
+  "name": "claude-plugins",
   "owner": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
@@ -128,7 +128,7 @@ plugins/{plugin-name}/
 
 #### 1. プロジェクトのアクティベート
 ```bash
-mcp__plugin_ndf_serena__activate_project /home/ubuntu/work/ai-agent-marketplace
+mcp__plugin_ndf_serena__activate_project /home/ubuntu/work/claude-plugins
 mcp__plugin_ndf_serena__check_onboarding_performed
 ```
 
@@ -248,10 +248,10 @@ mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-example.md" conten
 
 ```bash
 # マーケットプレイス追加
-/plugin marketplace add /path/to/ai-agent-marketplace
+/plugin marketplace add /path/to/claude-plugins
 
 # プラグインインストール
-/plugin install {plugin-name}@ai-agent-marketplace
+/plugin install {plugin-name}@claude-plugins
 
 # プラグイン検証
 claude plugin validate

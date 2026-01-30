@@ -1,4 +1,4 @@
-# add-playwrightmcp Plugin
+# playwright Plugin
 
 Playwright MCPを自動的にセットアップし、ブラウザ自動化機能を提供するプラグインです。
 
@@ -60,15 +60,15 @@ Playwright Chromiumブラウザをインストール中...
 
 ```
 // Webページにアクセスしてスクリーンショットを取得
-mcp__plugin_add_playwrightmcp__browser_navigate(url: "https://example.com")
-mcp__plugin_add_playwrightmcp__browser_take_screenshot()
+mcp__plugin_playwright__browser_navigate(url: "https://example.com")
+mcp__plugin_playwright__browser_take_screenshot()
 
 // フォームに入力してボタンをクリック
-mcp__plugin_add_playwrightmcp__browser_fill(selector: "#email", value: "test@example.com")
-mcp__plugin_add_playwrightmcp__browser_click(selector: "button[type='submit']")
+mcp__plugin_playwright__browser_fill(selector: "#email", value: "test@example.com")
+mcp__plugin_playwright__browser_click(selector: "button[type='submit']")
 
 // ページのスナップショットを取得（アクセシビリティツリー）
-mcp__plugin_add_playwrightmcp__browser_snapshot()
+mcp__plugin_playwright__browser_snapshot()
 ```
 
 ## 設定
@@ -124,7 +124,7 @@ export PLAYWRIGHT_BROWSERS_PATH=/path/to/custom/location
 
 2. **キャッシュをクリア**:
    ```bash
-   rm ~/.claude-add-playwrightmcp-installed
+   rm ~/.claude-playwright-installed
    ```
 
 3. **ログを確認**:
@@ -157,4 +157,4 @@ MIT License
 ## サポート
 
 問題が発生した場合は、GitHubリポジトリでissueを作成してください：
-https://github.com/takemi-ohama/ai-agent-marketplace/issues
+https://github.com/takemi-ohama/claude-plugins/issues

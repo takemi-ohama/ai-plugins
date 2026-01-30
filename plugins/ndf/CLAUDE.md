@@ -11,7 +11,7 @@
 - **名前**: ndf
 - **現在バージョン**: 2.0.0
 - **種類**: 統合プラグイン（MCP + Commands + Agents + Hooks）
-- **リポジトリ**: https://github.com/takemi-ohama/ai-agent-marketplace
+- **リポジトリ**: https://github.com/takemi-ohama/claude-plugins
 
 ## 重要な開発ルール
 
@@ -66,7 +66,7 @@ plugins/ndf/
 
 ```bash
 # プロジェクトをアクティベート
-mcp__plugin_ndf_serena__activate_project /home/ubuntu/work/ai-agent-marketplace
+mcp__plugin_ndf_serena__activate_project /home/ubuntu/work/claude-plugins
 
 # オンボーディング確認
 mcp__plugin_ndf_serena__check_onboarding_performed
@@ -356,10 +356,10 @@ mcp__plugin_ndf_serena__write_memory \
 
 ```bash
 # マーケットプレイスを追加（ローカルパス）
-/plugin marketplace add /home/ubuntu/work/ai-agent-marketplace
+/plugin marketplace add /home/ubuntu/work/claude-plugins
 
 # プラグインをインストール
-/plugin install ndf@ai-agent-marketplace
+/plugin install ndf@claude-plugins
 
 # プラグインを再読み込み（開発中）
 /plugin reload ndf
