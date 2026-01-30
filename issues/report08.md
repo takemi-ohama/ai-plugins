@@ -91,7 +91,7 @@
 ### 前提: NDFプラグインとの併用
 
 **NDFプラグインの役割（既存）**:
-- MCP統合（7個のMCPサーバー）
+- MCP統合（6個のMCPサーバー）
 - ワークフローコマンド（6個のスラッシュコマンド）
 - 専門エージェント（6個のサブエージェント）
 - スキル（8個のClaude Code Skills）
@@ -236,7 +236,7 @@ plugins/affaan-m/
 
 | カテゴリ | 機能 |
 |---------|------|
-| **MCP統合** | Codex CLI, BigQuery, AWS Docs, Chrome DevTools等（7個） |
+| **MCP統合** | Codex CLI, BigQuery, AWS Docs, Chrome DevTools等（6個） |
 | **ワークフローコマンド** | `/commit`, `/review-pr`, `/slack-notify`等（6個） |
 | **専門エージェント** | director, corder, data-analyst, researcher, scanner, qa（6個） |
 | **スキル** | データ分析、コード生成、リサーチ等（8個） |

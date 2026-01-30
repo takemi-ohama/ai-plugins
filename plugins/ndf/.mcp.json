@@ -7,7 +7,7 @@
       "envFile": "${workspaceFolder}/.env",
       "disabled": true
     },
-    "awslabs.aws-documentation-mcp-server": {
+    "awslabs.aws-docs": {
       "type": "stdio",
       "command": "uvx",
       "args": [
@@ -17,7 +17,7 @@
       "envFile": "${workspaceFolder}/.env",
       "disabled": true
     },
-    "mcp-server-bigquery": {
+    "bigquery": {
       "type": "stdio",
       "command": "uvx",
       "args": [
@@ -46,7 +46,7 @@
       "envFile": "${workspaceFolder}/.env",
       "disabled": true
     },
-    "chrome-devtools-mcp": {
+    "chrome-devtools": {
       "type": "stdio",
       "command": "npx",
       "args": [
@@ -69,17 +69,6 @@
       "env": {},
       "envFile": "${workspaceFolder}/.env",
       "disabled": false
-    },
-    "claude-code": {
-      "type": "stdio",
-      "command": "claude",
-      "args": [
-        "mcp",
-        "serve"
-      ],
-      "env": {},
-      "envFile": "${workspaceFolder}/.env",
-      "disabled": true
     }
   }
 }
