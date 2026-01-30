@@ -1,6 +1,6 @@
 {
   "name": "ndf",
-  "version": "2.1.4",
+  "version": "2.2.0",
   "description": "Integrated plugin with director orchestrator, specialized agents, workflow commands, skills, and Slack notifications. Core MCP servers (GitHub, Serena, Context7) moved to official plugins.",
   "author": {
     "name": "takemi-ohama",
@@ -31,6 +31,7 @@
     "./skills/researcher-report-templates",
     "./skills/scanner-pdf-analysis",
     "./skills/scanner-excel-extraction",
-    "./skills/qa-security-scan"
+    "./skills/qa-security-scan",
+    "./skills/markdown-writing"
   ]
 }

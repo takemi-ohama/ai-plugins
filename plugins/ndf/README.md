@@ -9,7 +9,7 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 1. **MCP統合**: 7個のMCPサーバー（Notion、BigQuery、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Claude Code）
 2. **開発ワークフロー**: PR作成、レビュー、マージ、ブランチクリーンアップコマンド
 3. **専門エージェント**: 6つの特化型AIエージェント（**director指揮者**、データ分析、コーディング、調査、ファイル読み取り、品質管理）
-4. **Skills**: 8個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、PDF解析等）
+4. **Skills**: 9個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、PDF解析、Markdown文書作成等）
 5. **自動フック**: Slack通知
 
 > **Note (v2.1.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。**directorエージェント**がClaude Code機能を活用する指揮者として再定義されました。
@@ -612,7 +612,7 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 @qa プラグインがClaude Code仕様に準拠しているか確認してください
 ```
 
-### 4. Skills (8種類) 🎯
+### 4. Skills (9種類) 🎯
 
 **Claude Code Skills**は、Claudeが自律的に判断して起動する**モデル起動型**の機能モジュールです。各サブエージェントは、タスク内容に応じて適切なSkillsを自動的に活用します。
 
@@ -657,6 +657,12 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 - 🔒 **qa-security-scan** - セキュリティスキャンと脆弱性評価
   - OWASP Top 10チェックリスト（詳細な修正方法付き）
   - 認証・認可テスト、データ保護確認
+
+**Documentation Skills (1個):**
+- 📝 **markdown-writing** - Markdown文書作成のルールとベストプラクティス
+  - mermaid/plantUMLによる図表作成（ASCII ART禁止）
+  - 文書の適切な分割（300行超の場合、順序prefix付きで分割）
+  - 構造化されたドキュメント作成ガイド
 
 #### Skillsの使い方
 

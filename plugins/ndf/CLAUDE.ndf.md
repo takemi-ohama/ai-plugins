@@ -1,6 +1,6 @@
 <!-- NDF_PLUGIN_GUIDE_START_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
 <!-- VERSION: 6 -->
-# NDF Plugin - AI Agent Guidelines (v2.1.4)
+# NDF Plugin - AI Agent Guidelines (v2.2.0)
 
 ## Overview
 
@@ -119,7 +119,7 @@ mcp__plugin_official_serena__search_for_pattern substring_pattern="TODO" relativ
 
 **Claude Code Skills are model-invoked**: Claude autonomously activates Skills based on request and Skill description.
 
-**8 Available Skills (v2.1.0):**
+**9 Available Skills (v2.2.0):**
 
 **Data Analyst Skills (2):**
 - `data-analyst-sql-optimization` - SQL optimization patterns and best practices
@@ -138,6 +138,9 @@ mcp__plugin_official_serena__search_for_pattern substring_pattern="TODO" relativ
 
 **QA Skills (1):**
 - `qa-security-scan` - Security scanning with OWASP Top 10 checklist
+
+**Documentation Skills (1):**
+- `markdown-writing` - Markdown文書作成のルールとベストプラクティス（mermaid/plantUML図表、文書分割、構造化）
 
 ## Sub-Agent Invocation
 
