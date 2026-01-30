@@ -11,6 +11,11 @@
       "description": "All-in-one plugin combining 10 MCP servers, 6 development workflow commands, 6 specialized agents, and Slack notifications with AI-generated summaries"
     },
     {
+      "name": "affaan-m",
+      "source": "./plugins/affaan-m",
+      "description": "Context management, quality assurance, TDD workflow, and security checks plugin (complements NDF plugin)"
+    },
+    {
       "name": "playwright",
       "source": "./plugins/playwright",
       "description": "Playwright MCP auto-setup plugin with Chromium browser installation and configuration"

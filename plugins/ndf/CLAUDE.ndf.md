@@ -1,6 +1,6 @@
 <!-- NDF_PLUGIN_GUIDE_START_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
-<!-- VERSION: 6 -->
-# NDF Plugin - AI Agent Guidelines (v2.2.0)
+<!-- VERSION: 7 -->
+# NDF Plugin - AI Agent Guidelines (v2.2.1)
 
 ## Overview
 
@@ -390,6 +390,82 @@ User: "Add dashboard feature with BigQuery data and performance metrics"
 - **Skip director for tasks requiring planning**
 - **Handle specialized tasks directly in main agent**
 - **Try to process PDFs/images without scanner**
+
+## Recommended Plugin Combination
+
+### affaan-m Plugin (Recommended)
+
+NDFプラグインと併用することで、以下の機能が追加されます：
+
+- **Context Management**: `/context-status`でコンテキスト使用率を監視、60%超過時に自動警告
+- **Quality Assurance Hooks**: 自動フォーマット、console.log検出、TypeScript型チェック、シークレットスキャン
+- **TDD Workflow**: `/tdd`コマンドで5段階TDDプロセス（RED → GREEN → REFACTOR → COVERAGE）をガイド
+- **Security Checks**: `/security-scan`, `/owasp-check`でOWASP Top 10準拠の脆弱性検出
+
+### Installation
+
+```bash
+/plugin install affaan-m@ai-plugins
+```
+
+### Usage Examples
+
+**Context Management**:
+```
+# コンテキスト使用率を確認
+/context-status
+
+# 60%を超えている場合
+/compact
+```
+
+**TDD Workflow with NDF**:
+```
+# 1. TDDワークフロー開始
+/tdd "ユーザー認証機能"
+
+# 2. ndf:corder がテストと実装を生成
+#    (affaan-mのHooksが自動的にチェック)
+
+# 3. カバレッジ検証
+/tdd-coverage "ユーザー認証機能"
+```
+
+**Security Review with NDF**:
+```
+# 1. セキュリティスキャン
+/security-scan
+
+# 2. ndf:qa がレビュー
+#    (affaan-mが自動的に脆弱性パターンを検出)
+
+# 3. OWASP Top 10チェック
+/owasp-check
+```
+
+### Integration with NDF Sub-Agents
+
+**director連携**:
+- タスク開始前に`/context-status`でコンテキスト確認を推奨
+- コンテキスト60%超過時は警告し、`/compact`実行を提案
+- 中〜大規模タスクでは計画を`issues/`または`docs/`に保存
+
+**corder連携**:
+- affaan-mの`auto-format` Hookが自動的にコードをフォーマット
+- `typescript-check` Hookが型エラーを検出
+- TDDワークフローでテストファーストな実装を支援
+
+**qa連携**:
+- affaan-mの`/security-scan`でOWASP Top 10チェック
+- `secret-scan` HookがPreCommit時にシークレット混入をブロック
+- カバレッジ80%未満時に警告
+
+### Notes
+
+- affaan-mプラグインのHooksは自動的に発火します
+- コンテキスト管理機能は常時監視モードで動作します
+- TDDワークフローはNDFの`corder`エージェントと連携します
+- セキュリティチェックはNDFの`qa`エージェントと連携します
 
 ## Available MCP Tools (Reference)
 
