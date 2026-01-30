@@ -33,7 +33,8 @@ const CONFIG = {
   NO_SUMMARY_MESSAGE: 'Claude Codeのセッションが終了しました(要約なし)',
   LOCK_TIMEOUT_MS: 30000, // Lock expires after 30 seconds
   NOTIFICATION_COOLDOWN_MS: 5000, // Prevent duplicate notifications within 5 seconds
-  DELETE_DELAY_MS: 500 // Wait before deleting mention message
+  DELETE_DELAY_MS: 500, // Wait before deleting mention message
+  LOG_DIR: path.join(os.homedir(), '.claude', 'logs')
 };
 
 const META_CONTENT_PREFIXES = ['Caveat:', '<local-command', '<command-name>'];
@@ -42,12 +43,52 @@ const META_CONTENT_PREFIXES = ['Caveat:', '<local-command', '<command-name>'];
 // Utilities
 // ============================================================================
 
+/**
+ * Get log file path for today's date
+ * Format: ~/.claude/logs/slack-notify-YYYY-MM-DD.log
+ */
+function getLogFilePath() {
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  return path.join(CONFIG.LOG_DIR, `slack-notify-${today}.log`);
+}
+
+/**
+ * Ensure log directory exists
+ */
+function ensureLogDirectory() {
+  if (!fs.existsSync(CONFIG.LOG_DIR)) {
+    fs.mkdirSync(CONFIG.LOG_DIR, { recursive: true });
+  }
+}
+
 const isDebugMode = () => process.env.DEBUG_SLACK_NOTIFY === 'true';
 
 const debugLog = (message, ...args) => {
   if (isDebugMode()) {
     const timestamp = new Date().toISOString();
-    console.error(`[${timestamp}] [RUN:${RUN_ID}] [PID:${process.pid}] ${message}`, ...args);
+    const logMessage = `[${timestamp}] [RUN:${RUN_ID}] [PID:${process.pid}] ${message}`;
+
+    // Format additional arguments
+    const formattedArgs = args.map(arg => {
+      if (typeof arg === 'object') {
+        return JSON.stringify(arg);
+      }
+      return String(arg);
+    }).join(' ');
+
+    const fullMessage = formattedArgs ? `${logMessage} ${formattedArgs}\n` : `${logMessage}\n`;
+
+    // Write to stderr for backward compatibility
+    process.stderr.write(fullMessage);
+
+    // Write to log file
+    try {
+      ensureLogDirectory();
+      fs.appendFileSync(getLogFilePath(), fullMessage, 'utf8');
+    } catch (error) {
+      // If file write fails, at least stderr output is available
+      process.stderr.write(`[ERROR] Failed to write to log file: ${error.message}\n`);
+    }
   }
 };
 
