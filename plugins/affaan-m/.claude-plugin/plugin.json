@@ -27,6 +27,5 @@
   "skills": [
     "./skills/tdd-workflow",
     "./skills/security-review"
-  ],
-  "hooks": "./hooks/hooks.json"
+  ]
 }
