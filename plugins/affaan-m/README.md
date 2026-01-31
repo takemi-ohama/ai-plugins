@@ -39,14 +39,17 @@ affaan-mプラグインは**NDFプラグイン（v2.1.0以降）との併用を�
 
 ### 2. 品質保証Hooks
 
-**PostToolUse Hooks**:
+**PreToolUse Hooks**:
+- `context-monitor` - コンテキスト使用率を監視
+- `detect-package-manager` - パッケージマネージャー自動検出
+
+**PostToolUse Hooks** (Edit|Write時に自動実行):
 - `auto-format` - Prettier/ESLintで自動フォーマット
 - `detect-console-log` - console.log/debugger検出警告
 - `typescript-check` - TypeScript型チェック自動実行
+- `secret-scan` - シークレット混入チェック（ファイル変更時）
 
-**PreCommit Hooks**:
-- `secret-scan` - シークレット混入チェック（コミットブロック）
-- `coverage-check` - テストカバレッジ検証（80%以上推奨）
+**Note**: `coverage-check`は`/tdd-coverage`コマンドから手動実行されます
 
 ### 3. TDDワークフロー
 
