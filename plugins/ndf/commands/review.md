@@ -152,7 +152,7 @@ PRレビューが完了しました。
 
 ---
 
-## 📎 リンク
+PRレビューが完了しました。
 
 **PR URL**: https://github.com/takemi-ohama/ai-plugins/pull/13
 ```
@@ -213,7 +213,7 @@ PRレビューが完了しました。
 
 ---
 
-## 📎 リンク
+PRレビューが完了しました。
 
 **PR URL**: https://github.com/takemi-ohama/ai-plugins/pull/13
 ```

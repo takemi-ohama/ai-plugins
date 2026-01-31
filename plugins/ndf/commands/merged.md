@@ -93,7 +93,7 @@ PRマージ後のクリーンアップを実行。
 
 ---
 
-## 📎 リンク
+マージ後クリーンアップが完了しました。
 
 **PR URL**: https://github.com/takemi-ohama/ai-plugins/pull/13
 ```

@@ -150,7 +150,7 @@ affaan-mプラグインの7つのフックスクリプトをClaude Code Hooks仕
 
 ---
 
-## 📎 リンク
+PR作成が完了しました。
 
 **PR URL**: https://github.com/takemi-ohama/ai-plugins/pull/13
 ```
