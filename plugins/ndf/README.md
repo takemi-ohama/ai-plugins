@@ -6,10 +6,10 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 
 このプラグイン1つで、以下の**すべて**の機能を利用できます：
 
-1. **MCP統合**: 7個のMCPサーバー（Notion、BigQuery、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Claude Code）
+1. **MCP統合**: 6個のMCPサーバー（Notion、BigQuery、DBHub、Chrome DevTools、AWS Docs、Codex CLI）
 2. **開発ワークフロー**: PR作成、レビュー、マージ、ブランチクリーンアップコマンド
 3. **専門エージェント**: 6つの特化型AIエージェント（**director指揮者**、データ分析、コーディング、調査、ファイル読み取り、品質管理）
-4. **Skills**: 8個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、PDF解析等）
+4. **Skills**: 9個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、PDF解析、Markdown文書作成等）
 5. **自動フック**: Slack通知
 
 > **Note (v2.1.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。**directorエージェント**がClaude Code機能を活用する指揮者として再定義されました。
@@ -286,13 +286,6 @@ DSN=mysql://user:password@host:3306/database
 # SSH_PASSWORD=ssh-password
 
 # ============================================
-# Claude Code MCP - Claude Code機能拡張
-# ============================================
-# すべてオプション
-# MCP_TIMEOUT=30000
-# MAX_MCP_OUTPUT_TOKENS=10000
-
-# ============================================
 # Slack通知 - 自動フック
 # ============================================
 SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
@@ -383,13 +376,6 @@ SLACK_USER_MENTION=<@U0123456789>
 **接続方法の選択:**
 - **Method 1（推奨）**: `DSN`または`DATABASE_DSN`のみ指定
 - **Method 2**: `DB_TYPE`, `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`を個別指定
-
-#### 7. Claude Code MCP
-
-| 環境変数 | 必須/オプション | デフォルト値 | 説明 |
-|---------|--------------|------------|------|
-| MCP_TIMEOUT | オプション | `30000` | MCPリクエストのタイムアウト（ミリ秒） |
-| MAX_MCP_OUTPUT_TOKENS | オプション | `10000` | MCPレスポンスの最大トークン数 |
 
 ### 🔧 データベース接続文字列（DSN）の形式
 
@@ -612,7 +598,7 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 @qa プラグインがClaude Code仕様に準拠しているか確認してください
 ```
 
-### 4. Skills (8種類) 🎯
+### 4. Skills (9種類) 🎯
 
 **Claude Code Skills**は、Claudeが自律的に判断して起動する**モデル起動型**の機能モジュールです。各サブエージェントは、タスク内容に応じて適切なSkillsを自動的に活用します。
 
@@ -658,6 +644,12 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
   - OWASP Top 10チェックリスト（詳細な修正方法付き）
   - 認証・認可テスト、データ保護確認
 
+**Documentation Skills (1個):**
+- 📝 **markdown-writing** - Markdown文書作成のルールとベストプラクティス
+  - mermaid/plantUMLによる図表作成（ASCII ART禁止）
+  - 文書の適切な分割（300行超の場合、順序prefix付きで分割）
+  - 構造化されたドキュメント作成ガイド
+
 #### Skillsの使い方
 
 **自動起動（推奨）:**
@@ -691,13 +683,13 @@ REST APIのテンプレートを使ってエンドポイントを作成してく
 
 詳細は各Skillの`SKILL.md`を参照してください。
 
-### 2. MCP統合 (7サーバー)
+### 2. MCP統合 (6サーバー)
 
-このプラグインは7個の強力なMCPサーバーを統合しています。各MCPの詳細な使用方法やベストプラクティスは、エージェント向けガイド `plugins/ndf/CLAUDE.md` を参照してください。
+このプラグインは6個の強力なMCPサーバーを統合しています。各MCPの詳細な使用方法やベストプラクティスは、エージェント向けガイド `plugins/ndf/CLAUDE.md` を参照してください。
 
 > **Note (v2.0.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。
 
-**Notion** などの基本MCP、**BigQuery、DBHub** などのデータベースMCP、**Chrome DevTools、AWS Docs、Codex CLI、Claude Code** など専門MCPを含みます。
+**Notion** などの基本MCP、**BigQuery、DBHub** などのデータベースMCP、**Chrome DevTools、AWS Docs、Codex CLI** など専門MCPを含みます。
 
 #### MCPのデフォルト状態
 
@@ -857,6 +849,33 @@ Claude Code終了時に自動的に以下が実行されます：
 
 **注意:**
 - プラグイン更新後も再起動が必要です
+
+## 推奨プラグイン併用
+
+### affaan-m プラグイン
+
+NDFプラグインと併用することで、以下の機能が追加されます：
+
+- **コンテキスト管理**: `/context-status`でコンテキスト使用率を監視
+- **品質保証**: 自動フォーマット、console.log検出、シークレットスキャン
+- **TDDワークフロー**: `/tdd`コマンドで5段階TDDプロセスをガイド
+- **セキュリティチェック**: OWASP Top 10準拠の脆弱性検出
+
+### インストール方法
+
+```bash
+/plugin install affaan-m@ai-plugins
+```
+
+### 併用による相乗効果
+
+| プラグイン | 役割 |
+|-----------|------|
+| **NDFプラグイン** | MCP統合、ワークフロー、専門エージェント |
+| **affaan-mプラグイン** | コンテキスト管理、品質保証、TDDワークフロー |
+
+詳細は[affaan-mプラグインREADME](../affaan-m/README.md)を参照してください。
+
 ## 利用方法
 
 セットアップが完了したら、Claude Codeで自然言語でリクエストするだけです：
