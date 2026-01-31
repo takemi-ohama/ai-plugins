@@ -25,7 +25,9 @@ function detectFromProjectFiles(projectRoot) {
       if (packageJson.packageManager) {
         return packageJson.packageManager.split('@')[0];
       }
-    } catch {}
+    } catch (error) {
+      // JSONパースエラーは無視してlockファイル検出にフォールバック
+    }
   }
   return null;
 }
@@ -38,7 +40,7 @@ function detectFromLockFiles(projectRoot) {
   return null;
 }
 
-async function main() {
+function main() {
   try {
     const projectRoot = process.cwd();
     const detectedPM =

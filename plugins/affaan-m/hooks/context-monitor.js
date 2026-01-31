@@ -7,10 +7,7 @@
  * PreToolUse Hook
  */
 
-const THRESHOLD = 60;
-const CRITICAL_THRESHOLD = 80;
-
-async function main() {
+function main() {
   try {
     // 注: 現在、Claude Code APIからコンテキスト使用率を直接取得する方法がないため
     // このフックは警告メッセージのみを表示します

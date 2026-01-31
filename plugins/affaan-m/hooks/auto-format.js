@@ -10,7 +10,7 @@
  * このフックは情報メッセージのみを表示します。
  */
 
-async function main() {
+function main() {
   try {
     const output = {
       hookSpecificOutput: {

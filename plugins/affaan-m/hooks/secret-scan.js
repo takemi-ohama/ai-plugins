@@ -50,7 +50,7 @@ function scanFile(filePath) {
   }
 }
 
-async function main() {
+function main() {
   try {
     // git diffでステージされたファイルを取得
     let stagedFiles = [];
@@ -73,7 +73,6 @@ async function main() {
       };
       console.log(JSON.stringify(output));
       process.exit(0);
-      return;
     }
 
     // ステージされたファイルをスキャン
@@ -85,15 +84,21 @@ async function main() {
     }
 
     if (allDetected.length > 0) {
-      let message = `\n🚨 [affaan-m] シークレット混入を検出しました:\n`;
+      let detailsMessage = '';
       allDetected.forEach(item => {
-        message += `\n  ファイル: ${item.file}:${item.line}`;
-        message += `\n  パターン: ${item.pattern}`;
-        message += `\n  内容: ${item.snippet}`;
+        detailsMessage += `\n  ファイル: ${item.file}:${item.line}`;
+        detailsMessage += `\n  パターン: ${item.pattern}`;
+        detailsMessage += `\n  内容: ${item.snippet}`;
       });
-      message += `\n\n❌ コミットをブロックしました。シークレットを削除してから再度コミットしてください。\n`;
 
-      console.error(message);
+      const output = {
+        hookSpecificOutput: {
+          hookEventName: "PreCommit",
+          additionalContext: `🚨 [affaan-m] シークレット混入を検出しました:${detailsMessage}\n\n❌ コミットをブロックしました。シークレットを削除してから再度コミットしてください。`,
+          error: "シークレット検出によりコミットをブロックしました"
+        }
+      };
+      console.log(JSON.stringify(output));
       process.exit(1);
     } else {
       const output = {
