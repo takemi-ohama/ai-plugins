@@ -333,7 +333,6 @@ app.use(helmet({
 
 ## 関連ドキュメント
 
-- [セキュリティガイド](../../docs/security-guide.md)
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/)
 

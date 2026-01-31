@@ -185,7 +185,6 @@ TDDワークフロー中、以下のHooksが自動的に発火します：
 
 ## 関連ドキュメント
 
-- [TDDガイド](../docs/tdd-guide.md)
 - [TDDワークフロースキル](../skills/tdd-workflow/SKILL.md)
 - [corderエージェント連携](../../ndf/agents/corder.md)
 

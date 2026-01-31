@@ -9,12 +9,13 @@ const fs = require('fs');
 const path = require('path');
 
 async function main(hookContext) {
-  const { config, toolName, args } = hookContext;
+  const { config } = hookContext;
   const threshold = config.threshold || 60;
 
   try {
-    // コンテキスト使用率を取得（仮想的な実装）
-    // 実際の実装では Claude Code の内部APIを使用
+    // ⚠️ 警告: getContextUsage()は仮想実装（Math.random()）です
+    // 実際のClaude Code APIが利用可能になるまで、このHookは正確なモニタリングを提供しません
+    // 実運用環境ではこのHookを無効化することを推奨します
     const contextUsage = getContextUsage();
 
     if (contextUsage >= threshold) {
@@ -43,7 +44,7 @@ async function main(hookContext) {
   } catch (error) {
     console.error('[affaan-m] context-monitor エラー:', error.message);
     // Hookが失敗してもメイン処理は継続
-    return { success: false, error: error.message };
+    return { success: true, skipped: true, error: error.message };
   }
 }
 

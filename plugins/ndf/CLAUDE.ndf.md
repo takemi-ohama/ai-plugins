@@ -4,7 +4,7 @@
 
 ## Overview
 
-NDF plugin provides **7 MCP servers, 6 commands, and 6 specialized sub-agents**. Delegate complex tasks to appropriate sub-agents for better results.
+NDF plugin provides **6 MCP servers, 6 commands, and 6 specialized sub-agents**. Delegate complex tasks to appropriate sub-agents for better results.
 
 > **Note (v2.1.0)**: GitHub MCP, Serena MCP, Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。directorエージェントはClaude Code機能を活用する指揮者として再定義されました。
 

@@ -353,7 +353,6 @@ npm install
 
 ## 関連ドキュメント
 
-- [セキュリティガイド](../docs/security-guide.md)
 - [セキュリティレビュースキル](../skills/security-review/SKILL.md)
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 

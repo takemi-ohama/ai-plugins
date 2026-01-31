@@ -5,12 +5,11 @@
  * コード編集後に自動フォーマット（Prettier/ESLint）を実行
  */
 
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const util = require('util');
-const fs = require('fs');
 const path = require('path');
 
-const execAsync = util.promisify(exec);
+const execFileAsync = util.promisify(execFile);
 
 async function main(hookContext) {
   const { config, toolName, args, modifiedFiles } = hookContext;
@@ -35,7 +34,7 @@ async function main(hookContext) {
       // Prettierでフォーマット
       if (config.prettier && await hasPrettier()) {
         try {
-          await execAsync(`npx prettier --write "${file}"`);
+          await execFileAsync('npx', ['prettier', '--write', file]);
           formattedFiles.push(file);
         } catch (error) {
           console.warn(`[affaan-m] Prettier failed for ${file}: ${error.message}`);
@@ -45,7 +44,7 @@ async function main(hookContext) {
       // ESLintで自動修正
       if (config.eslint && await hasESLint() && isJavaScriptFile(file)) {
         try {
-          await execAsync(`npx eslint --fix "${file}"`);
+          await execFileAsync('npx', ['eslint', '--fix', file]);
         } catch (error) {
           // ESLintエラーは警告のみ
           console.warn(`[affaan-m] ESLint failed for ${file}: ${error.message}`);
@@ -65,24 +64,26 @@ async function main(hookContext) {
 }
 
 /**
- * Prettierがインストールされているか確認
+ * Prettierがローカルにインストールされているか確認
  */
 async function hasPrettier() {
   try {
-    await execAsync('npx prettier --version');
-    return true;
+    const localPrettierPath = path.join(process.cwd(), 'node_modules', '.bin', 'prettier');
+    const fs = require('fs');
+    return fs.existsSync(localPrettierPath);
   } catch {
     return false;
   }
 }
 
 /**
- * ESLintがインストールされているか確認
+ * ESLintがローカルにインストールされているか確認
  */
 async function hasESLint() {
   try {
-    await execAsync('npx eslint --version');
-    return true;
+    const localESLintPath = path.join(process.cwd(), 'node_modules', '.bin', 'eslint');
+    const fs = require('fs');
+    return fs.existsSync(localESLintPath);
   } catch {
     return false;
   }

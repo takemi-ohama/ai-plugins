@@ -72,7 +72,7 @@ function createRegex(pattern) {
   // パターンマッピング
   const regexMap = {
     'AWS_ACCESS_KEY_ID': /AKIA[0-9A-Z]{16}/,
-    'AWS_SECRET_ACCESS_KEY': /[A-Za-z0-9/+=]{40}/,
+    'AWS_SECRET_ACCESS_KEY': /(AWS_SECRET_ACCESS_KEY|aws_secret_access_key)\s*[:=]\s*['"]?[A-Za-z0-9/+=]{40}['"]?/,
     'GITHUB_TOKEN': /ghp_[A-Za-z0-9]{36}/,
     'SLACK_TOKEN': /xox[baprs]-[0-9a-zA-Z-]+/,
     '-----BEGIN PRIVATE KEY-----': /-----BEGIN (RSA |DSA |EC )?PRIVATE KEY-----/,

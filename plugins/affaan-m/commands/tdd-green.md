@@ -241,7 +241,6 @@ REFACTORフェーズでコード品質を向上させます。
 
 ## 関連ドキュメント
 
-- [TDDガイド](../docs/tdd-guide.md)
 - [TDDワークフロー](./tdd.md)
 - [REFACTORフェーズ](./tdd-refactor.md)
 

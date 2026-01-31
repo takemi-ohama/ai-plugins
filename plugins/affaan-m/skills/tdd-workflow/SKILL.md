@@ -258,9 +258,7 @@ async function authenticateUser(username: string, password: string): Promise<Aut
 
 ## 関連ドキュメント
 
-- [TDDガイド](../../docs/tdd-guide.md)
-- [コーディングガイドライン](../../docs/coding-guide.md)
-- [テストガイド](../../docs/testing-guide.md)
+- TDDの詳細は関連コマンドを参照してください（`/tdd`, `/tdd-red`, `/tdd-green`, `/tdd-refactor`, `/tdd-coverage`）
 
 ## 参考
 

@@ -312,7 +312,6 @@ COVERAGEフェーズでテストカバレッジを検証します。
 
 ## 関連ドキュメント
 
-- [TDDガイド](../docs/tdd-guide.md)
 - [TDDワークフロー](./tdd.md)
 - [COVERAGEフェーズ](./tdd-coverage.md)
 

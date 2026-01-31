@@ -194,7 +194,6 @@ GREENフェーズで最小実装を行います。
 
 ## 関連ドキュメント
 
-- [TDDガイド](../docs/tdd-guide.md)
 - [TDDワークフロー](./tdd.md)
 - [GREENフェーズ](./tdd-green.md)
 

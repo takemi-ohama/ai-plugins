@@ -312,7 +312,6 @@ COVERAGEフェーズが完了したら：
 
 ## 関連ドキュメント
 
-- [TDDガイド](../docs/tdd-guide.md)
 - [TDDワークフロー](./tdd.md)
 - [セキュリティスキャン](./security-scan.md)
 

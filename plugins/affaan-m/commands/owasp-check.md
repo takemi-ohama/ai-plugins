@@ -409,7 +409,6 @@ Content-Security-Policy: default-src 'self'
 
 ## 関連ドキュメント
 
-- [セキュリティガイド](../docs/security-guide.md)
 - [セキュリティレビュースキル](../skills/security-review/SKILL.md)
 
 ## 参考
