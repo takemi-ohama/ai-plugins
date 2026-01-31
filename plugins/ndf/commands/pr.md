@@ -34,3 +34,92 @@
 - ブランチ: 英語（例: update-config）
 - github flow
 - コミット・PR: 日本語
+
+## 作業完了報告（必須）
+
+作業完了時は以下の情報を必ず報告すること：
+
+### 報告テンプレート
+
+```
+PR作成が完了しました。
+
+## PR情報
+
+### 基本情報
+- **PR URL**: https://github.com/owner/repo/pull/123
+- **PRタイトル**: [PRのタイトル]
+- **ベースブランチ**: `main` / `develop` / その他
+- **ソースブランチ**: `feature-branch-name`
+
+### 変更内容
+- **コミット数**: N個
+- **変更ファイル数**: M個
+- **変更行数**: +追加行, -削除行
+- **主な変更内容**:
+  - [変更内容1]
+  - [変更内容2]
+  - [変更内容3]
+
+### コミット情報
+- **最新コミット**: `abc1234` - "コミットメッセージ"
+- **コミット履歴**:
+  - `abc1234` - "コミットメッセージ1"
+  - `def5678` - "コミットメッセージ2"
+
+### PR本文の概要
+**Summary**:
+- [変更の概要を2-3行で]
+
+**Test plan**:
+- [ ] テスト項目1
+- [ ] テスト項目2
+
+### 次のアクション
+- レビュー依頼: GitHub Copilot / 特定のレビュアー
+- CI/CDチェック: 実行中 / 完了 / 失敗
+```
+
+### 報告例
+
+```
+PR作成が完了しました。
+
+## PR情報
+
+### 基本情報
+- **PR URL**: https://github.com/takemi-ohama/ai-plugins/pull/13
+- **PRタイトル**: feat: affaan-mプラグインのフックスクリプトをClaude Code仕様に実装
+- **ベースブランチ**: `main`
+- **ソースブランチ**: `implement-affaan-m-hooks-scripts`
+
+### 変更内容
+- **コミット数**: 3個
+- **変更ファイル数**: 7個
+- **変更行数**: +275, -497
+- **主な変更内容**:
+  - 7つのフックスクリプトをClaude Code Hooks仕様に完全準拠
+  - secret-scan、typescript-check、detect-package-managerに実機能実装
+  - 4つのフックは情報メッセージ表示（API制限のため）
+  - コード削減: 497行 → 275行（45%削減）
+
+### コミット情報
+- **最新コミット**: `6ff32b6` - "feat: affaan-mプラグインのフックスクリプトをClaude Code仕様に実装"
+- **コミット履歴**:
+  - `6ff32b6` - "feat: affaan-mプラグインのフックスクリプトをClaude Code仕様に実装"
+  - `8d013a2` - "fix: affaan-mプラグインのhooks.json構造をClaude Code仕様に修正"
+
+### PR本文の概要
+**Summary**:
+affaan-mプラグインの7つのフックスクリプトをClaude Code Hooks仕様に完全準拠するよう実装・修正しました。secret-scan、typescript-check、detect-package-managerは実機能を持ち、その他は情報メッセージを表示します。
+
+**Test plan**:
+- [ ] affaan-mプラグインを再インストールできること
+- [ ] 各フックスクリプトが個別実行できること
+- [ ] secret-scanがシークレットを検出できること
+
+### 次のアクション
+- レビュー依頼: GitHub Copilot
+- CI/CDチェック: 実行中
+```
+
