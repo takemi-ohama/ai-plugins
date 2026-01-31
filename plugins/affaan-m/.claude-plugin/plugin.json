@@ -28,35 +28,5 @@
     "./skills/tdd-workflow",
     "./skills/security-review"
   ],
-  "hooks": "./hooks/hooks.json",
-  "dependencies": {
-    "ndf": "^2.1.0"
-  },
-  "config": {
-    "contextMonitoring": {
-      "enabled": true,
-      "threshold": 60,
-      "autoCompact": true
-    },
-    "hooks": {
-      "autoFormat": true,
-      "consoleLogDetection": true,
-      "typescriptCheck": true,
-      "secretScan": true,
-      "coverageCheck": true
-    },
-    "tdd": {
-      "coverageThreshold": 80,
-      "enforceRedGreenRefactor": true
-    },
-    "security": {
-      "owaspCheck": true,
-      "secretPatterns": [
-        "AWS_ACCESS_KEY_ID",
-        "AWS_SECRET_ACCESS_KEY",
-        "GITHUB_TOKEN",
-        "SLACK_TOKEN"
-      ]
-    }
-  }
+  "hooks": "./hooks/hooks.json"
 }
