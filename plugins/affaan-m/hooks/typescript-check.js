@@ -22,6 +22,9 @@ async function main() {
 
     if (hasTsConfig) {
       try {
+        // Check if TypeScript is available
+        execSync('npx tsc --version', { stdio: 'ignore' });
+
         // TypeScript型チェックを実行（エラーは無視）
         execSync('npx tsc --noEmit', { stdio: 'ignore' });
 
@@ -33,14 +36,25 @@ async function main() {
         };
         console.log(JSON.stringify(output));
       } catch (error) {
-        // 型エラーがある場合
-        const output = {
-          hookSpecificOutput: {
-            hookEventName: "PostToolUse",
-            additionalContext: "⚠️ [affaan-m] TypeScript型エラーが検出されました。`npx tsc --noEmit` で詳細を確認してください。"
-          }
-        };
-        console.log(JSON.stringify(output));
+        // Check if error is due to missing TypeScript
+        if (error.message && (error.message.includes('tsc') && error.message.includes('not found'))) {
+          const output = {
+            hookSpecificOutput: {
+              hookEventName: "PostToolUse",
+              additionalContext: "💡 [affaan-m] TypeScriptのヒント: TypeScriptがインストールされていません。`npm install typescript` でインストールしてください。"
+            }
+          };
+          console.log(JSON.stringify(output));
+        } else {
+          // 型エラーがある場合
+          const output = {
+            hookSpecificOutput: {
+              hookEventName: "PostToolUse",
+              additionalContext: "⚠️ [affaan-m] TypeScript型エラーが検出されました。`npx tsc --noEmit` で詳細を確認してください。"
+            }
+          };
+          console.log(JSON.stringify(output));
+        }
       }
     } else {
       const output = {

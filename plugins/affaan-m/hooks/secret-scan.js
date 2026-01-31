@@ -12,7 +12,7 @@ const fs = require('fs');
 
 const SECRET_PATTERNS = {
   'AWS_ACCESS_KEY_ID': /AKIA[0-9A-Z]{16}/,
-  'AWS_SECRET_ACCESS_KEY': /(AWS_SECRET_ACCESS_KEY|aws_secret_access_key)\s*[:=]\s*['"]?[A-Za-z0-9/+=]{40}['"]?/,
+  'AWS_SECRET_ACCESS_KEY': /(AWS_SECRET_ACCESS_KEY|aws_secret_access_key)\s*[:=]\s*['"]?[A-Za-z0-9/+=]{40}['"]?/i,
   'GITHUB_TOKEN': /ghp_[A-Za-z0-9]{36}/,
   'SLACK_TOKEN': /xox[baprs]-[0-9a-zA-Z-]+/,
   'PRIVATE_KEY': /-----BEGIN (RSA |DSA |EC )?PRIVATE KEY-----/,
@@ -20,6 +20,12 @@ const SECRET_PATTERNS = {
 
 function scanFile(filePath) {
   try {
+    // Skip binary files and common non-text extensions
+    const binaryExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.pdf', '.zip', '.tar', '.gz', '.exe', '.dll', '.so', '.woff', '.woff2', '.ttf', '.eot'];
+    if (binaryExtensions.some(ext => filePath.toLowerCase().endsWith(ext))) {
+      return [];
+    }
+
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.split('\n');
     const detected = [];
@@ -39,6 +45,7 @@ function scanFile(filePath) {
 
     return detected;
   } catch (error) {
+    // エンコーディングエラーやファイル読み込みエラーは無視
     return [];
   }
 }
