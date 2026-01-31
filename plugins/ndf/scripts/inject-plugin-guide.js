@@ -33,23 +33,39 @@ function isUserScope() {
   return PLUGIN_ROOT.startsWith(USER_CLAUDE_DIR);
 }
 
+function getVersionFromFile(filePath) {
+  const fd = fs.openSync(filePath, 'r');
+  const buffer = Buffer.alloc(200);
+  fs.readSync(fd, buffer, 0, 200, 0);
+  fs.closeSync(fd);
+
+  const header = buffer.toString('utf8');
+  const match = header.match(/<!-- VERSION: (\d+) -->/);
+  return match ? match[1] : null;
+}
+
 function copyGuide(targetDir) {
   if (!fs.existsSync(GUIDE_SOURCE)) {
     throw new Error(`Plugin guide not found at ${GUIDE_SOURCE}`);
   }
 
-  const sourceContent = fs.readFileSync(GUIDE_SOURCE, 'utf8');
   const destPath = path.join(targetDir, 'CLAUDE.ndf.md');
   const exists = fs.existsSync(destPath);
 
   if (exists) {
-    const existingContent = fs.readFileSync(destPath, 'utf8');
-    if (existingContent === sourceContent) {
-      return false;
+    const sourceSize = fs.statSync(GUIDE_SOURCE).size;
+    const destSize = fs.statSync(destPath).size;
+
+    if (sourceSize === destSize) {
+      const sourceVersion = getVersionFromFile(GUIDE_SOURCE);
+      const destVersion = getVersionFromFile(destPath);
+      if (sourceVersion === destVersion) {
+        return false;
+      }
     }
   }
 
-  fs.writeFileSync(destPath, sourceContent, 'utf8');
+  fs.copyFileSync(GUIDE_SOURCE, destPath);
   console.log(`✓ ${exists ? 'Updated' : 'Copied'} plugin guide to ${destPath}`);
   return true;
 }
