@@ -3,127 +3,122 @@
 /**
  * secret-scan.js
  * コミット前にシークレット混入をチェック
+ *
+ * PreCommit Hook
  */
 
+const { execSync } = require('child_process');
 const fs = require('fs');
-const path = require('path');
 
-async function main(hookContext) {
-  const { config, stagedFiles } = hookContext;
-  const patterns = config.patterns || [];
-  const blockCommit = config.blockCommit !== false; // デフォルトtrue
+const SECRET_PATTERNS = {
+  'AWS_ACCESS_KEY_ID': /AKIA[0-9A-Z]{16}/,
+  'AWS_SECRET_ACCESS_KEY': /(AWS_SECRET_ACCESS_KEY|aws_secret_access_key)\s*[:=]\s*['"]?[A-Za-z0-9/+=]{40}['"]?/i,
+  'GITHUB_TOKEN': /ghp_[A-Za-z0-9]{36}/,
+  'SLACK_TOKEN': /xox[baprs]-[0-9a-zA-Z-]+/,
+  'PRIVATE_KEY': /-----BEGIN (RSA |DSA |EC )?PRIVATE KEY-----/,
+};
 
+function scanFile(filePath) {
   try {
-    const detectedSecrets = [];
-
-    for (const file of stagedFiles || []) {
-      // バイナリファイルやnode_modulesはスキップ
-      if (shouldSkipFile(file)) continue;
-
-      const content = fs.readFileSync(file, 'utf-8');
-      const lines = content.split('\n');
-
-      // 各パターンでスキャン
-      for (const pattern of patterns) {
-        const regex = createRegex(pattern);
-        lines.forEach((line, index) => {
-          if (regex.test(line)) {
-            detectedSecrets.push({
-              file,
-              line: index + 1,
-              pattern,
-              content: line.trim().substring(0, 100), // 最初の100文字のみ
-            });
-          }
-        });
-      }
+    // Skip binary files and common non-text extensions
+    const binaryExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.pdf', '.zip', '.tar', '.gz', '.exe', '.dll', '.so', '.woff', '.woff2', '.ttf', '.eot'];
+    if (binaryExtensions.some(ext => filePath.toLowerCase().endsWith(ext))) {
+      return [];
     }
 
-    if (detectedSecrets.length > 0) {
-      console.error('\n🚨 [affaan-m] シークレット混入を検出しました:\n');
-      detectedSecrets.forEach(secret => {
-        console.error(`  ファイル: ${secret.file}:${secret.line}`);
-        console.error(`  パターン: ${secret.pattern}`);
-        console.error(`  内容: ${secret.content}`);
-        console.error('');
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n');
+    const detected = [];
+
+    Object.entries(SECRET_PATTERNS).forEach(([name, regex]) => {
+      lines.forEach((line, index) => {
+        if (regex.test(line)) {
+          detected.push({
+            file: filePath,
+            line: index + 1,
+            pattern: name,
+            snippet: line.trim().substring(0, 80)
+          });
+        }
       });
+    });
 
-      if (blockCommit) {
-        console.error('❌ コミットをブロックしました');
-        console.error('   修正後に再度コミットしてください\n');
-        return { success: false, blocked: true, detectedSecrets };
-      } else {
-        console.warn('⚠️  警告のみ（コミットは継続）\n');
-        return { success: true, warned: true, detectedSecrets };
-      }
-    }
-
-    return { success: true };
+    return detected;
   } catch (error) {
-    console.error('[affaan-m] secret-scan エラー:', error.message);
-    return { success: false, error: error.message };
+    // エンコーディングエラーやファイル読み込みエラーは無視
+    return [];
   }
 }
 
-/**
- * パターンから正規表現を作成
- */
-function createRegex(pattern) {
-  // パターンマッピング
-  const regexMap = {
-    'AWS_ACCESS_KEY_ID': /AKIA[0-9A-Z]{16}/,
-    'AWS_SECRET_ACCESS_KEY': /(AWS_SECRET_ACCESS_KEY|aws_secret_access_key)\s*[:=]\s*['"]?[A-Za-z0-9/+=]{40}['"]?/,
-    'GITHUB_TOKEN': /ghp_[A-Za-z0-9]{36}/,
-    'SLACK_TOKEN': /xox[baprs]-[0-9a-zA-Z-]+/,
-    '-----BEGIN PRIVATE KEY-----': /-----BEGIN (RSA |DSA |EC )?PRIVATE KEY-----/,
-  };
+function main() {
+  try {
+    // git diffでステージされたファイルを取得
+    let stagedFiles = [];
+    try {
+      const output = execSync('git diff --cached --name-only --diff-filter=ACM', {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'ignore']
+      });
+      stagedFiles = output.trim().split('\n').filter(Boolean);
+    } catch (error) {
+      // gitリポジトリでない、または変更がない場合
+    }
 
-  return regexMap[pattern] || new RegExp(pattern);
+    if (stagedFiles.length === 0) {
+      const output = {
+        hookSpecificOutput: {
+          hookEventName: "PreCommit",
+          additionalContext: "🔒 [affaan-m] シークレットスキャン: チェック対象ファイルなし"
+        }
+      };
+      console.log(JSON.stringify(output));
+      process.exit(0);
+    }
+
+    // ステージされたファイルをスキャン
+    let allDetected = [];
+    for (const file of stagedFiles) {
+      if (file.includes('node_modules/') || file.includes('.git/')) continue;
+      const detected = scanFile(file);
+      allDetected = allDetected.concat(detected);
+    }
+
+    if (allDetected.length > 0) {
+      let detailsMessage = '';
+      allDetected.forEach(item => {
+        detailsMessage += `\n  ファイル: ${item.file}:${item.line}`;
+        detailsMessage += `\n  パターン: ${item.pattern}`;
+        detailsMessage += `\n  内容: ${item.snippet}`;
+      });
+
+      const output = {
+        hookSpecificOutput: {
+          hookEventName: "PreCommit",
+          additionalContext: `🚨 [affaan-m] シークレット混入を検出しました:${detailsMessage}\n\n❌ コミットをブロックしました。シークレットを削除してから再度コミットしてください。`,
+          error: "シークレット検出によりコミットをブロックしました"
+        }
+      };
+      console.log(JSON.stringify(output));
+      process.exit(1);
+    } else {
+      const output = {
+        hookSpecificOutput: {
+          hookEventName: "PreCommit",
+          additionalContext: `✅ [affaan-m] シークレットスキャン: 問題なし（${stagedFiles.length}個のファイルをスキャン）`
+        }
+      };
+      console.log(JSON.stringify(output));
+      process.exit(0);
+    }
+  } catch (error) {
+    console.error(JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PreCommit",
+        error: error.message
+      }
+    }));
+    process.exit(1);
+  }
 }
 
-/**
- * スキップすべきファイルか判定
- */
-function shouldSkipFile(file) {
-  const skipPatterns = [
-    'node_modules/',
-    '.git/',
-    'dist/',
-    'build/',
-    'coverage/',
-    '.png',
-    '.jpg',
-    '.jpeg',
-    '.gif',
-    '.svg',
-    '.ico',
-    '.pdf',
-    '.zip',
-    '.tar',
-    '.gz',
-  ];
-
-  return skipPatterns.some(pattern => file.includes(pattern));
-}
-
-module.exports = main;
-
-// CLIから直接実行された場合
-if (require.main === module) {
-  const hookContext = {
-    config: {
-      patterns: [
-        'AWS_ACCESS_KEY_ID',
-        'AWS_SECRET_ACCESS_KEY',
-        'GITHUB_TOKEN',
-        'SLACK_TOKEN',
-        '-----BEGIN PRIVATE KEY-----',
-      ],
-      blockCommit: true,
-    },
-    stagedFiles: process.argv.slice(2),
-  };
-  main(hookContext).then(result => {
-    process.exit(result.success ? 0 : 1);
-  });
-}
+main();

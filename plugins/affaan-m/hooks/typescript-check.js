@@ -3,51 +3,80 @@
 /**
  * typescript-check.js
  * TypeScript型チェックを自動実行
+ *
+ * PostToolUse Hook
+ *
+ * 注: 現在、編集されたファイル情報を取得するClaude Code APIがないため、
+ * このフックは情報メッセージのみを表示します。
  */
 
-const { exec } = require('child_process');
-const util = require('util');
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
-const execAsync = util.promisify(exec);
-
-async function main(hookContext) {
-  const { config, toolName, modifiedFiles } = hookContext;
-
-  if (!['Edit', 'Write'].includes(toolName)) {
-    return { success: true };
-  }
-
-  const tsFiles = (modifiedFiles || []).filter(f => f.match(/\.(ts|tsx)$/));
-  if (tsFiles.length === 0) {
-    return { success: true };
-  }
-
+function main() {
   try {
-    // TypeScriptがインストールされているか確認
-    try {
-      await execAsync('npx tsc --version');
-    } catch {
-      return { success: true }; // TypeScript未導入プロジェクトはスキップ
+    // tsconfigが存在するか確認
+    const tsconfigPath = path.join(process.cwd(), 'tsconfig.json');
+    const hasTsConfig = fs.existsSync(tsconfigPath);
+
+    if (hasTsConfig) {
+      try {
+        // Check if TypeScript is available
+        try {
+          execSync('npx tsc --version', { stdio: 'ignore' });
+        } catch (versionError) {
+          // TypeScript未インストール
+          const output = {
+            hookSpecificOutput: {
+              hookEventName: "PostToolUse",
+              additionalContext: "💡 [affaan-m] TypeScriptのヒント: TypeScriptがインストールされていません。`npm install typescript` でインストールしてください。"
+            }
+          };
+          console.log(JSON.stringify(output));
+          process.exit(0);
+        }
+
+        // TypeScript型チェックを実行
+        execSync('npx tsc --noEmit', { stdio: 'ignore' });
+
+        const output = {
+          hookSpecificOutput: {
+            hookEventName: "PostToolUse",
+            additionalContext: "✅ [affaan-m] TypeScript型チェック: 問題なし"
+          }
+        };
+        console.log(JSON.stringify(output));
+      } catch (error) {
+        // 型エラーがある場合
+        const output = {
+          hookSpecificOutput: {
+            hookEventName: "PostToolUse",
+            additionalContext: "⚠️ [affaan-m] TypeScript型エラーが検出されました。`npx tsc --noEmit` で詳細を確認してください。"
+          }
+        };
+        console.log(JSON.stringify(output));
+      }
+    } else {
+      const output = {
+        hookSpecificOutput: {
+          hookEventName: "PostToolUse",
+          additionalContext: "💡 [affaan-m] TypeScriptのヒント: tsconfig.jsonが見つかりません。"
+        }
+      };
+      console.log(JSON.stringify(output));
     }
 
-    // 型チェック実行
-    const { stdout, stderr } = await execAsync('npx tsc --noEmit');
-
-    return { success: true };
+    process.exit(0);
   } catch (error) {
-    console.warn('\n⚠️  [affaan-m] TypeScript型エラーを検出しました:');
-    console.warn(error.stdout || error.message);
-    console.warn('  推奨: 型エラーを修正してください\n');
-    return { success: true, hasTypeErrors: true }; // 警告のみ
+    console.error(JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PostToolUse",
+        error: error.message
+      }
+    }));
+    process.exit(1);
   }
 }
 
-module.exports = main;
-
-if (require.main === module) {
-  main({
-    config: {},
-    toolName: 'Edit',
-    modifiedFiles: process.argv.slice(2),
-  }).then(result => process.exit(result.success ? 0 : 1));
-}
+main();
