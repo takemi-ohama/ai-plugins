@@ -1,0 +1,89 @@
+{
+  "hooks": [
+    {
+      "name": "context-monitor",
+      "type": "PreToolUse",
+      "script": "./context-monitor.js",
+      "description": "コンテキスト使用率を監視し、60%を超えたら警告を表示",
+      "enabled": true,
+      "config": {
+        "threshold": 60,
+        "autoWarn": true
+      }
+    },
+    {
+      "name": "auto-format",
+      "type": "PostToolUse",
+      "script": "./auto-format.js",
+      "description": "コード編集後に自動フォーマット（Prettier/ESLint）を実行",
+      "enabled": true,
+      "config": {
+        "prettier": true,
+        "eslint": true,
+        "stylelint": false
+      }
+    },
+    {
+      "name": "detect-console-log",
+      "type": "PostToolUse",
+      "script": "./detect-console-log.js",
+      "description": "console.log や debugger の使用を検出して警告",
+      "enabled": true,
+      "config": {
+        "patterns": ["console.log", "console.debug", "debugger"],
+        "severity": "warning"
+      }
+    },
+    {
+      "name": "typescript-check",
+      "type": "PostToolUse",
+      "script": "./typescript-check.js",
+      "description": "TypeScript型チェックを自動実行",
+      "enabled": true,
+      "config": {
+        "autoFix": false,
+        "strictMode": true
+      }
+    },
+    {
+      "name": "secret-scan",
+      "type": "PreCommit",
+      "script": "./secret-scan.js",
+      "description": "コミット前にシークレット混入をチェック",
+      "enabled": true,
+      "config": {
+        "patterns": [
+          "AWS_ACCESS_KEY_ID",
+          "AWS_SECRET_ACCESS_KEY",
+          "GITHUB_TOKEN",
+          "SLACK_TOKEN",
+          "-----BEGIN PRIVATE KEY-----"
+        ],
+        "blockCommit": true
+      }
+    },
+    {
+      "name": "coverage-check",
+      "type": "PreCommit",
+      "script": "./coverage-check.js",
+      "description": "テストカバレッジを検証（80%以上推奨）",
+      "enabled": true,
+      "config": {
+        "threshold": 80,
+        "blockCommit": false,
+        "warnOnly": true
+      }
+    },
+    {
+      "name": "detect-package-manager",
+      "type": "PreToolUse",
+      "script": "./detect-package-manager.js",
+      "description": "プロジェクトのパッケージマネージャーを自動検出（npm/pnpm/yarn/bun）",
+      "enabled": true,
+      "config": {
+        "priority": ["environment", "projectFiles", "lockFiles"],
+        "cache": true
+      }
+    }
+  ]
+}
