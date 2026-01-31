@@ -1,17 +1,25 @@
 #!/usr/bin/env node
 
 /**
- * SessionStart Hook: Copy NDF Plugin Guide and add @import to CLAUDE.md
+ * SessionStart Hook: NDFプラグインガイドの配置とインポート
  *
- * This script:
- * 1. Copies CLAUDE.ndf.md to project root as CLAUDE.ndf.md
- * 2. Adds @CLAUDE.ndf.md import line to CLAUDE.md or AGENT.md
+ * 【要件】
+ * CLAUDE.mdのある場所にCLAUDE.ndf.mdを作成する。
+ * CLAUDE.mdがどこにもなければCLAUDE.ndf.mdも作成しない。
+ *
+ * 【処理フロー】
+ * 1. CLAUDE.md/AGENT.mdの場所を探す（プロジェクトルート or ~/.claude/）
+ * 2. 見つかった場合、同じディレクトリにCLAUDE.ndf.mdをコピー
+ * 3. CLAUDE.md/AGENT.mdに @CLAUDE.ndf.md のインポート行を追加
  */
 
 const fs = require('fs');
 const path = require('path');
 
-// Get current working directory (project root)
+// ============================================================
+// 設定
+// ============================================================
+
 const projectRoot = process.cwd();
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
 
@@ -20,98 +28,134 @@ if (!pluginRoot) {
   process.exit(1);
 }
 
-// Paths
-const pluginGuidePath = path.join(pluginRoot, 'CLAUDE.ndf.md');
-const targetGuidePath = path.join(projectRoot, 'CLAUDE.ndf.md');
+const PLUGIN_GUIDE_SOURCE = path.join(pluginRoot, 'CLAUDE.ndf.md');
+const IMPORT_LINE = '@CLAUDE.ndf.md';
 
-// Find target file (CLAUDE.md or AGENT.md)
-function findTargetFile() {
-  // Priority 1: Root CLAUDE.md
-  const rootClaude = path.join(projectRoot, 'CLAUDE.md');
-  if (fs.existsSync(rootClaude)) return rootClaude;
+// ============================================================
+// CLAUDE.md/AGENT.mdの場所を探す
+// ============================================================
 
-  // Priority 2: Root AGENT.md
-  const rootAgent = path.join(projectRoot, 'AGENT.md');
-  if (fs.existsSync(rootAgent)) return rootAgent;
+/**
+ * CLAUDE.md または AGENT.md の場所を探す
+ *
+ * 優先順位:
+ * 1. プロジェクトルート/CLAUDE.md
+ * 2. プロジェクトルート/AGENT.md
+ * 3. ~/.claude/CLAUDE.md
+ * 4. ~/.claude/AGENT.md
+ *
+ * @returns {string|null} 見つかったファイルのパス、見つからない場合はnull
+ */
+function findClaudeMdLocation() {
+  const candidates = [
+    path.join(projectRoot, 'CLAUDE.md'),
+    path.join(projectRoot, 'AGENT.md'),
+    path.join(projectRoot, '.claude', 'CLAUDE.md'),
+    path.join(projectRoot, '.claude', 'AGENT.md')
+  ];
 
-  // Priority 3: .claude/CLAUDE.md
-  const claudeDirClaude = path.join(projectRoot, '.claude', 'CLAUDE.md');
-  if (fs.existsSync(claudeDirClaude)) return claudeDirClaude;
-
-  // Priority 4: .claude/AGENT.md
-  const claudeDirAgent = path.join(projectRoot, '.claude', 'AGENT.md');
-  if (fs.existsSync(claudeDirAgent)) return claudeDirAgent;
+  for (const filePath of candidates) {
+    if (fs.existsSync(filePath)) {
+      return filePath;
+    }
+  }
 
   return null;
 }
 
-// Get import line based on target file location
-function getImportLine(targetFile) {
-  const targetDir = path.dirname(targetFile);
-  const relativePath = path.relative(targetDir, targetGuidePath);
-  // Convert to forward slashes for consistency
-  const normalizedPath = relativePath.split(path.sep).join('/');
-  return `@${normalizedPath}`;
+// ============================================================
+// CLAUDE.ndf.mdをコピーする
+// ============================================================
+
+/**
+ * プラグインガイドをターゲットディレクトリにコピーする
+ *
+ * @param {string} targetDirectory コピー先ディレクトリ
+ * @returns {boolean} コピーしたかどうか
+ */
+function copyPluginGuideToDirectory(targetDirectory) {
+  if (!fs.existsSync(PLUGIN_GUIDE_SOURCE)) {
+    console.error(`❌ Error: Plugin guide not found at ${PLUGIN_GUIDE_SOURCE}`);
+    process.exit(1);
+  }
+
+  const sourceContent = fs.readFileSync(PLUGIN_GUIDE_SOURCE, 'utf8');
+  const destinationPath = path.join(targetDirectory, 'CLAUDE.ndf.md');
+
+  // 既存ファイルが同じ内容なら何もしない
+  if (fs.existsSync(destinationPath)) {
+    const existingContent = fs.readFileSync(destinationPath, 'utf8');
+    if (existingContent === sourceContent) {
+      console.log('✓ CLAUDE.ndf.md is already up to date');
+      return false;
+    }
+  }
+
+  // コピー実行
+  fs.writeFileSync(destinationPath, sourceContent, 'utf8');
+  console.log(`✓ Copied plugin guide to ${destinationPath}`);
+  return true;
 }
 
-// Main function
+// ============================================================
+// インポート行を追加する
+// ============================================================
+
+/**
+ * CLAUDE.md/AGENT.mdにインポート行を追加する
+ *
+ * @param {string} targetFilePath 対象ファイルのパス
+ * @returns {boolean} 追加したかどうか
+ */
+function addImportLineToFile(targetFilePath) {
+  const content = fs.readFileSync(targetFilePath, 'utf8');
+
+  // 既にインポート行があれば何もしない
+  if (content.includes(IMPORT_LINE)) {
+    console.log(`✓ Import line already exists in ${path.basename(targetFilePath)}`);
+    return false;
+  }
+
+  // ファイル末尾にインポート行を追加
+  const newContent = content.trimEnd() + '\n' + IMPORT_LINE + '\n';
+  fs.writeFileSync(targetFilePath, newContent, 'utf8');
+  console.log(`✓ Added import line to ${path.basename(targetFilePath)}: ${IMPORT_LINE}`);
+  return true;
+}
+
+// ============================================================
+// メイン処理
+// ============================================================
+
 function main() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('📋 NDF Plugin: Inject Plugin Guide');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-  // Step 1: Copy plugin guide to project root
-  if (!fs.existsSync(pluginGuidePath)) {
-    console.error(`❌ Error: Plugin guide not found at ${pluginGuidePath}`);
-    process.exit(1);
-  }
+  // ステップ1: CLAUDE.md/AGENT.mdの場所を探す
+  const claudeMdPath = findClaudeMdLocation();
 
-  const pluginGuideContent = fs.readFileSync(pluginGuidePath, 'utf8');
-
-  // Check if CLAUDE.ndf.md needs update
-  let shouldCopy = true;
-  if (fs.existsSync(targetGuidePath)) {
-    const existingContent = fs.readFileSync(targetGuidePath, 'utf8');
-    if (existingContent === pluginGuideContent) {
-      console.log('✓ CLAUDE.ndf.md is already up to date');
-      shouldCopy = false;
-    }
-  }
-
-  if (shouldCopy) {
-    fs.writeFileSync(targetGuidePath, pluginGuideContent, 'utf8');
-    console.log(`✓ Copied plugin guide to ${targetGuidePath}`);
-  }
-
-  // Step 2: Add @import line to CLAUDE.md or AGENT.md
-  const targetFile = findTargetFile();
-
-  if (!targetFile) {
+  if (!claudeMdPath) {
+    // CLAUDE.mdが見つからない → CLAUDE.ndf.mdも作成しない
     console.log('⚠ No CLAUDE.md or AGENT.md found in project');
-    console.log('  Plugin guide is available at CLAUDE.ndf.md');
+    console.log('  CLAUDE.ndf.md will not be created');
+    console.log('  (CLAUDE.ndf.md is only created where CLAUDE.md exists)');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return;
   }
 
-  let targetContent = fs.readFileSync(targetFile, 'utf8');
+  console.log(`✓ Found CLAUDE.md at: ${claudeMdPath}`);
 
-  // Get correct import line for target file location
-  const importLine = getImportLine(targetFile);
+  // ステップ2: CLAUDE.mdと同じディレクトリにCLAUDE.ndf.mdをコピー
+  const targetDirectory = path.dirname(claudeMdPath);
+  copyPluginGuideToDirectory(targetDirectory);
 
-  // Check if import line already exists
-  if (targetContent.includes(importLine)) {
-    console.log(`✓ Import line already exists in ${path.basename(targetFile)}`);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    return;
-  }
+  // ステップ3: CLAUDE.mdにインポート行を追加
+  addImportLineToFile(claudeMdPath);
 
-  // Add import line at the end
-  const newContent = targetContent.trimEnd() + '\n' + importLine + '\n';
-  fs.writeFileSync(targetFile, newContent, 'utf8');
-  console.log(`✓ Added import line to ${path.basename(targetFile)}: ${importLine}`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-  // Notify Claude Code
+  // Claude Codeへの通知
   const hookOutput = {
     hookSpecificOutput: {
       hookEventName: "SessionStart",
@@ -121,7 +165,10 @@ function main() {
   console.log(JSON.stringify(hookOutput));
 }
 
-// Run
+// ============================================================
+// 実行
+// ============================================================
+
 try {
   main();
 } catch (error) {
