@@ -110,7 +110,7 @@ PR修正対応が完了しました。
 
 ---
 
-## 📎 リンク
+PR修正対応が完了しました。
 
 **PR URL**: https://github.com/takemi-ohama/ai-plugins/pull/13
 ```
