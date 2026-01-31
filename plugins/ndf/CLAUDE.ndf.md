@@ -1,6 +1,6 @@
 <!-- NDF_PLUGIN_GUIDE_START_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
 <!-- VERSION: 7 -->
-# NDF Plugin - AI Agent Guidelines (v2.2.1)
+# NDF Plugin - AI Agent Guidelines (v2.2.2)
 
 ## Overview
 
