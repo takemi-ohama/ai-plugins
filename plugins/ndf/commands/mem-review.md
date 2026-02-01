@@ -73,8 +73,8 @@ Bash で以下を行う:
 
 以下を必ず出力:
 - 今日の日付
-- 設定（dir, days）
-- overdue一覧（ファイル名・review_at・type・project・冒頭1〜2行の要約）
+- 設定（dir, threshold）
+- overdue一覧（ファイル名・review_after_commits・last_reviewed_commit・type・project・冒頭1〜2行の要約）
 - due_soon一覧（同上）
 
 要約のために必要なファイルだけ Read する。
@@ -83,9 +83,9 @@ Bash で以下を行う:
 
 各対象memoryについて、次の選択肢を提示し、ユーザーが指示しなくても「推奨」を1つ示す:
 
-**A. 延長**（review_at を未来に更新）
-**B. 長期化**（type=principle/constraint/policyへ移行、expires: none 付与、review_at削除）
-**C. 更新**（内容修正 + review_at更新）
+**A. 延長**（review_after_commits を増やし、last_reviewed_commit を現在のコミットに更新）
+**B. 長期化**（type=principle/constraint/policyへ移行、expires: none 付与、review_after_commits削除）
+**C. 更新**（内容修正 + review_after_commits・last_reviewed_commit更新）
 **D. アーカイブ**（ファイル末尾に `status: archived` を追記、または `ARCHIVE/` に移動）
 **E. 削除**
 
@@ -101,8 +101,8 @@ Bash で以下を行う:
 
 最後に、実行した変更を一覧で出力:
 - 更新したファイル
-- 変更内容（review_at変更/長期化/アーカイブ/削除）
-- 次回のレビュー推奨日
+- 変更内容（review_after_commits変更/長期化/アーカイブ/削除）
+- 次回のレビュー推奨コミット数
 
 ## 注意
 

@@ -14,9 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 
-const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || process.cwd();
 const MEMORY_DIR = path.join(process.cwd(), '.serena', 'memories');
 const MEMORY_STRATEGY_FILE = path.join(MEMORY_DIR, 'memory-strategy.md');
 
