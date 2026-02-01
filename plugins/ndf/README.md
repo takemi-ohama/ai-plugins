@@ -7,9 +7,9 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 このプラグイン1つで、以下の**すべて**の機能を利用できます：
 
 1. **MCP統合**: 6個のMCPサーバー（Notion、BigQuery、DBHub、Chrome DevTools、AWS Docs、Codex CLI）
-2. **開発ワークフロー**: 7つのコマンド（PR作成、Test Plan自動実行、レビュー、修正対応、マージ、ブランチクリーンアップ）
+2. **開発ワークフロー**: 9つのコマンド（PR作成、Test Plan自動実行、レビュー、修正対応、マージ、ブランチクリーンアップ、Memory管理）
 3. **専門エージェント**: 6つの特化型AIエージェント（**director指揮者**、データ分析、コーディング、調査、ファイル読み取り、品質管理）
-4. **Skills**: 9個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、PDF解析、Markdown文書作成等）
+4. **Skills**: 10個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、PDF解析、Markdown文書作成、記憶戦略等）
 5. **自動フック**: Slack通知
 
 > **Note (v2.1.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。**directorエージェント**がClaude Code機能を活用する指揮者として再定義されました。
@@ -475,9 +475,64 @@ PRの本文に記載されたTest Plan（チェックリスト形式）を読み
 mainブランチを更新し、マージ済みのfeatureブランチを安全に削除します。
 
 #### `/clean`
-**用途:** マージ済みの古いブランチを一括クリーンアップ  
-**使用タイミング:** ローカルに不要なブランチが溜まってきたとき  
+**用途:** マージ済みの古いブランチを一括クリーンアップ
+**使用タイミング:** ローカルに不要なブランチが溜まってきたとき
 リモートで削除済みのブランチをローカルからも削除します。
+
+#### `/mem-review` ⭐ NEW in v2.4.0
+**用途:** 中期Serena memory（review_after_commits付き）をコミット数ベースで自動レビュー
+**使用タイミング:** 開発活動量に応じて記憶をレビューし、延長・長期化・アーカイブ・削除を判断したいとき
+`.serena/memories/`にある中期memoryのレビュー条件（review_after_commits）をチェックし、レビューが必要なメモリーをリストアップします。各メモリーに対して延長、長期化、更新、アーカイブ、削除の選択肢を提示します。
+
+**コミット数ベースの利点:**
+- 開発が活発な時期: 頻繁にレビュー
+- 開発が停滞している時期: 無駄なレビューを回避
+- プロジェクトの実際の活動量に応じた自動調整
+
+**引数:**
+- `--threshold N`: 「レビュー間近」とみなすコミット数の閾値（デフォルト5コミット）
+- `--dir PATH`: memoryディレクトリ（デフォルト `.serena/memories`）
+
+**使用例:**
+```bash
+# レビューが必要なmemoryをチェック
+/ndf:mem-review
+
+# 閾値を指定（10コミット以内をレビュー間近とする）
+/ndf:mem-review --threshold 10
+```
+
+#### `/mem-capture` ⭐ NEW in v2.4.0
+**用途:** タスク終了時に、再利用価値のある知見をSerena memoryとして保存
+**使用タイミング:** 重要な意思決定や前提条件を記録したいとき
+判断・前提・制約をMemoryに保存し、Skillを肥大化させないようにします。手順や実装詳細は保存しません。コミット数ベースでレビュー時期を管理します。
+
+**引数:**
+- `--project NAME`: プロジェクト名
+- `--type TYPE`: decision/assumption/experiment/principle/constraint/policy
+- `--review-after N`: レビューまでのコミット数（中期memoryの場合）
+- `--long`: 長期memory（原則）として保存
+- `--append FILE`: 既存memoryに追記
+
+**推奨レビュー設定:**
+- 実験的な決定（confidence: low）: 10コミット
+- 通常の決定（confidence: medium）: 20コミット
+- 重要な決定（confidence: high）: 30コミット
+
+**使用例:**
+```bash
+# 中期memoryとして記録（20コミット後レビュー）
+/ndf:mem-capture --project myproject --type decision
+
+# 実験的な決定（10コミット後レビュー）
+/ndf:mem-capture --project myproject --type experiment --review-after 10
+
+# 長期memory（原則）として保存
+/ndf:mem-capture --project global --type principle --long
+
+# 既存memoryに追記
+/ndf:mem-capture --append .serena/memories/2025-01-15-myproject-api-design.md
+```
 
 ### 3. 専門エージェント (6種類)
 
@@ -615,7 +670,7 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 @qa プラグインがClaude Code仕様に準拠しているか確認してください
 ```
 
-### 4. Skills (9種類) 🎯
+### 4. Skills (10種類) 🎯
 
 **Claude Code Skills**は、Claudeが自律的に判断して起動する**モデル起動型**の機能モジュールです。各サブエージェントは、タスク内容に応じて適切なSkillsを自動的に活用します。
 
@@ -666,6 +721,13 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
   - mermaid/plantUMLによる図表作成（ASCII ART禁止）
   - 文書の適切な分割（300行超の場合、順序prefix付きで分割）
   - 構造化されたドキュメント作成ガイド
+
+**Memory Management Skills (1個):** ⭐ NEW in v2.4.0
+- 🧠 **memory-handling** - 記憶戦略の運用ルール
+  - Serena MCP Memoryの読み書きタイミングを定義
+  - Skillは薄く保ち、判断・前提・制約はMemoryに保存
+  - 中期/長期記憶の使い分け戦略
+  - 「Skillは行動の型、Memoryは判断・前提」の原則
 
 #### Skillsの使い方
 
@@ -846,9 +908,30 @@ REST APIのテンプレートを使ってエンドポイントを作成してく
 
 ### 3. 自動フック
 
-Claude Code終了時に自動的に以下が実行されます：
+Claude Codeの起動時と終了時に自動的に以下が実行されます：
 
-#### Slack通知
+#### SessionStart: Memory Strategy初期化 ⭐ NEW in v2.4.0
+
+セッション開始時に、記憶戦略ドキュメントを自動的に`.serena/memories/`に配置します。
+
+**機能:**
+- `.serena/memories/memory-strategy.md`が存在しない場合のみ作成
+- コミット数ベースのレビュー戦略を含む完全な記憶戦略を定義
+- Skill vs Memory の使い分け原則を明記
+- 中期/長期記憶のメタデータ定義
+
+**動作:**
+- 既に存在する場合はスキップ（上書きしない）
+- エラーが発生してもセッション起動を妨げない
+- セッション開始時に自動実行（手動操作不要）
+
+**記憶戦略の内容:**
+- Memory層の定義（短期/中期/長期）
+- コミット数ベースのレビュー戦略
+- Skill vs Memory の決定チェックリスト
+- アンチパターンとベストプラクティス
+
+#### Stop: Slack通知
 
 作業終了時にSlackへ要約通知を送信します（`SLACK_BOT_TOKEN`設定時のみ）。
 

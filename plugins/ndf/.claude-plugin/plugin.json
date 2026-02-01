@@ -1,6 +1,6 @@
 {
   "name": "ndf",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Integrated plugin with director orchestrator, specialized agents, workflow commands, skills, and Slack notifications. Core MCP servers (GitHub, Serena, Context7) moved to official plugins.",
   "author": {
     "name": "takemi-ohama",
@@ -14,7 +14,9 @@
     "./commands/fix.md",
     "./commands/review.md",
     "./commands/merged.md",
-    "./commands/clean.md"
+    "./commands/clean.md",
+    "./commands/mem-review.md",
+    "./commands/mem-capture.md"
   ],
   "agents": [
     "./agents/director.md",
@@ -33,6 +35,7 @@
     "./skills/scanner-pdf-analysis",
     "./skills/scanner-excel-extraction",
     "./skills/qa-security-scan",
-    "./skills/markdown-writing"
+    "./skills/markdown-writing",
+    "./skills/memory-handling"
   ]
 }

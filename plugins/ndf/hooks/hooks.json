@@ -16,6 +16,21 @@
             "suppressOutput": false
           }
         ]
+      },
+      {
+        "description": "Initialize Memory Strategy in Serena MCP",
+        "matcher": "startup|resume",
+        "priority": 40,
+        "enabled": true,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/init-memory-strategy.js",
+            "description": "Create memory-strategy.md if it doesn't exist in .serena/memories",
+            "continueOnError": true,
+            "suppressOutput": false
+          }
+        ]
       }
     ],
     "Stop": [
