@@ -1,6 +1,6 @@
 <!-- NDF_PLUGIN_GUIDE_START_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
-<!-- VERSION: 7 -->
-# NDF Plugin - AI Agent Guidelines (v2.2.2)
+<!-- VERSION: 8 -->
+# NDF Plugin - AI Agent Guidelines (v2.4.0)
 
 ## Overview
 
@@ -119,7 +119,7 @@ mcp__plugin_official_serena__search_for_pattern substring_pattern="TODO" relativ
 
 **Claude Code Skills are model-invoked**: Claude autonomously activates Skills based on request and Skill description.
 
-**9 Available Skills (v2.2.0):**
+**10 Available Skills (v2.4.0):**
 
 **Data Analyst Skills (2):**
 - `data-analyst-sql-optimization` - SQL optimization patterns and best practices
@@ -141,6 +141,23 @@ mcp__plugin_official_serena__search_for_pattern substring_pattern="TODO" relativ
 
 **Documentation Skills (1):**
 - `markdown-writing` - Markdown文書作成のルールとベストプラクティス（mermaid/plantUML図表、文書分割、構造化）
+
+**Memory Management Skills (1):**
+- `memory-handling` - 記憶戦略の運用ルール（Serena MCP Memory読み書きタイミング、Skillは薄く保つ原則、中期/長期記憶の使い分け）
+
+**Related Commands:**
+- `/ndf:mem-review` - 中期memoryの自動レビュー（コミット数ベース、延長・長期化・アーカイブ・削除判断）
+- `/ndf:mem-capture` - タスク終了時のmemory記録（判断・前提・制約の保存、コミット数ベースのレビュー設定）
+
+**コミット数ベースの利点:**
+- 開発が活発な時期: 頻繁にレビュー
+- 開発が停滞している時期: 無駄なレビューを回避
+- プロジェクトの実際の活動量に応じた自動調整
+
+**推奨レビュー設定:**
+- 実験的な決定（confidence: low）: 10コミット後
+- 通常の決定（confidence: medium）: 20コミット後
+- 重要な決定（confidence: high）: 30コミット後
 
 ## Sub-Agent Invocation
 
