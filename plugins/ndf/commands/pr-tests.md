@@ -295,4 +295,10 @@ PR Test Plan実行が完了しました。
 1. PRコメント#123456で構文エラーの対策案を確認
 2. commands/pr-tests.mdを修正
 3. 修正後に再度`/ndf:pr-tests`を実行してテストが成功することを確認
+
+---
+
+PR Test Plan実行が完了しました。
+
+**PR URL**: https://github.com/owner/repo/pull/19
 ```
