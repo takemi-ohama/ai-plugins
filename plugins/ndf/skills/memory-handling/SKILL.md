@@ -1,3 +1,19 @@
+---
+name: memory-handling
+description: |
+  記憶戦略の運用ルール。Serena MCP Memoryの読み書きタイミング、Skillは薄く保つ原則、中期/長期記憶の使い分けを定義します。
+
+  このスキルは「記憶をどう扱うか」の行動ルールを提供します：
+  - タスク開始前：関連するメモリーを読み込む
+  - タスク完了後：再利用価値のある知見をメモリーに保存
+  - 手順や実装詳細は保存しない
+
+  Triggers: "memory handling", "Serena memory", "記憶管理", "メモリー戦略", "知見の保存"
+allowed-tools:
+  - Read
+  - Bash
+---
+
 # Skill: Memory Handling Strategy
 
 ## Purpose
@@ -76,7 +92,7 @@ Do NOT store:
 このスキルは「記憶をどう扱うか」の行動ルールを定義します。
 
 **基本原則**:
-- Skillは薄く保つ（プロジェクト固有のルールは記憶しない）
+- Skillは薄く保つ（プロジェクト固有のルールはプロジェクトスコープに）
 - 判断・前提・制約はSerena MCP Memoryから取得
 - タスク開始前に関連するメモリーを読み込む
 - タスク完了後に再利用価値のある知見をメモリーに保存

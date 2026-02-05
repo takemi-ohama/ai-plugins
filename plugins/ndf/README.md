@@ -6,10 +6,10 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 
 このプラグイン1つで、以下の**すべて**の機能を利用できます：
 
-1. **MCP統合**: 6個のMCPサーバー（Notion、BigQuery、DBHub、Chrome DevTools、AWS Docs、Codex CLI）
+1. **MCP統合**: 7個のMCPサーバー（Serena、Notion、BigQuery、DBHub、Chrome DevTools、AWS Docs、Codex CLI）
 2. **開発ワークフロー**: 9つのコマンド（PR作成、Test Plan自動実行、レビュー、修正対応、マージ、ブランチクリーンアップ、Memory管理）
 3. **専門エージェント**: 6つの特化型AIエージェント（**director指揮者**、データ分析、コーディング、調査、ファイル読み取り、品質管理）
-4. **Skills**: 10個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、PDF解析、Markdown文書作成、記憶戦略等）
+4. **Skills**: 13個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、Python実行環境判定、Dockerコンテナアクセス、Skill開発、PDF解析、Markdown文書作成、記憶戦略等）
 5. **自動フック**: Slack通知
 
 > **Note (v2.1.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。**directorエージェント**がClaude Code機能を活用する指揮者として再定義されました。
@@ -54,6 +54,12 @@ GitHub、Serena、Context7 MCPは公式プラグインとして提供されて�
 プロジェクトルートに `.env` ファイルを作成し、必要な認証情報を設定します。
 
 ```bash
+# Serena MCP (セマンティックコード操作 - 推奨)
+# Gemini/Claude APIキーが必要
+SERENA_HOME=.serena
+GOOGLE_API_KEY=
+ANTHROPIC_API_KEY=
+
 # Notion MCP (オプション - Notion使用時のみ)
 # Integration Token取得: https://www.notion.so/my-integrations
 NOTION_TOKEN=
@@ -75,10 +81,11 @@ SLACK_CHANNEL_ID=
 SLACK_USER_MENTION=  # 例: <@U0123456789>
 
 # 注意:
+# - Serena MCPは常時有効化推奨（セマンティックコード操作）
 # - AWS Docs MCP、Chrome DevTools MCPは認証不要
 # - Codex CLI MCPはインストール必要: https://github.com/openai/codex/releases
 #   インストール後、'codex login'を実行
-# - GitHub MCP、Serena MCP、Context7 MCPは公式プラグインを使用してください
+# - GitHub MCP、Context7 MCPは公式プラグインを使用してください
 ```
 
 #### .envファイルの保護
@@ -670,7 +677,7 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
 @qa プラグインがClaude Code仕様に準拠しているか確認してください
 ```
 
-### 4. Skills (10種類) 🎯
+### 4. Skills (13種類) 🎯
 
 **Claude Code Skills**は、Claudeが自律的に判断して起動する**モデル起動型**の機能モジュールです。各サブエージェントは、タスク内容に応じて適切なSkillsを自動的に活用します。
 
@@ -695,6 +702,20 @@ mainブランチを更新し、マージ済みのfeatureブランチを安全に
   - ユニットテスト（Jest、Mocha、pytest）
   - AAA（Arrange-Act-Assert）パターン
   - テストフィクスチャ・モック生成
+
+**Common Skills (3個):** ⭐ NEW in v2.5.0
+- 🐍 **python-execution** - Python実行環境の自動判定
+  - uv/venv/システムPythonの自動検出
+  - pyproject.toml、.venvの有無に基づく実行方法選択
+  - uvセットアップガイド、トラブルシューティング
+- 🐳 **docker-container-access** - Dockerコンテナアクセス方法の判定
+  - DinD/DooD環境の自動検出
+  - 環境に応じた接続方法（localhost vs コンテナ名）
+  - bind mountの注意点と代替手段
+- 📚 **skill-development** - Agent Skill開発ベストプラクティス
+  - SKILL.md構造とYAMLフロントマター
+  - Progressive Disclosure（多段階読み込み）
+  - allowed-toolsとトリガーキーワード設定
 
 **Researcher Skills (1個):**
 - 📊 **researcher-report-templates** - 調査レポートテンプレート集

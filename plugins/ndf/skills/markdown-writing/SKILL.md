@@ -8,7 +8,7 @@ description: |
   - 文書長: 概ね300行以内、超える場合は分割
   - 分割時: ディレクトリ作成+順序prefix（01-, 02-, ...）
 
-  トリガー: "Markdown作成", "ドキュメント作成", "文書作成", "図を描く", "mermaid", "create document", "write docs"
+  Triggers: "Markdown作成", "ドキュメント作成", "文書作成", "図を描く", "mermaid", "create document", "write docs"
 allowed-tools:
   - Read
   - Write
@@ -21,11 +21,7 @@ allowed-tools:
 
 ### 1. 図表作成ルール
 
-**❌ ASCII ART は使用禁止**（例外: ディレクトリツリーのみ）
-
-**✅ mermaid または plantUML を使用**
-
-#### mermaid 例
+**mermaid または plantUML を使用**（ASCII ART禁止、ツリー除く）
 
 ```mermaid
 graph TD
@@ -34,69 +30,22 @@ graph TD
     B -->|No| D[処理B]
 ```
 
-```mermaid
-sequenceDiagram
-    User->>API: リクエスト
-    API->>DB: クエリ
-    DB-->>API: 結果
-    API-->>User: レスポンス
-```
-
-#### plantUML 例
-
-```plantuml
-@startuml
-package "Frontend" {
-    [React App]
-}
-package "Backend" {
-    [API Server]
-    [Database]
-}
-[React App] --> [API Server]
-[API Server] --> [Database]
-@enduml
-```
-
-#### ASCII 許可例（ツリーのみ）
-
-```
-project/
-├── src/
-│   ├── components/
-│   └── utils/
-└── tests/
-```
-
 ### 2. 文書の長さと分割ルール
-
-**基本ルール**:
-- **1ファイルあたり概ね300行以内**
-- 300行超の場合は分割
-
-**分割方法**:
-
-```
-docs/
-└── feature-guide/
-    ├── 01-introduction.md
-    ├── 02-installation.md
-    ├── 03-configuration.md
-    └── 04-usage.md
-```
-
-**ファイル名規則**:
-- 順序prefix: **パディング付き2桁**（01-, 02-, 03-, ...）
-- ケバブケース（ハイフン区切り）
-
-**分割の判断基準**:
 
 | ページ数 | 対応 |
 |---------|-----|
 | ~300行 | そのまま |
 | 301~600行 | 2ファイルに分割 |
-| 601~900行 | 3ファイルに分割 |
-| 900行以上 | セクションごとに分割 |
+| 600行以上 | セクションごとに分割 |
+
+**分割時のファイル名**: 順序prefix（01-, 02-, ...）+ ケバブケース
+
+```
+docs/feature-guide/
+├── 01-introduction.md
+├── 02-installation.md
+└── 03-usage.md
+```
 
 ## チェックリスト
 
@@ -104,41 +53,13 @@ docs/
 - [ ] ファイル長は300行以内（超える場合は分割）
 - [ ] 分割時は順序prefix使用（01-, 02-, ...）
 
-## よくある間違い
+## 詳細ガイド
 
-### ❌ 避けるべき
+| ファイル | 内容 |
+|---------|------|
+| `01-diagram-guide.md` | mermaid/plantUML記法、よくある間違い |
 
-**ASCII ARTで図を描く**:
-```
-    ┌─────────┐
-    │  User   │
-    └────┬────┘
-         │
-    ┌────▼────┐
-    │   API   │
-    └─────────┘
-```
+## 関連リソース
 
-**順序prefixなしで分割**:
-```
-docs/
-├── introduction.md  ← NGプレfixがない
-├── setup.md
-└── usage.md
-```
-
-### ✅ 推奨
-
-**mermaidで図を描く**:
-```mermaid
-graph TD
-    User --> API
-```
-
-**順序prefixあり**:
-```
-docs/
-├── 01-introduction.md  ← OK
-├── 02-setup.md
-└── 03-usage.md
-```
+- [Mermaid公式ドキュメント](https://mermaid.js.org/)
+- [PlantUML公式ドキュメント](https://plantuml.com/)

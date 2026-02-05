@@ -1,5 +1,5 @@
 <!-- NDF_PLUGIN_GUIDE_START_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
-<!-- VERSION: 8 -->
+<!-- VERSION: 9 -->
 # NDF Plugin - AI Agent Guidelines (v2.4.0)
 
 ## Overview
@@ -119,7 +119,7 @@ mcp__plugin_official_serena__search_for_pattern substring_pattern="TODO" relativ
 
 **Claude Code Skills are model-invoked**: Claude autonomously activates Skills based on request and Skill description.
 
-**10 Available Skills (v2.4.0):**
+**13 Available Skills (v2.5.0):**
 
 **Data Analyst Skills (2):**
 - `data-analyst-sql-optimization` - SQL optimization patterns and best practices
@@ -128,6 +128,11 @@ mcp__plugin_official_serena__search_for_pattern substring_pattern="TODO" relativ
 **Corder Skills (2):**
 - `corder-code-templates` - Code generation templates (REST API, React, database models, authentication)
 - `corder-test-generation` - Automated unit/integration test generation with AAA pattern
+
+**Common Skills (3):**
+- `python-execution` - Python実行環境の自動判定（uv/venv/システムPython）と適切な実行コマンドの選択
+- `docker-container-access` - Dockerコンテナアクセス方法の判定（DinD/DooD環境検出、bind mount注意点）
+- `skill-development` - Agent Skill開発ベストプラクティス（SKILL.md構造、Progressive Disclosure、ツール登録）
 
 **Researcher Skills (1):**
 - `researcher-report-templates` - Structured research report templates with comparison tables and best practices
