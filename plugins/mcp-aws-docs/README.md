@@ -16,7 +16,7 @@ AWS公式ドキュメントにアクセスするためのMCPサーバープラ�
 ## インストール
 
 ```bash
-/plugin install aws-docs-mcp@ai-plugins
+/plugin install mcp-aws-docs@ai-plugins
 ```
 
 ## 使用方法

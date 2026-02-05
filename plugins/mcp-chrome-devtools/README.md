@@ -18,7 +18,7 @@ Chrome DevTools MCPサーバーをClaude Codeで利用するためのプラグ�
 ## インストール
 
 ```bash
-/plugin install chrome-devtools-mcp@ai-plugins
+/plugin install mcp-chrome-devtools@ai-plugins
 ```
 
 ## 使用方法

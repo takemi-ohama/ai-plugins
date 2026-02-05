@@ -41,7 +41,7 @@ BIGQUERY_KEY_FILE=/path/to/service-account-key.json
 ## インストール
 
 ```bash
-/plugin install bigquery-mcp@ai-plugins
+/plugin install mcp-bigquery@ai-plugins
 ```
 
 ## 使用方法

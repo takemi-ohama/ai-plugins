@@ -17,7 +17,7 @@
 ## インストール
 
 ```bash
-/plugin install dbhub-mcp@ai-plugins
+/plugin install mcp-dbhub@ai-plugins
 ```
 
 ## 使用方法
@@ -25,8 +25,8 @@
 ### 基本的な使用例
 
 ```bash
-# データベースに接続
-mcp__plugin_dbhub-mcp__dbhub__connect "mysql://user:password@localhost:3306/database"
+# データベースに接続（環境変数から読み込み推奨）
+mcp__plugin_dbhub-mcp__dbhub__connect "${DATABASE_URL}"
 
 # SQLクエリを実行
 mcp__plugin_dbhub-mcp__dbhub__execute_query "SELECT * FROM users LIMIT 10"

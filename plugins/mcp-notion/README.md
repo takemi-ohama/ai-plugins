@@ -26,13 +26,13 @@ NotionワークスペースにアクセスするためのMCPサーバープラ�
 
 ```bash
 # Notion Integration Token
-NOTION_TOKEN=secret_xxxxxxxxxxxxx
+NOTION_TOKEN=<your-notion-integration-token>
 ```
 
 ## インストール
 
 ```bash
-/plugin install notion-mcp@ai-plugins
+/plugin install mcp-notion@ai-plugins
 ```
 
 ## 使用方法
