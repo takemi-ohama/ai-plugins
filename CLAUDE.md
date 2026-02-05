@@ -1,126 +1,12 @@
-# AI Plugins - 開発ガイドライン
+# AI Plugins - Claude Code開発ガイドライン
 
-## プロジェクト概要
+## 基本ガイドライン
 
-このリポジトリは**Claude Codeプラグインマーケットプレイス**の開発プロジェクトです。チーム全体でClaude Codeの導入を加速するための事前設定されたプラグインを提供します。
+プロジェクトの基本的な開発ガイドラインは **@AGENTS.md** を参照してください。
 
-**リポジトリ**: https://github.com/takemi-ohama/ai-plugins
+このファイルには、Claude Code固有の機能（Serena MCP）に関する情報のみを記載します。
 
-## 重要な注意事項
-
-### 言語とコミュニケーション
-- すべてのAIエージェントとのやり取りは**日本語**で行う
-- ドキュメント、コミットメッセージ、PR説明も日本語
-
-### Git運用ルール
-- **mainブランチへの直接コミット/プッシュ禁止**
-- 必ずfeatureブランチを作成して作業
-- Pull Requestを通じてレビュー・マージ
-- ユーザーの許可なくPRを承認しない
-
-## マーケットプレイスの構造
-
-### 必須ファイル
-
-```
-ai-plugins/
-├── .claude-plugin/
-│   └── marketplace.json          # マーケットプレイス定義（必須）
-├── plugins/
-│   ├── ndf/                      # NDFプラグイン
-│   └── {plugin-name}/            # その他のプラグイン
-├── README.md                     # マーケットプレイス説明
-└── CLAUDE.md                     # このファイル
-```
-
-### marketplace.json
-
-プラグインマーケットプレイスの中心となる設定ファイル：
-
-```json
-{
-  "name": "ai-plugins",
-  "owner": {
-    "name": "takemi-ohama",
-    "url": "https://github.com/takemi-ohama"
-  },
-  "plugins": [
-    {
-      "name": "ndf",
-      "source": "./plugins/ndf"
-    }
-  ]
-}
-```
-
-## プラグイン開発ガイドライン
-
-### 1. プラグイン構造
-
-各プラグインは以下の構造を持ちます：
-
-```
-plugins/{plugin-name}/
-├── .claude-plugin/
-│   └── plugin.json              # プラグインメタデータ（必須）
-├── commands/                    # スラッシュコマンド（オプション）
-│   └── *.md
-├── agents/                      # サブエージェント（オプション）
-│   └── *.md
-├── skills/                      # プロジェクトスキル（オプション）
-│   └── {skill-name}/
-│       └── SKILL.md
-├── hooks/                       # プロジェクトフック（オプション）
-│   └── hooks.json
-└── README.md                    # プラグイン説明
-```
-
-### 2. plugin.json の作成
-
-**必須フィールド**:
-- `name`: プラグイン名（ケバブケース）
-- `version`: セマンティックバージョニング（MAJOR.MINOR.PATCH）
-- `description`: プラグインの説明
-- `author`: 作成者情報
-
-**例**:
-```json
-{
-  "name": "example-plugin",
-  "version": "1.0.0",
-  "description": "Example plugin for demonstration",
-  "author": {
-    "name": "Your Name",
-    "url": "https://github.com/yourname"
-  },
-  "keywords": ["example", "demo"],
-  "commands": ["./commands/example.md"],
-  "agents": ["./agents/example-agent.md"]
-}
-```
-
-### 3. バージョン管理
-
-**セマンティックバージョニング**:
-- **MAJOR**: 破壊的変更
-- **MINOR**: 後方互換性のある新機能
-- **PATCH**: バグフィックス
-
-**バージョン更新時の手順**:
-1. `plugin.json`のバージョンをインクリメント
-2. 変更内容をドキュメント化
-3. 破壊的変更がある場合は明示
-4. テストを実行
-
-### 4. ドキュメント要件
-
-**各プラグインに必要なドキュメント**:
-- ✅ README.md: プラグインの概要、インストール方法、使用方法
-- ✅ 各機能の説明とサンプルコード
-- ✅ トラブルシューティングガイド
-- ✅ 必要な環境変数や認証情報の説明
-
-## Serena MCPの活用
+## Serena MCPの活用（Claude Code固有）
 
 このプロジェクトでは**Serena MCP**を積極的に活用してください。
 
@@ -165,7 +51,11 @@ mcp__plugin_ndf_serena__replace_symbol_body name_path="/symbol" relative_path="f
 mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-example.md" content="詳細..."
 ```
 
-## 一般的な開発タスク
+## 一般的な開発タスク（Serena MCP活用）
+
+基本的な開発タスクの手順は **@AGENTS.md** を参照してください。
+
+以下はClaude CodeでSerena MCPを活用する場合の追加手順です。
 
 ### 新しいプラグインの追加
 
@@ -244,114 +134,42 @@ mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-example.md" conten
 
 ## 検証とテスト
 
-### ローカルテスト
+検証とテストの詳細は **@AGENTS.md** を参照してください。
+
+### Claude Code固有の検証
 
 ```bash
-# マーケットプレイス追加
-/plugin marketplace add /path/to/ai-plugins
-
-# プラグインインストール
-/plugin install {plugin-name}@ai-plugins
-
 # プラグイン検証
 claude plugin validate
 ```
 
-### 検証チェックリスト
+## NDFプラグインガイドライン
 
-- [ ] marketplace.jsonが正しい形式
-- [ ] 各plugin.jsonが必須フィールドを含む
-- [ ] バージョン番号が適切
-- [ ] ドキュメントが完全
-- [ ] 機密情報が含まれていない
-- [ ] プラグインが正常にインストールできる
-- [ ] 各機能が動作する
+NDFプラグインの詳細は **@AGENTS.md** を参照してください。
 
-## セキュリティ要件
+NDFプラグインを使用する際の詳細なガイドラインは、以下のファイルに記載されています：
 
-### 禁止事項
+@plugins/ndf/CLAUDE.ndf.md
+@CLAUDE.ndf.md
 
-❌ **絶対にコミットしてはいけないもの**:
-- APIトークン、パスワード
-- 認証情報
-- 秘密鍵
-- 個人を特定できる情報
+## ベストプラクティス（Serena MCP）
 
-### 推奨事項
+基本的なベストプラクティスは **@AGENTS.md** を参照してください。
 
-✅ **実施すべきこと**:
-- 認証情報は環境変数で管理
-- `.env.example`でテンプレートを提供
-- ドキュメントでセキュアな設定方法を説明
-- `.gitignore`に機密ファイルを追加
-
-## NDFプラグインについて
-
-**NDFプラグイン**は、このマーケットプレイスの主要プラグインです：
-- 7個のMCPサーバー統合
-- 6個のスラッシュコマンド
-- 6個の専門サブエージェント
-- 8個のClaude Code Skills
-- 自動Slack通知
-
-> **Note (v2.0.0)**: GitHub MCP, Serena MCP, Context7 MCPは`anthropics/claude-plugins-official`に移行しました。
-
-詳細は`plugins/ndf/README.md`を参照してください。
-
-NDFプラグインを使用する場合は、`plugins/ndf/CLAUDE.ndf.md`にある詳細なガイドラインを参照してください。
-
-## ベストプラクティス
-
-### DO（推奨）
+### Claude Code + Serena MCP固有
 
 ✅ Serena MCPを活用してコード構造を理解
 ✅ ファイル全体を読む前にシンボル概要を取得
 ✅ 段階的な探索（list_dir → get_symbols_overview → find_symbol）
 ✅ メモリーを活用してプロジェクト文脈を維持
 ✅ シンボルベース編集で安全な変更
-✅ セマンティックバージョニングに従う
-✅ 包括的なドキュメントを提供
-✅ 変更前にテスト
-
-### DON'T（非推奨）
 
 ❌ ファイル全体を無闇に読み込む
 ❌ メモリーを確認せずに作業開始
-❌ mainブランチに直接コミット
-❌ バージョン番号の更新を忘れる
-❌ ドキュメントをスキップ
-❌ 機密情報をコミット
-❌ テストをスキップ
-
-## トラブルシューティング
-
-### よくある問題
-
-**Q: marketplace.jsonが認識されない**
-- A: `.claude-plugin/marketplace.json`の配置を確認
-- A: JSON形式の検証（`claude plugin validate`）
-
-**Q: プラグインがインストールできない**
-- A: plugin.jsonの必須フィールドを確認
-- A: パスが正しいか確認（相対パス）
-
-**Q: バージョン更新が反映されない**
-- A: plugin.jsonとmarketplace.jsonの両方を更新
-- A: Claude Codeを再起動
 
 ## 参考リンク
 
-- [Claude Code公式ドキュメント](https://docs.claude.com/en/docs/claude-code)
-- [プラグインマーケットプレイス](https://code.claude.com/docs/ja/plugin-marketplaces)
-- [プラグインスキル](https://docs.claude.com/en/docs/claude-code/skills)
-- [MCP仕様](https://modelcontextprotocol.io)
-
-## NDFプラグインガイドライン
-
-NDFプラグインを使用する際の詳細なガイドラインは、以下のファイルに記載されています：
-
-@plugins/ndf/CLAUDE.ndf.md
-@CLAUDE.ndf.md
+基本的な参考リンクは **@AGENTS.md** を参照してください。
 
 ## Serena MCPメモリー管理
 

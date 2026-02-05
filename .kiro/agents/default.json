@@ -1,0 +1,7 @@
+{
+  "description": "AI Plugins開発用デフォルトエージェント",
+  "resources": [
+    "file://AGENTS.md",
+    "file://README.md"
+  ]
+}
