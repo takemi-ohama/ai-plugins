@@ -6,33 +6,52 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 
 このプラグイン1つで、以下の**すべて**の機能を利用できます：
 
-1. **MCP統合**: 7個のMCPサーバー（Serena、Notion、BigQuery、DBHub、Chrome DevTools、AWS Docs、Codex CLI）
+1. **コアMCP**: 2個のMCPサーバー（Serena、Codex CLI）
 2. **開発ワークフロー**: 9つのコマンド（PR作成、Test Plan自動実行、レビュー、修正対応、マージ、ブランチクリーンアップ、Memory管理）
 3. **専門エージェント**: 6つの特化型AIエージェント（**director指揮者**、データ分析、コーディング、調査、ファイル読み取り、品質管理）
 4. **Skills**: 13個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、Python実行環境判定、Dockerコンテナアクセス、Skill開発、PDF解析、Markdown文書作成、記憶戦略等）
 5. **自動フック**: Slack通知
 
-> **Note (v2.1.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。**directorエージェント**がClaude Code機能を活用する指揮者として再定義されました。
+> **Note (v2.6.0)**: NDFプラグインはコアMCP（Serena、Codex）のみを含みます。追加のMCP（BigQuery、Chrome DevTools、AWS Docs、DBHub、Notion）は個別プラグインとしてインストール可能です。**directorエージェント**がClaude Code機能を活用する指揮者として機能します。
 
 ## インストール
 
 ### 前提条件
 
 - Claude Code がインストール済み
-- Python 3.10以上（BigQuery MCP用）
+- Python 3.10以上（Serena MCP用）
 - `uvx` がインストール済み（`pip install uv`）
-- Node.js（DBHub、Chrome DevTools MCP用）
 - Codex CLI（Codex CLI MCP用）- オプション
 
 ### 公式プラグインのインストール（推奨）
 
-GitHub、Serena、Context7 MCPは公式プラグインとして提供されています：
+GitHub、Context7 MCPは公式プラグインとして提供されています：
 
 ```bash
 # Claude Codeで実行
 /plugin install github@anthropics/claude-plugins-official
-/plugin install serena@anthropics/claude-plugins-official
 /plugin install context7@anthropics/claude-plugins-official
+```
+
+### 追加MCPプラグインのインストール（オプション）
+
+用途に応じて個別のMCPプラグインをインストールできます：
+
+```bash
+# ブラウザ自動化とテスト
+/plugin install mcp-chrome-devtools@ai-plugins
+
+# データ分析
+/plugin install mcp-bigquery@ai-plugins
+
+# AWS公式ドキュメント調査
+/plugin install mcp-aws-docs@ai-plugins
+
+# データベース操作
+/plugin install mcp-dbhub@ai-plugins
+
+# Notion統合
+/plugin install mcp-notion@ai-plugins
 ```
 
 ### ステップ1: マーケットプレイスの追加
@@ -55,24 +74,7 @@ GitHub、Serena、Context7 MCPは公式プラグインとして提供されて�
 
 ```bash
 # Serena MCP (セマンティックコード操作 - 推奨)
-# Gemini/Claude APIキーが必要
 SERENA_HOME=.serena
-GOOGLE_API_KEY=
-ANTHROPIC_API_KEY=
-
-# Notion MCP (オプション - Notion使用時のみ)
-# Integration Token取得: https://www.notion.so/my-integrations
-NOTION_TOKEN=
-
-# BigQuery MCP (オプション - BigQuery使用時のみ)
-# GCPプロジェクトID、ロケーション、サービスアカウントキーファイル
-BIGQUERY_PROJECT=
-BIGQUERY_LOCATION=US
-BIGQUERY_KEY_FILE=
-
-# DBHub MCP (オプション - データベース操作用)
-# データベース接続文字列 (DSN)
-DSN=
 
 # Slack通知 (オプション)
 # Slack Appセットアップ手順は下記の詳細設定を参照
@@ -82,10 +84,12 @@ SLACK_USER_MENTION=  # 例: <@U0123456789>
 
 # 注意:
 # - Serena MCPは常時有効化推奨（セマンティックコード操作）
-# - AWS Docs MCP、Chrome DevTools MCPは認証不要
+# - Serena MCPはGOOGLE_API_KEY、ANTHROPIC_API_KEYは不要です（自動検出）
 # - Codex CLI MCPはインストール必要: https://github.com/openai/codex/releases
 #   インストール後、'codex login'を実行
 # - GitHub MCP、Context7 MCPは公式プラグインを使用してください
+# - 追加のMCP（BigQuery、Notion、AWS Docs、DBHub、Chrome DevTools）は
+#   個別プラグインとしてインストール可能です（下記参照）
 ```
 
 #### .envファイルの保護
@@ -225,9 +229,9 @@ SLACK_USER_MENTION="<@U0123456789>"  # オプション
 
 ```bash
 # ============================================
-# Chrome DevTools MCP - Web調査
+# Serena MCP - セマンティックコード操作
 # ============================================
-# 専用環境変数なし - envFileのみ
+SERENA_HOME=.serena
 
 # ============================================
 # Codex CLI MCP - コードレビュー
@@ -240,59 +244,6 @@ SLACK_USER_MENTION="<@U0123456789>"  # オプション
 # MISTRAL_API_KEY=your-mistral-api-key
 
 # ============================================
-# Notion MCP - Notionドキュメント管理
-# ============================================
-NOTION_TOKEN=your-notion-token-here
-
-# オプション設定
-# OPENAPI_MCP_HEADERS={"Authorization": "Bearer token"}
-# AUTH_TOKEN=your-auth-token
-
-# ============================================
-# AWS Docs MCP - AWS公式ドキュメント
-# ============================================
-# FASTMCP_LOG_LEVEL=ERROR
-# AWS_DOCUMENTATION_PARTITION=aws
-# MCP_USER_AGENT=custom-user-agent
-
-# ============================================
-# BigQuery MCP - BigQueryデータ分析
-# ============================================
-BIGQUERY_PROJECT=your-gcp-project-id
-BIGQUERY_LOCATION=US
-
-# オプション設定
-# BIGQUERY_DATASETS=dataset1,dataset2
-# BIGQUERY_KEY_FILE=/path/to/service-account-key.json
-
-# ============================================
-# DBHub MCP - データベース操作
-# ============================================
-# Method 1: DSN（推奨）
-DSN=mysql://user:password@host:3306/database
-
-# Method 2: 個別指定
-# DB_TYPE=mysql
-# DB_HOST=localhost
-# DB_USER=username
-# DB_PASSWORD=password
-# DB_NAME=database
-# DB_PORT=3306
-
-# オプション設定
-# TRANSPORT=http
-# PORT=8080
-# READONLY=false
-
-# SSH踏み台サーバー経由接続（オプション）
-# SSH_HOST=bastion.example.com
-# SSH_PORT=22
-# SSH_USER=ssh-user
-# SSH_PRIVATE_KEY_PATH=/path/to/ssh/key
-# SSH_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----...
-# SSH_PASSWORD=ssh-password
-
-# ============================================
 # Slack通知 - 自動フック
 # ============================================
 SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
@@ -300,15 +251,55 @@ SLACK_CHANNEL_ID=C0123456789
 SLACK_USER_MENTION=<@U0123456789>
 ```
 
+**追加のMCPプラグインが必要な場合:**
+
+以下のMCPは個別プラグインとしてインストール可能です。必要に応じて環境変数を設定してください。
+
+```bash
+# ============================================
+# Chrome DevTools MCP (mcp-chrome-devtools)
+# ============================================
+# 専用環境変数なし - envFileのみ
+
+# ============================================
+# Notion MCP (mcp-notion)
+# ============================================
+NOTION_TOKEN=your-notion-token-here
+
+# ============================================
+# AWS Docs MCP (mcp-aws-docs)
+# ============================================
+# FASTMCP_LOG_LEVEL=ERROR
+# AWS_DOCUMENTATION_PARTITION=aws
+
+# ============================================
+# BigQuery MCP (mcp-bigquery)
+# ============================================
+BIGQUERY_PROJECT=your-gcp-project-id
+BIGQUERY_LOCATION=US
+# BIGQUERY_KEY_FILE=/path/to/service-account-key.json
+
+# ============================================
+# DBHub MCP (mcp-dbhub)
+# ============================================
+DSN=mysql://user:password@host:3306/database
+```
+
 ### 📊 MCPサーバー別環境変数詳細
 
-> **Note (v2.0.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。環境変数設定は各公式プラグインのドキュメントを参照してください。
+> **Note (v2.6.0)**: NDFプラグインはコアMCP（Serena、Codex）のみを含みます。GitHub MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）から、その他のMCP（BigQuery、Notion、AWS Docs、DBHub、Chrome DevTools）は個別プラグインとしてインストールしてください。
 
-#### 1. Chrome DevTools MCP
+#### 1. Serena MCP（コアMCP）
 
-**専用環境変数なし** - `.env`ファイルの`envFile`設定のみ使用。
+| 環境変数 | 必須/オプション | デフォルト値 | 説明 |
+|---------|--------------|------------|------|
+| SERENA_HOME | オプション | `.serena` | Serenaのホームディレクトリ |
 
-#### 2. Codex CLI MCP
+**注意:**
+- GOOGLE_API_KEY、ANTHROPIC_API_KEYは不要です（自動検出）
+- Claude CodeのAPI設定を自動的に継承します
+
+#### 2. Codex CLI MCP（コアMCP）
 
 | 環境変数 | 必須/オプション | デフォルト値 | 説明 |
 |---------|--------------|------------|------|
@@ -322,98 +313,64 @@ SLACK_USER_MENTION=<@U0123456789>
 
 インストール: https://github.com/openai/codex/releases
 
-#### 3. Notion MCP
+---
+
+**以下のMCPは個別プラグインとしてインストール可能です:**
+
+#### 3. Chrome DevTools MCP (mcp-chrome-devtools)
+
+```bash
+/plugin install mcp-chrome-devtools@ai-plugins
+```
+
+**専用環境変数なし** - `.env`ファイルの`envFile`設定のみ使用。
+
+#### 4. Notion MCP (mcp-notion)
+
+```bash
+/plugin install mcp-notion@ai-plugins
+```
 
 | 環境変数 | 必須/オプション | デフォルト値 | 説明 |
 |---------|--------------|------------|------|
 | **NOTION_TOKEN** | **必須** | - | Notion Internal Integration Token<br>取得: https://www.notion.so/my-integrations |
-| OPENAPI_MCP_HEADERS | オプション | - | カスタムHTTPヘッダー（JSON形式） |
-| AUTH_TOKEN | オプション | - | 追加の認証トークン |
 
-#### 4. AWS Docs MCP
+#### 5. AWS Docs MCP (mcp-aws-docs)
+
+```bash
+/plugin install mcp-aws-docs@ai-plugins
+```
 
 | 環境変数 | 必須/オプション | デフォルト値 | 説明 |
 |---------|--------------|------------|------|
-| FASTMCP_LOG_LEVEL | オプション | `ERROR` | ログレベル（`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`） |
-| AWS_DOCUMENTATION_PARTITION | オプション | `aws` | AWSパーティション（`aws`, `aws-cn`, `aws-us-gov`） |
-| MCP_USER_AGENT | オプション | - | カスタムUser-Agent |
+| FASTMCP_LOG_LEVEL | オプション | `ERROR` | ログレベル |
+| AWS_DOCUMENTATION_PARTITION | オプション | `aws` | AWSパーティション |
 
 **注意:** 認証不要でAWS公式ドキュメントにアクセスできます。
 
-#### 5. BigQuery MCP
+#### 6. BigQuery MCP (mcp-bigquery)
+
+```bash
+/plugin install mcp-bigquery@ai-plugins
+```
 
 | 環境変数 | 必須/オプション | デフォルト値 | 説明 |
 |---------|--------------|------------|------|
 | **BIGQUERY_PROJECT** | **必須** | - | GCPプロジェクトID |
 | BIGQUERY_LOCATION | オプション | `US` | BigQueryデータセットのロケーション |
-| BIGQUERY_DATASETS | オプション | - | アクセス許可するデータセット（カンマ区切り） |
-| BIGQUERY_KEY_FILE | オプション | - | サービスアカウントキーファイルのパス<br>（未指定の場合はApplication Default Credentials使用） |
+| BIGQUERY_KEY_FILE | オプション | - | サービスアカウントキーファイルのパス |
 
-**認証方法:**
-1. **サービスアカウントキーファイル（推奨）**: `BIGQUERY_KEY_FILE`にJSON keyファイルのパスを指定
-2. **Application Default Credentials（ADC）**: `BIGQUERY_KEY_FILE`を設定せず、以下のいずれかを使用
-   - 環境変数`GOOGLE_APPLICATION_CREDENTIALS`でキーファイルのパスを指定
-   - `gcloud auth application-default login`を実行してユーザー認証情報を使用
+#### 7. DBHub MCP (mcp-dbhub)
 
-**注意:** NDFプラグインでは`BIGQUERY_KEY_FILE`を推奨します。ADCを使う場合は`BIGQUERY_KEY_FILE`を設定しないでください。
-
-サービスアカウント作成: https://console.cloud.google.com/iam-admin/serviceaccounts
-
-#### 6. DBHub MCP
+```bash
+/plugin install mcp-dbhub@ai-plugins
+```
 
 | 環境変数 | 必須/オプション | デフォルト値 | 説明 |
 |---------|--------------|------------|------|
-| **DSN** または **DATABASE_DSN** | **必須（Method 1）** | - | データベース接続文字列<br>例: `mysql://user:pass@host:3306/db`<br>（両変数名をサポート） |
-| **DB_TYPE** | **必須（Method 2）** | - | データベースタイプ（`mysql`, `postgres`, `sqlite`, `sqlserver`） |
-| **DB_HOST** | **必須（Method 2）** | - | データベースホスト |
-| **DB_USER** | **必須（Method 2）** | - | データベースユーザー名 |
-| **DB_PASSWORD** | **必須（Method 2）** | - | データベースパスワード |
-| **DB_NAME** | **必須（Method 2）** | - | データベース名 |
-| DB_PORT | オプション | DB依存 | データベースポート（MySQL: 3306, PostgreSQL: 5432） |
-| TRANSPORT | オプション | `http` | トランスポートプロトコル（`http`または`tcp`） |
-| PORT | オプション | `8080` | MCPサーバーのポート |
-| SSH_HOST | オプション | - | SSH踏み台サーバーのホスト |
-| SSH_PORT | オプション | `22` | SSHポート |
-| SSH_USER | オプション | - | SSHユーザー名 |
-| SSH_PRIVATE_KEY_PATH | オプション | - | SSH秘密鍵のパス |
-| SSH_PRIVATE_KEY | オプション | - | SSH秘密鍵の内容（直接指定） |
-| SSH_PASSWORD | オプション | - | SSHパスワード（鍵認証推奨） |
-| READONLY | オプション | `false` | 読み取り専用モード |
+| **DSN** | **必須** | - | データベース接続文字列<br>例: `mysql://user:pass@host:3306/db` |
 
-**接続方法の選択:**
-- **Method 1（推奨）**: `DSN`または`DATABASE_DSN`のみ指定
-- **Method 2**: `DB_TYPE`, `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`を個別指定
-
-### 🔧 データベース接続文字列（DSN）の形式
-
-#### PostgreSQL
-```bash
-DSN="postgres://USERNAME:PASSWORD@HOST:PORT/DATABASE?sslmode=disable"
-```
-
-SSL接続が必要な場合：
-```bash
-DSN="postgres://USERNAME:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
-```
-
-#### MySQL / MariaDB
-```bash
-DSN="mysql://USERNAME:PASSWORD@HOST:PORT/DATABASE"
-```
-
-#### SQLite
-```bash
-DSN="sqlite:///PATH/TO/DATABASE.db"
-```
-
-#### SQL Server
-```bash
-DSN="sqlserver://USERNAME:PASSWORD@HOST:PORT?database=DATABASE"
-```
-
-**注意事項:**
-- パスワードに特殊文字が含まれる場合は、URLエンコードが必要（例: `@` → `%40`, `#` → `%23`）
-- ローカルデータベースの場合は `localhost` を使用
+DSN形式の詳細については、各プラグインのREADMEを参照してください。
 
 ### 🔐 Slack通知の環境変数
 
@@ -783,149 +740,56 @@ REST APIのテンプレートを使ってエンドポイントを作成してく
 
 詳細は各Skillの`SKILL.md`を参照してください。
 
-### 2. MCP統合 (6サーバー)
+### 2. MCP統合 (2つのコアMCP)
 
-このプラグインは6個の強力なMCPサーバーを統合しています。各MCPの詳細な使用方法やベストプラクティスは、エージェント向けガイド `plugins/ndf/CLAUDE.md` を参照してください。
+このプラグインは2つのコアMCPサーバーを統合しています。各MCPの詳細な使用方法やベストプラクティスは、エージェント向けガイド `plugins/ndf/CLAUDE.md` を参照してください。
 
-> **Note (v2.0.0)**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。
+> **Note (v2.6.0)**: NDFプラグインはコアMCP（Serena、Codex）のみを含みます。その他のMCPは個別プラグインとして提供されています。
 
-**Notion** などの基本MCP、**BigQuery、DBHub** などのデータベースMCP、**Chrome DevTools、AWS Docs、Codex CLI** など専門MCPを含みます。
-
-#### MCPのデフォルト状態
-
-コンテキスト使用量を最適化するため、よく使うMCPのみがデフォルトで有効化されています。
-
-**デフォルトで有効（2つ）:**
-- ✅ **Chrome DevTools MCP** - Web調査、パフォーマンステスト
+**コアMCP（2つ）:**
+- ✅ **Serena MCP** - セマンティックコード操作、メモリー管理
 - ✅ **Codex CLI MCP** - コードレビュー、ファイル読み取り
 
-**デフォルトで無効（5つ）:**
-- ⏸️ **Notion MCP** - コンテキストが大きいため無効
-- ⏸️ **AWS Documentation MCP** - エラーが発生するため無効
-- ⏸️ **BigQuery MCP** - 利用するプロジェクトが限られるため無効
-- ⏸️ **DBHub MCP** - 利用するプロジェクトが限られるため無効
-- ⏸️ **Claude Code MCP** - コンテキストが大きいため無効
+**個別プラグインとして提供（5つ）:**
+- 📦 **Chrome DevTools MCP** (`mcp-chrome-devtools`) - Web調査、パフォーマンステスト
+- 📦 **BigQuery MCP** (`mcp-bigquery`) - BigQueryデータ分析
+- 📦 **AWS Docs MCP** (`mcp-aws-docs`) - AWS公式ドキュメント検索
+- 📦 **DBHub MCP** (`mcp-dbhub`) - データベース操作
+- 📦 **Notion MCP** (`mcp-notion`) - Notionドキュメント管理
 
-> **Tip**: GitHub MCP、Serena MCP、Context7 MCPは公式プラグインからインストールして使用してください：
+> **Tip**: GitHub MCP、Context7 MCPは公式プラグインからインストールして使用してください：
 > ```bash
 > /plugin install github@anthropics/claude-plugins-official
-> /plugin install serena@anthropics/claude-plugins-official
 > /plugin install context7@anthropics/claude-plugins-official
 > ```
 
-#### 無効化されているMCPを有効にする方法
+#### 追加MCPのインストール方法
 
-特定のプロジェクトで無効化されているMCPを使いたい場合、`/mcp`コマンドで簡単に有効化できます：
+必要に応じて個別のMCPプラグインをインストールできます：
 
-**手順:**
+```bash
+# ブラウザ自動化とテスト
+/plugin install mcp-chrome-devtools@ai-plugins
 
-1. **Claude Codeで`/mcp`コマンドを実行**
+# データ分析
+/plugin install mcp-bigquery@ai-plugins
 
-   チャット入力欄に以下を入力してEnter：
-   ```
-   /mcp
-   ```
+# AWS公式ドキュメント調査
+/plugin install mcp-aws-docs@ai-plugins
 
-2. **MCP一覧から有効化したいMCPを選択**
+# データベース操作
+/plugin install mcp-dbhub@ai-plugins
 
-   表示されるMCP一覧で：
-   - 🟢 緑色のドット = 有効
-   - ⚫ グレーのドット = 無効
+# Notion統合
+/plugin install mcp-notion@ai-plugins
+```
 
-   有効化したいMCP（例: `plugin:ndf:notion`）をクリックして選択します。
-
-3. **Enable（有効化）を選択**
-
-   選択したMCPの詳細画面で「Enable」ボタンをクリックします。
-
-   または、一覧画面でMCP名の右側にあるトグルスイッチをクリックして有効化できます。
-
-4. **（必要に応じて）認証情報を設定**
-
-   BigQuery、DBHub、Notionなどを有効化した場合は、`.env`ファイルに対応する認証情報も設定してください：
-   ```bash
-   # .envファイルに追加
-   NOTION_TOKEN=your_notion_integration_token_here
-   DSN=mysql://user:pass@host:3306/db
-   BIGQUERY_PROJECT=your-gcp-project-id
-   BIGQUERY_KEY_FILE=/path/to/service-account-key.json
-   ```
-
-5. **Claude Codeを再起動**
-
-   変更を反映するために、Claude Codeを終了して再起動します。
-
-   ```bash
-   # ターミナルから再起動する場合
-   # Ctrl+C で終了後、再度起動
-   claude
-   ```
-
-6. **有効化を確認**
-
-   再度 `/mcp` コマンドを実行して、該当のMCPが🟢緑色になっていることを確認します。
-
-**有効化の具体例:**
-
-| MCP | 必要な認証情報 | 用途 |
-|-----|-------------|------|
-| **Notion MCP** | `NOTION_TOKEN` | Notionドキュメント管理 |
-| **BigQuery MCP** | `BIGQUERY_PROJECT`, `BIGQUERY_KEY_FILE`（オプション） | BigQueryデータ分析 |
-| **DBHub MCP** | `DSN`（または`DATABASE_DSN`） | データベース操作（MySQL/PostgreSQL等） |
-| **AWS Docs MCP** | 不要 | AWS公式ドキュメント検索 |
-| **Claude Code MCP** | 不要 | Claude Code機能拡張 |
+各プラグインのインストール後、対応する環境変数を`.env`に設定してClaude Codeを再起動してください。
 
 **注意事項:**
-- MCPを有効化すると、コンテキスト使用量が増加します（1MCPあたり約5k～30k tokens）
-- 認証が必要なMCPは、対応する`.env`設定を忘れずに行ってください
-- 使わないMCPは無効のままにしておくことを推奨します（パフォーマンス向上）
-
-#### 現在有効なMCPをさらに無効化する
-
-デフォルトで有効になっている5つのMCPのうち、使用しないものがあればさらに無効化できます。
-
-**無効化の手順:**
-
-1. **Claude Codeで`/mcp`コマンドを実行**
-
-   チャット入力欄に以下を入力してEnter：
-   ```
-   /mcp
-   ```
-
-2. **MCP一覧から無効化したいMCPを選択**
-
-   表示されるMCP一覧で：
-   - 🟢 緑色のドット = 有効
-   - ⚫ グレーのドット = 無効
-
-   無効化したいMCP（例: `plugin:ndf:context7`）をクリックして選択します。
-
-3. **Disable（無効化）を選択**
-
-   選択したMCPの詳細画面で「Disable」ボタンをクリックします。
-
-   または、一覧画面でMCP名の右側にあるトグルスイッチをクリックして無効化できます。
-
-4. **Claude Codeを再起動**
-
-   変更を反映するために、Claude Codeを終了して再起動します。
-
-5. **無効化を確認**
-
-   再度 `/mcp` コマンドを実行して、該当のMCPが⚫グレーになっていることを確認します。
-
-**無効化の具体例:**
-
-| MCP | 無効化を検討すべきケース |
-|-----|---------------------|
-| **Chrome DevTools** | Webスクレイピングやパフォーマンステストが不要な場合（約10k tokens削減） |
-| **Codex CLI** | AIコードレビュー機能が不要な場合（約3k tokens削減） |
-
-**補足:**
-- MCPの有効化/無効化は各プロジェクトごとに設定されます
-- 設定は`.claude/settings.json`または`.mcp.json`に保存されます
-- 変更後、Claude Codeを再起動すると設定が反映されます
+- 各MCPプラグインは独立しているため、必要なものだけをインストールできます
+- コンテキスト使用量を最適化するため、使わないMCPはインストールしないことを推奨します
+- 各プラグインの詳細な設定方法は、個別のREADMEを参照してください
 
 ### 3. 自動フック
 

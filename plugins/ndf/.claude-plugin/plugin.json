@@ -1,7 +1,7 @@
 {
   "name": "ndf",
-  "version": "2.5.0",
-  "description": "Integrated plugin with director orchestrator, specialized agents, workflow commands, skills, and Slack notifications. Core MCP servers (GitHub, Serena, Context7) moved to official plugins.",
+  "version": "2.6.0",
+  "description": "Integrated plugin with specialized agents, workflow commands, and skills. Includes Serena and Codex MCP servers. Additional MCPs available as separate plugins.",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"

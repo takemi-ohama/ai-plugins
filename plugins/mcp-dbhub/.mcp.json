@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "dbhub": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@bytebase/dbhub",
+        "--transport",
+        "http",
+        "--port",
+        "8080"
+      ],
+      "env": {},
+      "envFile": "${workspaceFolder}/.env"
+    }
+  }
+}
