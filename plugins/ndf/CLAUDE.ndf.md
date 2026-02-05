@@ -4,9 +4,9 @@
 
 ## Overview
 
-NDF plugin provides **7 MCP servers, 6 commands, and 6 specialized sub-agents**. Delegate complex tasks to appropriate sub-agents for better results.
+NDF plugin provides **2 core MCP servers, 9 commands, 13 skills, and 6 specialized sub-agents**. Delegate complex tasks to appropriate sub-agents for better results.
 
-> **Note (v2.1.0)**: GitHub MCP, Serena MCP, Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。directorエージェントはClaude Code機能を活用する指揮者として再定義されました。
+> **Note (v2.5.0)**: directorエージェントはClaude Code機能を活用する指揮者として再定義されました。Serena MCPはNDFプラグインに統合されています。
 
 ## Core Policies
 
@@ -515,14 +515,16 @@ NDFプラグインと併用することで、以下の機能が追加されま�
 - **GitHub MCP**: `/plugin install github@anthropics/claude-plugins-official`
 - **Context7 MCP**: `/plugin install context7@anthropics/claude-plugins-official`
 
-**NDF Plugin MCPs:**
+**NDF Plugin Core MCPs:**
 - **Serena MCP**: Semantic code operations (activate at session start)
 - **Codex CLI MCP**: -> Delegate to @corder or @scanner
-- **BigQuery MCP**: -> Delegate to @data-analyst
-- **AWS Docs MCP**: -> Delegate to @researcher
-- **Chrome DevTools MCP**: -> Delegate to @researcher or @qa
-- **Notion MCP**: Note management (optional, disabled by default)
-- **DBHub MCP**: Database operations (optional, disabled by default)
+
+**Optional MCP Plugins (install separately from ai-plugins marketplace):**
+- **Chrome DevTools MCP**: `/plugin install mcp-chrome-devtools@ai-plugins` -> Delegate to @researcher or @qa
+- **BigQuery MCP**: `/plugin install mcp-bigquery@ai-plugins` -> Delegate to @data-analyst
+- **AWS Docs MCP**: `/plugin install mcp-aws-docs@ai-plugins` -> Delegate to @researcher
+- **Notion MCP**: `/plugin install mcp-notion@ai-plugins` -> Note management
+- **DBHub MCP**: `/plugin install mcp-dbhub@ai-plugins` -> Delegate to @data-analyst
 
 ## Summary
 

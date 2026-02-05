@@ -8,47 +8,49 @@
 
 ## Serena MCPの活用（Claude Code固有）
 
-このプロジェクトでは**Serena MCP**を積極的に活用してください。
+このプロジェクトでは**Serena MCP**（NDFプラグインに統合）を積極的に活用してください。
+
+> **Note (v2.6.0)**: Serena MCPはNDFプラグインのコアMCPです。GOOGLE_API_KEY、ANTHROPIC_API_KEYは不要（Claude Codeの設定を自動継承）。
 
 ### 基本ワークフロー
 
 #### 1. プロジェクトのアクティベート
 ```bash
-mcp__plugin_ndf_serena__activate_project /work/ai-plugins
-mcp__plugin_ndf_serena__check_onboarding_performed
+mcp__plugin_serena_serena__activate_project /work/ai-plugins
+mcp__plugin_serena_serena__check_onboarding_performed
 ```
 
 #### 2. メモリーの活用
 ```bash
 # メモリー一覧を確認
-mcp__plugin_ndf_serena__list_memories
+mcp__plugin_serena_serena__list_memories
 
 # プロジェクト概要を読む
-mcp__plugin_ndf_serena__read_memory project-overview.md
+mcp__plugin_serena_serena__read_memory project-overview.md
 
 # プラグイン情報を読む
-mcp__plugin_ndf_serena__read_memory plugin-ndf.md
+mcp__plugin_serena_serena__read_memory plugin-ndf.md
 ```
 
 #### 3. コード探索（ファイル全体を読む前に）
 ```bash
 # ディレクトリ構造を確認
-mcp__plugin_ndf_serena__list_dir plugins/ndf recursive=false
+mcp__plugin_serena_serena__list_dir plugins/ndf recursive=false
 
 # シンボル概要を取得
-mcp__plugin_ndf_serena__get_symbols_overview relative_path="plugins/ndf/.claude-plugin/plugin.json"
+mcp__plugin_serena_serena__get_symbols_overview relative_path="plugins/ndf/.claude-plugin/plugin.json"
 
 # パターン検索
-mcp__plugin_ndf_serena__search_for_pattern substring_pattern="version" relative_path="plugins/"
+mcp__plugin_serena_serena__search_for_pattern substring_pattern="version" relative_path="plugins/"
 ```
 
 #### 4. 編集作業
 ```bash
 # シンボルベース編集（推奨）
-mcp__plugin_ndf_serena__replace_symbol_body name_path="/symbol" relative_path="file.md" body="new content"
+mcp__plugin_serena_serena__replace_symbol_body name_path="/symbol" relative_path="file.md" body="new content"
 
 # メモリー更新
-mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-example.md" content="詳細..."
+mcp__plugin_serena_serena__write_memory memory_file_name="plugin-example.md" content="詳細..."
 ```
 
 ## 一般的な開発タスク（Serena MCP活用）
@@ -63,8 +65,8 @@ mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-example.md" conten
 
 1. **既存プラグインを参考に構造を理解**
    ```bash
-   mcp__plugin_ndf_serena__list_dir plugins/ndf recursive=true
-   mcp__plugin_ndf_serena__read_memory project-overview.md
+   mcp__plugin_serena_serena__list_dir plugins/ndf recursive=true
+   mcp__plugin_serena_serena__read_memory project-overview.md
    ```
 
 2. **ディレクトリ構造を作成**
@@ -82,7 +84,7 @@ mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-example.md" conten
 5. **marketplace.jsonに登録**
    ```bash
    # Serenaで既存の設定を確認
-   mcp__plugin_ndf_serena__read_memory project-overview.md
+   mcp__plugin_serena_serena__read_memory project-overview.md
    ```
 
 6. **ドキュメント作成**
@@ -97,7 +99,7 @@ mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-example.md" conten
 
 8. **Serenaメモリーに記録**
    ```bash
-   mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-{name}.md" content="プラグイン情報..."
+   mcp__plugin_serena_serena__write_memory memory_file_name="plugin-{name}.md" content="プラグイン情報..."
    ```
 
 9. **コミット＆PR作成**
@@ -108,12 +110,12 @@ mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-example.md" conten
 
 1. **Serenaメモリーで現在の状態を確認**
    ```bash
-   mcp__plugin_ndf_serena__read_memory plugin-{name}.md
+   mcp__plugin_serena_serena__read_memory plugin-{name}.md
    ```
 
 2. **変更対象ファイルの構造を理解**
    ```bash
-   mcp__plugin_ndf_serena__get_symbols_overview relative_path="plugins/{name}/file.md"
+   mcp__plugin_serena_serena__get_symbols_overview relative_path="plugins/{name}/file.md"
    ```
 
 3. **変更を実施**
@@ -125,7 +127,7 @@ mcp__plugin_ndf_serena__write_memory memory_file_name="plugin-example.md" conten
 
 6. **Serenaメモリーを更新**
    ```bash
-   mcp__plugin_ndf_serena__edit_memory memory_file_name="plugin-{name}.md" needle="old" repl="new" mode="literal"
+   mcp__plugin_serena_serena__edit_memory memory_file_name="plugin-{name}.md" needle="old" repl="new" mode="literal"
    ```
 
 7. **テスト**

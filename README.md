@@ -8,10 +8,13 @@ Claude Codeプラグイン、プロジェクトスキル、MCP（Model Context P
 
 **NDFプラグイン**は、以下の機能を**オールインワン**で提供する統合プラグインです：
 
-- **10つのMCPサーバー**: GitHub、Serena、BigQuery、Notion、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Context7、Claude Code
-- **6つの開発ワークフローコマンド**: `/ndf:pr`, `/ndf:fix`, `/ndf:review`, `/ndf:merged`, `/ndf:clean`, `/ndf:serena`
-- **6つの専門エージェント**: タスク統括、データ分析、コーディング、調査、ファイル読み取り、品質管理
+- **2つのコアMCPサーバー**: Serena、Codex CLI
+- **9つの開発ワークフローコマンド**: `/ndf:pr`, `/ndf:pr-tests`, `/ndf:fix`, `/ndf:review`, `/ndf:merged`, `/ndf:clean`, `/ndf:serena`, `/ndf:mem-review`, `/ndf:mem-capture`
+- **6つの専門エージェント**: **director指揮者**、データ分析、コーディング、調査、ファイル読み取り、品質管理
+- **13個のSkills**: SQL最適化、データエクスポート、コードテンプレート、テスト生成、Python実行、Docker判定、Skill開発、調査レポート、PDF解析、Excel抽出、セキュリティスキャン、Markdown文書作成、記憶戦略
 - **自動フック**: Claude Code終了時にAI要約生成とSlack通知
+
+> **Note (v2.6.0)**: 追加のMCP（BigQuery、Chrome DevTools、AWS Docs、DBHub、Notion）は個別プラグインとしてインストール可能です。GitHub MCP、Context7 MCPは公式プラグインから利用できます。
 
 ## 利用方法
 
@@ -38,7 +41,7 @@ Claude Codeでマーケットプレイスを追加します：
 
 | プラグイン名 | バージョン | 説明 | 詳細 |
 |------------|----------|------|------|
-| **ndf** | 1.0.6 | Claude Code開発環境を**オールインワン**で強化する統合プラグイン。10つのMCPサーバー（GitHub、Serena、BigQuery、Notion、DBHub、Chrome DevTools、AWS Docs、Codex CLI、Context7、Claude Code）、6つの開発ワークフローコマンド、6つの専門エージェント（タスク統括、データ分析、コーディング、調査、ファイル読み取り、品質管理）、Stopフック（AI要約生成とSlack通知）を提供。 | [README](./plugins/ndf/README.md) |
+| **ndf** | 2.6.0 | Claude Code開発環境を**オールインワン**で強化する統合プラグイン。2つのコアMCPサーバー（Serena、Codex CLI）、9つの開発ワークフローコマンド、6つの専門エージェント（**director指揮者**、データ分析、コーディング、調査、ファイル読み取り、品質管理）、13個のSkills、Stopフック（AI要約生成とSlack通知）を提供。追加のMCPは個別プラグインとしてインストール可能。 | [README](./plugins/ndf/README.md) |
 
 ## 開発ガイドライン
 

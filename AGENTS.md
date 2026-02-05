@@ -280,10 +280,13 @@ fs_read plugins/ndf/README.md --start_line=1 --end_line=50
 ## NDFプラグインについて
 
 **NDFプラグイン**は、このマーケットプレイスの主要プラグインです：
-- 10個のMCPサーバー統合
-- 6個のスラッシュコマンド
-- 6個の専門サブエージェント
+- 2個のコアMCPサーバー（Serena、Codex CLI）
+- 9個のスラッシュコマンド（PR作成、Test Plan実行、レビュー、修正対応、マージ、クリーンアップ、Memory管理）
+- 6個の専門サブエージェント（**director指揮者**、データ分析、コーディング、調査、ファイル読み取り、品質管理）
+- 13個のSkills（SQL最適化、データエクスポート、コードテンプレート、テスト生成等）
 - 自動Slack通知
+
+> **Note (v2.6.0)**: 追加のMCP（BigQuery、Chrome DevTools、AWS Docs、DBHub、Notion）は個別プラグインとしてインストール可能です。
 
 詳細は`plugins/ndf/README.md`を参照してください。
 

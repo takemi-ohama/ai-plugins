@@ -1,12 +1,5 @@
 {
   "mcpServers": {
-    "notion": {
-      "type": "http",
-      "url": "https://mcp.notion.com/mcp",
-      "env": {},
-      "envFile": "${workspaceFolder}/.env",
-      "disabled": true
-    },
     "serena": {
       "type": "stdio",
       "command": "uvx",
@@ -21,64 +14,9 @@
         "False"
       ],
       "env": {
-        "SERENA_HOME": "${SERENA_HOME:-.serena}",
-        "GOOGLE_API_KEY": "${GOOGLE_API_KEY}",
-        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+        "SERENA_HOME": "${SERENA_HOME:-.serena}"
       },
       "envFile": "${workspaceFolder}/.env"
-    },
-    "awslabs.aws-docs": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": [
-        "awslabs.aws-documentation-mcp-server@latest"
-      ],
-      "env": {},
-      "envFile": "${workspaceFolder}/.env",
-      "disabled": true
-    },
-    "bigquery": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": [
-        "mcp-server-bigquery@latest"
-      ],
-      "env": {
-        "BIGQUERY_PROJECT": "${BIGQUERY_PROJECT}",
-        "BIGQUERY_LOCATION": "${BIGQUERY_LOCATION}",
-        "BIGQUERY_DATASETS": "${BIGQUERY_DATASETS}",
-        "BIGQUERY_KEY_FILE": "${BIGQUERY_KEY_FILE}"
-      },
-      "envFile": "${workspaceFolder}/.env",
-      "disabled": true
-    },
-    "dbhub": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "@bytebase/dbhub",
-        "--transport",
-        "http",
-        "--port",
-        "8080"
-      ],
-      "env": {},
-      "envFile": "${workspaceFolder}/.env",
-      "disabled": true
-    },
-    "chrome-devtools": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "chrome-devtools-mcp@latest",
-        "--isolated",
-        "--chromeArg=--no-sandbox",
-        "--chromeArg=--disable-setuid-sandbox",
-        "--chromeArg=--disable-dev-shm-usage"
-      ],
-      "envFile": "${workspaceFolder}/.env",
-      "disabled": false
     },
     "codex": {
       "type": "stdio",
@@ -87,8 +25,7 @@
         "mcp-server"
       ],
       "env": {},
-      "envFile": "${workspaceFolder}/.env",
-      "disabled": false
+      "envFile": "${workspaceFolder}/.env"
     }
   }
 }
