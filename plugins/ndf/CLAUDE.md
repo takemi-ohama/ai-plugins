@@ -66,33 +66,33 @@ plugins/ndf/
 
 ```bash
 # プロジェクトをアクティベート
-mcp__plugin_ndf_serena__activate_project /work/ai-plugins
+mcp__plugin_serena_serena__activate_project /work/ai-plugins
 
 # オンボーディング確認
-mcp__plugin_ndf_serena__check_onboarding_performed
+mcp__plugin_serena_serena__check_onboarding_performed
 ```
 
 ### メモリーの活用
 
 ```bash
 # NDFプラグイン情報を読む
-mcp__plugin_ndf_serena__read_memory plugin-ndf.md
+mcp__plugin_serena_serena__read_memory plugin-ndf.md
 
 # プロジェクト概要を読む
-mcp__plugin_ndf_serena__read_memory project-overview.md
+mcp__plugin_serena_serena__read_memory project-overview.md
 ```
 
 ### コード探索（ファイル全体を読む前に）
 
 ```bash
 # ディレクトリ構造を確認
-mcp__plugin_ndf_serena__list_dir plugins/ndf recursive=false
+mcp__plugin_serena_serena__list_dir plugins/ndf recursive=false
 
 # plugin.jsonの構造を理解
-mcp__plugin_ndf_serena__get_symbols_overview relative_path="plugins/ndf/.claude-plugin/plugin.json"
+mcp__plugin_serena_serena__get_symbols_overview relative_path="plugins/ndf/.claude-plugin/plugin.json"
 
 # エージェント一覧を確認
-mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
+mcp__plugin_serena_serena__list_dir plugins/ndf/agents recursive=false
 ```
 
 ## 一般的な開発タスク
@@ -103,8 +103,8 @@ mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
 
 1. **既存エージェントを参考に理解**
    ```bash
-   mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
-   mcp__plugin_ndf_serena__read_memory plugin-ndf.md
+   mcp__plugin_serena_serena__list_dir plugins/ndf/agents recursive=false
+   mcp__plugin_serena_serena__read_memory plugin-ndf.md
    ```
 
 2. **エージェントファイルを作成**
@@ -117,7 +117,7 @@ mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
 3. **plugin.jsonに登録**
    ```bash
    # Serenaで既存のagents配列を確認
-   mcp__plugin_ndf_serena__get_symbols_overview relative_path="plugins/ndf/.claude-plugin/plugin.json"
+   mcp__plugin_serena_serena__get_symbols_overview relative_path="plugins/ndf/.claude-plugin/plugin.json"
    ```
 
 4. **CLAUDE.ndf.mdに説明を追加**
@@ -130,7 +130,7 @@ mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
 
 6. **Serenaメモリーを更新**
    ```bash
-   mcp__plugin_ndf_serena__edit_memory memory_file_name="plugin-ndf.md" needle="専門エージェント (X種類)" repl="専門エージェント (Y種類)" mode="literal"
+   mcp__plugin_serena_serena__edit_memory memory_file_name="plugin-ndf.md" needle="専門エージェント (X種類)" repl="専門エージェント (Y種類)" mode="literal"
    ```
 
 7. **テストとコミット**
@@ -141,7 +141,7 @@ mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
 
 1. **既存コマンドを参考に理解**
    ```bash
-   mcp__plugin_ndf_serena__list_dir plugins/ndf/commands recursive=false
+   mcp__plugin_serena_serena__list_dir plugins/ndf/commands recursive=false
    ```
 
 2. **コマンドファイルを作成**
@@ -173,7 +173,7 @@ mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
 
 1. **既存の.mcp.jsonを確認**
    ```bash
-   mcp__plugin_ndf_serena__read_memory plugin-ndf.md
+   mcp__plugin_serena_serena__read_memory plugin-ndf.md
    ```
 
 2. **.mcp.jsonに新しいMCPサーバーを追加**
@@ -204,7 +204,7 @@ mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
 
 1. **hooks/hooks.jsonを確認**
    ```bash
-   mcp__plugin_ndf_serena__get_symbols_overview relative_path="plugins/ndf/hooks/hooks.json"
+   mcp__plugin_serena_serena__get_symbols_overview relative_path="plugins/ndf/hooks/hooks.json"
    ```
 
 2. **フックを追加・修正**
@@ -236,7 +236,7 @@ mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
 
 1. **構造を理解**
    ```bash
-   mcp__plugin_ndf_serena__get_symbols_overview relative_path="plugins/ndf/CLAUDE.ndf.md"
+   mcp__plugin_serena_serena__get_symbols_overview relative_path="plugins/ndf/CLAUDE.ndf.md"
    ```
 
 2. **該当セクションを更新**
@@ -307,7 +307,7 @@ mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
 
 3. **Serenaメモリーを更新**
    ```bash
-   mcp__plugin_ndf_serena__edit_memory memory_file_name="plugin-ndf.md" needle="**バージョン:** 1.0.X" repl="**バージョン:** 1.0.Y" mode="literal"
+   mcp__plugin_serena_serena__edit_memory memory_file_name="plugin-ndf.md" needle="**バージョン:** 1.0.X" repl="**バージョン:** 1.0.Y" mode="literal"
    ```
 
 4. **コミット**
@@ -338,14 +338,14 @@ mcp__plugin_ndf_serena__list_dir plugins/ndf/agents recursive=false
 
 ```bash
 # 部分的な更新（推奨）
-mcp__plugin_ndf_serena__edit_memory \
+mcp__plugin_serena_serena__edit_memory \
   memory_file_name="plugin-ndf.md" \
   needle="old text" \
   repl="new text" \
   mode="literal"
 
 # 全体の再作成（大規模変更時）
-mcp__plugin_ndf_serena__write_memory \
+mcp__plugin_serena_serena__write_memory \
   memory_file_name="plugin-ndf.md" \
   content="完全な新しい内容"
 ```

@@ -1,10 +1,10 @@
 <!-- NDF_PLUGIN_GUIDE_START_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
-<!-- VERSION: 8 -->
-# NDF Plugin - AI Agent Guidelines (v2.4.0)
+<!-- VERSION: 9 -->
+# NDF Plugin - AI Agent Guidelines (v2.5.0)
 
 ## Overview
 
-NDF plugin provides **6 MCP servers, 6 commands, and 6 specialized sub-agents**. Delegate complex tasks to appropriate sub-agents for better results.
+NDF plugin provides **7 MCP servers, 6 commands, and 6 specialized sub-agents**. Delegate complex tasks to appropriate sub-agents for better results.
 
 > **Note (v2.1.0)**: GitHub MCP, Serena MCP, Context7 MCPは公式プラグイン（`anthropics/claude-plugins-official`）に移行しました。directorエージェントはClaude Code機能を活用する指揮者として再定義されました。
 
@@ -85,25 +85,42 @@ For codebase investigation:
 Task(subagent_type="Explore", prompt="Find how authentication is implemented", description="Explore auth code")
 ```
 
-### 5. Serena MCP Usage (Official Plugin)
+### 5. Serena MCP Usage (NDF Plugin)
 
-**Serena MCP is now available via official plugin.** Install separately:
+**Serena MCP is now integrated into NDF plugin.**
+
+#### Session Start: Activate Serena
+
+**IMPORTANT: Always activate Serena at the beginning of each Claude Code session:**
+
 ```bash
-/plugin install serena@anthropics/claude-plugins-official
+# 1. Activate project (REQUIRED at session start)
+mcp__plugin_serena_serena__activate_project /path/to/your/project
+
+# 2. Check onboarding status
+mcp__plugin_serena_serena__check_onboarding_performed
+
+# 3. List available memories
+mcp__plugin_serena_serena__list_memories
 ```
+
+**Why activate at session start?**
+- Serena maintains project context across sessions
+- Enables semantic code operations
+- Required for memory access and code understanding
 
 #### Key Commands
 
 **Read code progressively (not entire files):**
 ```bash
 # 1. Get symbol overview first
-mcp__plugin_official_serena__get_symbols_overview relative_path="path/to/file.py"
+mcp__plugin_serena_serena__get_symbols_overview relative_path="path/to/file.py"
 
 # 2. Find specific symbol
-mcp__plugin_official_serena__find_symbol name_path="/ClassName" relative_path="src/" include_body=true
+mcp__plugin_serena_serena__find_symbol name_path="/ClassName" relative_path="src/" include_body=true
 
 # 3. Search pattern if symbol name unknown
-mcp__plugin_official_serena__search_for_pattern substring_pattern="TODO" relative_path="src/"
+mcp__plugin_serena_serena__search_for_pattern substring_pattern="TODO" relative_path="src/"
 ```
 
 ### 6. Research Facts
@@ -119,7 +136,7 @@ mcp__plugin_official_serena__search_for_pattern substring_pattern="TODO" relativ
 
 **Claude Code Skills are model-invoked**: Claude autonomously activates Skills based on request and Skill description.
 
-**10 Available Skills (v2.4.0):**
+**13 Available Skills (v2.5.0):**
 
 **Data Analyst Skills (2):**
 - `data-analyst-sql-optimization` - SQL optimization patterns and best practices
@@ -128,6 +145,11 @@ mcp__plugin_official_serena__search_for_pattern substring_pattern="TODO" relativ
 **Corder Skills (2):**
 - `corder-code-templates` - Code generation templates (REST API, React, database models, authentication)
 - `corder-test-generation` - Automated unit/integration test generation with AAA pattern
+
+**Common Skills (3):**
+- `python-execution` - Python実行環境の自動判定（uv/venv/システムPython）と適切な実行コマンドの選択
+- `docker-container-access` - Dockerコンテナアクセス方法の判定（DinD/DooD環境検出、bind mount注意点）
+- `skill-development` - Agent Skill開発ベストプラクティス（SKILL.md構造、Progressive Disclosure、ツール登録）
 
 **Researcher Skills (1):**
 - `researcher-report-templates` - Structured research report templates with comparison tables and best practices
@@ -491,14 +513,16 @@ NDFプラグインと併用することで、以下の機能が追加されま�
 
 **Official Plugins (install separately):**
 - **GitHub MCP**: `/plugin install github@anthropics/claude-plugins-official`
-- **Serena MCP**: `/plugin install serena@anthropics/claude-plugins-official`
 - **Context7 MCP**: `/plugin install context7@anthropics/claude-plugins-official`
 
 **NDF Plugin MCPs:**
+- **Serena MCP**: Semantic code operations (activate at session start)
 - **Codex CLI MCP**: -> Delegate to @corder or @scanner
 - **BigQuery MCP**: -> Delegate to @data-analyst
 - **AWS Docs MCP**: -> Delegate to @researcher
 - **Chrome DevTools MCP**: -> Delegate to @researcher or @qa
+- **Notion MCP**: Note management (optional, disabled by default)
+- **DBHub MCP**: Database operations (optional, disabled by default)
 
 ## Summary
 
