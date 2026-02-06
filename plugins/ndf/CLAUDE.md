@@ -2,487 +2,148 @@
 
 ## 概要
 
-このドキュメントは、**NDFプラグインの開発・メンテナンス**を行うAIエージェント向けのガイドラインです。
+**NDFプラグインの開発・メンテナンス**を行うAIエージェント向けガイドライン。
 
-**プラグイン利用者向けガイドライン**は`CLAUDE.ndf.md`を参照してください。
+**利用者向けガイドライン**は`CLAUDE.ndf.md`を参照。
 
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 2.0.0
-- **種類**: 統合プラグイン（MCP + Commands + Agents + Hooks）
+- **現在バージョン**: 2.7.0
+- **種類**: 統合プラグイン（MCP + Skills + Agents + Hooks）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
-## 重要な開発ルール
+## 開発ルール
 
-### 言語
-- すべてのドキュメント、コミットメッセージ、PR説明は**日本語**
-
-### Git運用
-- **mainブランチへの直接コミット禁止**
-- featureブランチで作業し、PRを通じてマージ
-- ユーザーの許可なくPRを承認しない
-
-### バージョン管理
-- **セマンティックバージョニング**（MAJOR.MINOR.PATCH）に厳密に従う
-- 変更内容に応じて適切なバージョンをインクリメント
-  - **MAJOR**: 破壊的変更
-  - **MINOR**: 後方互換性のある新機能
-  - **PATCH**: バグフィックス
+- ドキュメント・コミットメッセージ・PR説明は**日本語**
+- **mainブランチへの直接コミット禁止**（featureブランチ+PR）
+- **セマンティックバージョニング**: MAJOR（破壊的変更）、MINOR（新機能）、PATCH（バグ修正）
 
 ## ディレクトリ構造
 
 ```
 plugins/ndf/
 ├── .claude-plugin/
-│   └── plugin.json              # プラグインメタデータ（必須）
-├── .mcp.json                    # MCPサーバー定義
+│   └── plugin.json              # プラグインメタデータ
+├── .mcp.json                    # MCPサーバー定義（Serena, Codex CLI）
 ├── hooks/
 │   └── hooks.json               # プロジェクトフック定義
 ├── scripts/
 │   ├── slack-notify.js          # Slack通知スクリプト
-│   └── inject-plugin-guide.js   # SessionStartフック用スクリプト
-├── commands/                    # スラッシュコマンド（6個）
-│   ├── serena.md
-│   ├── pr.md
-│   ├── fix.md
-│   ├── review.md
-│   ├── merged.md
-│   └── clean.md
-├── agents/                      # サブエージェント（5個）
+│   └── inject-plugin-guide.js   # CLAUDE.ndf.md自動注入スクリプト
+├── agents/                      # サブエージェント（6個）
+│   ├── director.md
 │   ├── data-analyst.md
 │   ├── corder.md
 │   ├── researcher.md
 │   ├── scanner.md
 │   └── qa.md
+├── skills/                      # スキル（23個）
+│   ├── pr/                      # ワークフロー系（9個、/ndf:* で呼出）
+│   ├── pr-tests/
+│   ├── fix/
+│   ├── review/
+│   ├── merged/
+│   ├── clean/
+│   ├── serena/
+│   ├── mem-review/
+│   ├── mem-capture/
+│   ├── data-analyst-sql-optimization/  # モデル起動型（14個）
+│   ├── data-analyst-export/
+│   ├── corder-code-templates/
+│   ├── corder-test-generation/
+│   ├── researcher-report-templates/
+│   ├── scanner-pdf-analysis/
+│   ├── scanner-excel-extraction/
+│   ├── qa-security-scan/
+│   ├── markdown-writing/
+│   ├── memory-handling/
+│   ├── serena-memory-strategy/
+│   ├── python-execution/
+│   ├── docker-container-access/
+│   └── skill-development/
 ├── CLAUDE.md                    # このファイル（開発者向け）
-├── CLAUDE.ndf.md                # プラグイン利用者向けガイドライン
+├── CLAUDE.ndf.md                # 利用者向けガイドライン
 └── README.md                    # プラグイン説明書
-```
-
-## Serena MCPの活用
-
-### プロジェクトアクティベート
-
-```bash
-# プロジェクトをアクティベート
-mcp__plugin_serena_serena__activate_project /work/ai-plugins
-
-# オンボーディング確認
-mcp__plugin_serena_serena__check_onboarding_performed
-```
-
-### メモリーの活用
-
-```bash
-# NDFプラグイン情報を読む
-mcp__plugin_serena_serena__read_memory plugin-ndf.md
-
-# プロジェクト概要を読む
-mcp__plugin_serena_serena__read_memory project-overview.md
-```
-
-### コード探索（ファイル全体を読む前に）
-
-```bash
-# ディレクトリ構造を確認
-mcp__plugin_serena_serena__list_dir plugins/ndf recursive=false
-
-# plugin.jsonの構造を理解
-mcp__plugin_serena_serena__get_symbols_overview relative_path="plugins/ndf/.claude-plugin/plugin.json"
-
-# エージェント一覧を確認
-mcp__plugin_serena_serena__list_dir plugins/ndf/agents recursive=false
 ```
 
 ## 一般的な開発タスク
 
-### 1. 新しいサブエージェントの追加
+### 新しいスキルの追加
 
-**手順**:
+1. `skills/{skill-name}/SKILL.md` を作成（YAMLフロントマター必須）
+2. `plugin.json` の `skills` 配列に `"./skills/{skill-name}"` を追加
+3. `CLAUDE.ndf.md` のスキル一覧を更新
+4. `plugin.json` のバージョンをMINOR上げ
+5. Serenaメモリーを更新
+6. テスト・コミット
 
-1. **既存エージェントを参考に理解**
-   ```bash
-   mcp__plugin_serena_serena__list_dir plugins/ndf/agents recursive=false
-   mcp__plugin_serena_serena__read_memory plugin-ndf.md
-   ```
-
-2. **エージェントファイルを作成**
-   ```bash
-   # YAMLフロントマター必須
-   # - name: エージェント名
-   # - description: 簡潔な説明
-   ```
-
-3. **plugin.jsonに登録**
-   ```bash
-   # Serenaで既存のagents配列を確認
-   mcp__plugin_serena_serena__get_symbols_overview relative_path="plugins/ndf/.claude-plugin/plugin.json"
-   ```
-
-4. **CLAUDE.ndf.mdに説明を追加**
-   - Available subagent_type
-   - Specialized Sub-Agents セクション
-   - 使用例
-
-5. **plugin.jsonのバージョンをインクリメント**
-   - MINOR版を上げる（新機能）
-
-6. **Serenaメモリーを更新**
-   ```bash
-   mcp__plugin_serena_serena__edit_memory memory_file_name="plugin-ndf.md" needle="専門エージェント (X種類)" repl="専門エージェント (Y種類)" mode="literal"
-   ```
-
-7. **テストとコミット**
-
-### 2. 新しいスラッシュコマンドの追加
-
-**手順**:
-
-1. **既存コマンドを参考に理解**
-   ```bash
-   mcp__plugin_serena_serena__list_dir plugins/ndf/commands recursive=false
-   ```
-
-2. **コマンドファイルを作成**
-   - `commands/{command-name}.md`
-   - マークダウン形式でコマンド説明を記述
-
-3. **plugin.jsonに登録**
-   ```json
-   {
-     "commands": [
-       "./commands/existing.md",
-       "./commands/new-command.md"
-     ]
-   }
-   ```
-
-4. **README.mdに説明を追加**
-
-5. **plugin.jsonのバージョンをインクリメント**
-   - MINOR版を上げる
-
-6. **Serenaメモリーを更新**
-
-7. **テストとコミット**
-
-### 3. MCPサーバーの追加・更新
-
-**手順**:
-
-1. **既存の.mcp.jsonを確認**
-   ```bash
-   mcp__plugin_serena_serena__read_memory plugin-ndf.md
-   ```
-
-2. **.mcp.jsonに新しいMCPサーバーを追加**
-   - `mcpServers`オブジェクトに追加
-   - `command`または`url`を指定
-   - 環境変数が必要な場合は`env`を設定
-
-3. **README.mdに説明を追加**
-   - MCPサーバー一覧
-   - 認証方法
-   - 使用例
-
-4. **環境変数ドキュメントを更新**
-   - 必要な環境変数を明記
-   - セットアップ手順を提供
-
-5. **plugin.jsonのバージョンをインクリメント**
-   - MINOR版を上げる（新MCP追加の場合）
-   - PATCH版を上げる（既存MCPの修正）
-
-6. **Serenaメモリーを更新**
-
-7. **テストとコミット**
-
-### 4. フックの追加・更新
-
-**手順**:
-
-1. **hooks/hooks.jsonを確認**
-   ```bash
-   mcp__plugin_serena_serena__get_symbols_overview relative_path="plugins/ndf/hooks/hooks.json"
-   ```
-
-2. **フックを追加・修正**
-   - SessionStart, Stop, UserPromptSubmitなどのイベント
-   - command型またはprompt型
-
-3. **スクリプトファイルを作成（command型の場合）**
-   - `scripts/`ディレクトリに配置
-   - 環境変数`CLAUDE_PLUGIN_ROOT`を活用
-
-4. **README.mdに説明を追加**
-
-5. **plugin.jsonのバージョンをインクリメント**
-   - MINOR版を上げる（新フック）
-   - PATCH版を上げる（既存フックの修正）
-
-6. **テストとコミット**
-
-### 5. CLAUDE.ndf.mdの更新
-
-**CLAUDE.ndf.mdは利用者向けガイドライン**のため、以下の場合に更新：
-
-- サブエージェントの追加・変更
-- 使用方法の変更
-- 新機能の追加
-- ベストプラクティスの更新
-
-**手順**:
-
-1. **構造を理解**
-   ```bash
-   mcp__plugin_serena_serena__get_symbols_overview relative_path="plugins/ndf/CLAUDE.ndf.md"
-   ```
-
-2. **該当セクションを更新**
-   - Overview
-   - Available subagent_type
-   - Specialized Sub-Agents
-   - Task Classification
-   - Multi-Agent Collaboration
-   - Summary
-
-3. **バージョンコメントを更新**
-   ```markdown
-   <!-- VERSION: 2 -->
-   ```
-
-4. **plugin.jsonのバージョンをインクリメント**
-   - MINOR版を上げる（機能追加・変更）
-   - PATCH版を上げる（ドキュメント修正のみ）
-
-5. **Serenaメモリーを更新**
-
-6. **コミット**
-
-## plugin.jsonの管理
-
-### 必須フィールド
-
-```json
-{
-  "name": "ndf",
-  "version": "2.0.0",
-  "description": "Integrated plugin with specialized agents, workflow commands, skills, and Slack notifications",
-  "author": {
-    "name": "takemi-ohama",
-    "url": "https://github.com/takemi-ohama"
-  },
-  "keywords": ["mcp", "bigquery", "notion", ...],
-  "commands": ["./commands/serena.md", ...],
-  "agents": ["./agents/data-analyst.md", ...]
-}
+**スキルのフロントマター:**
+```yaml
+---
+name: skill-name
+description: "スキルの説明"
+argument-hint: "[引数のヒント]"          # オプション
+disable-model-invocation: true           # true=手動呼出のみ、false=Claude自動呼出可
+user-invocable: true                     # false=/メニューから非表示
+allowed-tools:
+  - Bash
+  - Read
+---
 ```
 
-### バージョン更新ルール
+### 新しいサブエージェントの追加
 
-**MAJOR（破壊的変更）**:
-- APIの非互換変更
-- 既存機能の削除
-- 設定ファイル形式の変更
+1. `agents/{agent-name}.md` を作成（YAMLフロントマター必須）
+2. `plugin.json` の `agents` 配列に追加
+3. `CLAUDE.ndf.md` のエージェント一覧を更新
+4. バージョンMINOR上げ → Serenaメモリー更新 → テスト・コミット
 
-**MINOR（新機能）**:
-- 新しいサブエージェントの追加
-- 新しいコマンドの追加
-- 新しいMCPサーバーの追加
-- 後方互換性のある機能追加
+### MCPサーバーの追加・更新
 
-**PATCH（バグフィックス）**:
-- バグ修正
-- ドキュメント修正
-- 既存機能の改善（動作変更なし）
+1. `.mcp.json` の `mcpServers` に追加
+2. README.mdに説明追加
+3. バージョン更新 → Serenaメモリー更新 → テスト・コミット
 
-### バージョン更新手順
+### フックの追加・更新
 
-1. **plugin.jsonのversionフィールドを更新**
+1. `hooks/hooks.json` を編集
+2. スクリプトは `scripts/` に配置（`CLAUDE_PLUGIN_ROOT`環境変数利用）
+3. バージョン更新 → テスト・コミット
 
-2. **関連ドキュメントのバージョン参照を更新**
-   - README.md
-   - CLAUDE.ndf.md
+## 検証チェックリスト
 
-3. **Serenaメモリーを更新**
-   ```bash
-   mcp__plugin_serena_serena__edit_memory memory_file_name="plugin-ndf.md" needle="**バージョン:** 1.0.X" repl="**バージョン:** 1.0.Y" mode="literal"
-   ```
-
-4. **コミット**
-
-## Serenaメモリーの管理
-
-### メモリーファイル: plugin-ndf.md
-
-**含まれる情報**:
-- プラグイン概要
-- バージョン情報
-- 重要な変更履歴
-- ディレクトリ構造
-- 機能一覧（MCP、コマンド、エージェント、フック）
-- 環境変数
-- トラブルシューティング
-- 設計の利点
-
-### メモリー更新のタイミング
-
-- サブエージェント追加・削除
-- コマンド追加・削除
-- MCPサーバー追加・削除
-- バージョン更新
-- 重要な設計変更
-
-### メモリー更新方法
-
-```bash
-# 部分的な更新（推奨）
-mcp__plugin_serena_serena__edit_memory \
-  memory_file_name="plugin-ndf.md" \
-  needle="old text" \
-  repl="new text" \
-  mode="literal"
-
-# 全体の再作成（大規模変更時）
-mcp__plugin_serena_serena__write_memory \
-  memory_file_name="plugin-ndf.md" \
-  content="完全な新しい内容"
-```
-
-## テストとデバッグ
-
-### ローカルテスト
-
-```bash
-# マーケットプレイスを追加（ローカルパス）
-/plugin marketplace add /work/ai-plugins
-
-# プラグインをインストール
-/plugin install ndf@ai-plugins
-
-# プラグインを再読み込み（開発中）
-/plugin reload ndf
-
-# エージェントが認識されているか確認
-/help agents
-
-# コマンドが認識されているか確認
-/help commands
-```
-
-### 検証チェックリスト
-
-- [ ] plugin.jsonが有効なJSON形式
-- [ ] バージョン番号が適切にインクリメントされている
-- [ ] すべてのコマンドファイルが存在する
-- [ ] すべてのエージェントファイルが存在する
+- [ ] plugin.jsonが有効なJSON
+- [ ] バージョン番号が適切にインクリメント
+- [ ] すべてのスキル/エージェントファイルが存在
 - [ ] YAMLフロントマターが正しい
-- [ ] .mcp.jsonが有効なJSON形式
-- [ ] 環境変数のドキュメントが完全
-- [ ] README.mdが最新
-- [ ] CLAUDE.ndf.mdが最新
+- [ ] .mcp.jsonが有効なJSON
+- [ ] README.md / CLAUDE.ndf.md が最新
 - [ ] Serenaメモリーが更新されている
 
 ## トラブルシューティング
 
-### よくある問題
-
-**Q: エージェントが認識されない**
-- A: plugin.jsonのagents配列を確認
-- A: ファイルパスが正しいか確認（相対パス）
-- A: YAMLフロントマターの構文を確認
-
-**Q: コマンドが表示されない**
-- A: plugin.jsonのcommands配列を確認
-- A: ファイルパスが正しいか確認
-- A: プラグインを再読み込み（/plugin reload ndf）
-
-**Q: MCPサーバーが起動しない**
-- A: .mcp.jsonの構文を確認
-- A: コマンドパスが正しいか確認
-- A: 環境変数が設定されているか確認
-- A: Claude Codeを再起動
-
-**Q: フックが動作しない**
-- A: hooks/hooks.jsonの構文を確認
-- A: スクリプトの実行権限を確認
-- A: CLAUDE_PLUGIN_ROOT環境変数を確認
-
-## ベストプラクティス
-
-### DO（推奨）
-
-✅ **変更前にSerenaメモリーで現状を確認**
-✅ **Serenaで構造を理解してから編集**
-✅ **セマンティックバージョニングに厳密に従う**
-✅ **すべての変更をドキュメント化**
-✅ **Serenaメモリーを必ず更新**
-✅ **変更後にローカルテスト**
-✅ **PRの説明を詳細に記述**
-
-### DON'T（非推奨）
-
-❌ **メモリーを確認せずに変更開始**
-❌ **ファイル全体を無闇に読み込む**
-❌ **バージョン更新を忘れる**
-❌ **ドキュメント更新をスキップ**
-❌ **Serenaメモリー更新をスキップ**
-❌ **テストをスキップ**
-❌ **mainブランチに直接コミット**
-
-## セキュリティ
-
-### 禁止事項
-
-❌ **絶対にコミットしてはいけないもの**:
-- APIトークン、パスワード
-- SLACK_BOT_TOKEN、GITHUB_PERSONAL_ACCESS_TOKEN等の実際の値
-- 認証情報
-- 秘密鍵
-
-### 推奨事項
-
-✅ **実施すべきこと**:
-- 環境変数で認証情報を管理
-- ドキュメントで環境変数の設定方法を説明
-- テンプレートには`your-token-here`等のプレースホルダーを使用
-- .gitignoreに.envファイルを追加
-
-## 参考リンク
-
-- [Claude Codeプラグイン開発](https://docs.claude.com/en/docs/claude-code)
-- [プラグインマーケットプレイス](https://code.claude.com/docs/ja/plugin-marketplaces)
-- [MCP仕様](https://modelcontextprotocol.io)
-- [Serena MCP](https://github.com/oraios/serena)
+| 問題 | 対処 |
+|------|------|
+| エージェントが認識されない | plugin.jsonのagents配列、ファイルパス、YAMLフロントマターを確認 |
+| スキル/コマンドが表示されない | plugin.jsonのskills配列、SKILL.mdのフロントマターを確認、`/plugin reload ndf` |
+| MCPサーバーが起動しない | .mcp.jsonの構文、コマンドパス、環境変数を確認 |
+| フックが動作しない | hooks.jsonの構文、スクリプト実行権限、CLAUDE_PLUGIN_ROOTを確認 |
 
 ## 開発履歴
 
-### v2.0.0 (最新)
-- **破壊的変更**: GitHub MCP, Serena MCP, Context7 MCPを公式プラグインに移行
-- directorサブエージェントを削除（Claude Code組み込み機能と重複）
-- director-project-planning, qa-code-review-checklistスキルを削除
-- MCP: 10個→7個、エージェント: 6個→5個、スキル: 10個→8個
+### v2.7.0
+- commandsをskillsに統合（Claude Code 2.1.3対応）
+- `commands/`ディレクトリ廃止、全9コマンドを`skills/`に移行
+- `serena-memory-strategy`スキル追加（init-memory-strategyフック廃止）
+- Skills: 14個→23個（ワークフロー9個 + モデル起動型14個）
 
-### v1.2.1
-- MCP設定簡略化とディレクトリ再構成
-- devtoolsディレクトリの削除
-- researchディレクトリをdocsに移動
+### v2.6.0
+- NDFプラグインのMCP構成を最適化し個別プラグイン化
 
-### v1.2.0
-- Claude Code Skills導入（10個のモデル起動型機能モジュール）
+### v2.5.0
+- スキル分割改修とProgressive Disclosure実装
+- directorエージェントをClaude Code機能活用の指揮者として再定義
 
-### v1.0.6
-- directorサブエージェント追加
-- Main Agent責務をdirectorに移譲
-- CLAUDE_plugin.md → CLAUDE.ndf.mdにリネーム
-
-### v1.0.5
-- 細かいバグフィックスとドキュメント改善
-
-### v1.0.1
-- 3つのプラグインを統合（mcp-integration、install-slack-hook、workflow-commands）
-- マーケットプレイスをNDF単一プラグインに整理
-
-### v1.0.0
-- 初期リリース
+### v2.0.0
+- GitHub MCP, Serena MCP, Context7 MCPを公式プラグインに移行
