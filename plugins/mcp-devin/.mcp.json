@@ -1,11 +1,5 @@
 {
   "mcpServers": {
-    "deepwiki": {
-      "type": "http",
-      "url": "https://mcp.deepwiki.com/mcp",
-      "env": {},
-      "envFile": "${workspaceFolder}/.env"
-    },
     "devin": {
       "type": "http",
       "url": "https://mcp.devin.ai/mcp",

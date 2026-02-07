@@ -135,7 +135,7 @@ allowed-tools:
 
 ### v2.8.0
 - `deepwiki-transfer`スキル追加（DeepWikiコンテンツのMarkdown転載）
-- `mcp-deepwiki`プラグイン追加（DeepWiki MCP HTTPトランスポート）
+- `mcp-devin`プラグイン追加（DeepWiki MCP HTTPトランスポート）
 - Skills: 23個→24個（ワークフロー10個 + モデル起動型14個）
 
 ### v2.7.0
