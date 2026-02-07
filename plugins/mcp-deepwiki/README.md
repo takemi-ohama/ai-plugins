@@ -52,7 +52,11 @@ mcp__plugin_mcp-deepwiki__deepwiki__ask_question "owner/repo" "How does authenti
 ### CLIで直接追加する場合
 
 ```bash
+# パブリックリポジトリ用（認証不要）
 claude mcp add -s user -t http deepwiki https://mcp.deepwiki.com/mcp
+
+# プライベートリポジトリ用（DEVIN_API_KEY必要）
+claude mcp add -s user -t http devin https://mcp.devin.ai/mcp --header "Authorization: Bearer $DEVIN_API_KEY"
 ```
 
 ## 推奨される使用シーン
@@ -74,10 +78,19 @@ Task(
 )
 ```
 
+## MCPサーバー構成
+
+本プラグインは2つのMCPサーバーを提供します：
+
+| サーバー名 | エンドポイント | 認証 | 用途 |
+|-----------|---------------|------|------|
+| `deepwiki` | `https://mcp.deepwiki.com/mcp` | 不要 | パブリックリポジトリ |
+| `devin` | `https://mcp.devin.ai/mcp` | `Authorization: Bearer {DEVIN_API_KEY}` | プライベートリポジトリ |
+
 ## 注意事項
 
-- パブリックリポジトリは認証不要で利用可能
-- プライベートリポジトリは `DEVIN_API_KEY` が必要（`/ndf:deepwiki-transfer` スキルの `fetch_wiki.py` 経由で利用）
+- パブリックリポジトリは `deepwiki` サーバーで認証不要で利用可能
+- プライベートリポジトリは `devin` サーバーで `DEVIN_API_KEY` が必要
 - HTTPトランスポートを使用しています（Devin公式のDeepWiki MCPサーバー）
 - レート制限がある場合があります
 
