@@ -44,6 +44,11 @@
       "name": "mcp-notion",
       "source": "./plugins/mcp-notion",
       "description": "Notion MCP server for note management and knowledge base operations"
+    },
+    {
+      "name": "mcp-devin",
+      "source": "./plugins/mcp-devin",
+      "description": "Devin MCP server for accessing repository documentation and code knowledge via DeepWiki"
     }
   ]
 }

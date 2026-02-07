@@ -1,6 +1,6 @@
 {
   "name": "ndf",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "description": "Integrated plugin with specialized agents, workflow commands, and skills. Includes Serena and Codex MCP servers. Additional MCPs available as separate plugins.",
   "author": {
     "name": "takemi-ohama",
@@ -38,6 +38,7 @@
     "./skills/serena-memory-strategy",
     "./skills/python-execution",
     "./skills/docker-container-access",
-    "./skills/skill-development"
+    "./skills/skill-development",
+    "./skills/deepwiki-transfer"
   ]
 }
