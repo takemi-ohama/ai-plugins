@@ -1,0 +1,10 @@
+{
+  "name": "mcp-deepwiki",
+  "version": "1.0.0",
+  "description": "DeepWiki MCP server for accessing public repository documentation and code knowledge",
+  "author": {
+    "name": "takemi-ohama",
+    "url": "https://github.com/takemi-ohama"
+  },
+  "keywords": ["mcp", "deepwiki", "documentation", "repository", "wiki", "code-knowledge"]
+}

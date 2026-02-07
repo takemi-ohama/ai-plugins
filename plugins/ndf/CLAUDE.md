@@ -9,7 +9,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 2.7.0
+- **現在バージョン**: 2.8.0
 - **種類**: 統合プラグイン（MCP + Skills + Agents + Hooks）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -38,8 +38,8 @@ plugins/ndf/
 │   ├── researcher.md
 │   ├── scanner.md
 │   └── qa.md
-├── skills/                      # スキル（23個）
-│   ├── pr/                      # ワークフロー系（9個、/ndf:* で呼出）
+├── skills/                      # スキル（24個）
+│   ├── pr/                      # ワークフロー系（10個、/ndf:* で呼出）
 │   ├── pr-tests/
 │   ├── fix/
 │   ├── review/
@@ -48,6 +48,7 @@ plugins/ndf/
 │   ├── serena/
 │   ├── mem-review/
 │   ├── mem-capture/
+│   ├── deepwiki-transfer/
 │   ├── data-analyst-sql-optimization/  # モデル起動型（14個）
 │   ├── data-analyst-export/
 │   ├── corder-code-templates/
@@ -131,6 +132,11 @@ allowed-tools:
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限、CLAUDE_PLUGIN_ROOTを確認 |
 
 ## 開発履歴
+
+### v2.8.0
+- `deepwiki-transfer`スキル追加（DeepWikiコンテンツのMarkdown転載）
+- `mcp-deepwiki`プラグイン追加（DeepWiki MCP HTTPトランスポート）
+- Skills: 23個→24個（ワークフロー10個 + モデル起動型14個）
 
 ### v2.7.0
 - commandsをskillsに統合（Claude Code 2.1.3対応）

@@ -1,6 +1,6 @@
 <!-- NDF_PLUGIN_GUIDE_START_8k3jf9s2n4m5p7q1w6e8r0t2y4u6i8o -->
 <!-- VERSION: 11 -->
-# NDF Plugin Guide (v2.7.0)
+# NDF Plugin Guide (v2.8.0)
 
 ## ポリシー
 
@@ -43,11 +43,11 @@ Task toolで `subagent_type="ndf:{name}"` として起動。
 - Main Agentが報告に基づきサブエージェントを起動する
 - 中〜大規模タスクでは計画を `issues/` `docs/` `specs/` に保存する
 
-## Skills（23個）
+## Skills（24個）
 
 すべてのスキルは `skills/` ディレクトリに統合。スラッシュコマンド（`/ndf:*`）もスキルとして実装。
 
-### ワークフロースキル（9個） - ユーザー手動呼出
+### ワークフロースキル（10個） - ユーザー手動呼出
 
 | スキル | 用途 |
 |--------|------|
@@ -60,6 +60,7 @@ Task toolで `subagent_type="ndf:{name}"` として起動。
 | `/ndf:serena` | 開発履歴・知見の記録 |
 | `/ndf:mem-capture` | タスク終了時のSerena memory保存 |
 | `/ndf:mem-review` | 中期memoryのコミット数ベース自動レビュー |
+| `/ndf:deepwiki-transfer` | DeepWikiコンテンツをMarkdownファイルとして転載 |
 
 ### モデル起動型スキル（14個） - Claude自動活用
 
