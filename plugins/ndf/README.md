@@ -7,12 +7,11 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 このプラグイン1つで、以下の**すべて**の機能を利用できます：
 
 1. **コアMCP**: 2個のMCPサーバー（Serena、Codex CLI）
-2. **開発ワークフロー**: 9つのコマンド（PR作成、Test Plan自動実行、レビュー、修正対応、マージ、ブランチクリーンアップ、Memory管理）
+2. **Skills**: 23個（ワークフロー9個 + モデル起動型14個）
 3. **専門エージェント**: 6つの特化型AIエージェント（**director指揮者**、データ分析、コーディング、調査、ファイル読み取り、品質管理）
-4. **Skills**: 13個のモデル起動型機能モジュール（SQL最適化、コードテンプレート、テスト生成、Python実行環境判定、Dockerコンテナアクセス、Skill開発、PDF解析、Markdown文書作成、記憶戦略等）
-5. **自動フック**: Slack通知
+4. **自動フック**: Slack通知
 
-> **Note (v2.6.0)**: NDFプラグインはコアMCP（Serena、Codex）のみを含みます。追加のMCP（BigQuery、Chrome DevTools、AWS Docs、DBHub、Notion）は個別プラグインとしてインストール可能です。**directorエージェント**がClaude Code機能を活用する指揮者として機能します。
+> **Note (v2.7.0)**: commandsとskillsが統合されました。全ワークフロー（`/ndf:pr`等）はskillsとして実装されています。追加のMCP（BigQuery、Chrome DevTools、AWS Docs、DBHub、Notion）は個別プラグインとしてインストール可能です。
 
 ## インストール
 
@@ -208,7 +207,7 @@ SLACK_CHANNEL_ID="C0123456789"
 SLACK_USER_MENTION="<@U0123456789>"  # オプション
 ```
 
-**⚠️ セキュリティ注意:**
+**セキュリティ注意:**
 - Bot Tokenは絶対にGitにコミットしない
 - トークンが漏洩した場合は即座に無効化（Revoke）
 - 最小限の権限（Scope）のみを付与
@@ -218,6 +217,301 @@ SLACK_USER_MENTION="<@U0123456789>"  # オプション
 ### ステップ4: Claude Codeを再起動
 
 `.env` ファイルに値を入力したら、Claude Codeを再起動してMCPサーバーとフックをロードします。
+
+## 利用方法
+
+セットアップが完了したら、Claude Codeで自然言語でリクエストするだけです：
+
+```
+このリポジトリのオープンなPRを確認して
+```
+
+Claude Codeが自動的に適切なMCPツールを選択・利用します。
+
+また、ワークフロースキルをスラッシュコマンドで呼び出せます：
+
+```
+/ndf:pr
+/ndf:review 123
+/ndf:merged
+```
+
+## 機能詳細
+
+> **v2.7.0**: commandsとskillsが統合されました。ワークフロー（`/ndf:*`）もモデル起動型機能もすべてskillsとして実装されています。
+
+### 1. MCP統合 (2つのコアMCP)
+
+このプラグインは2つのコアMCPサーバーを統合しています。各MCPの詳細な使用方法やベストプラクティスは、エージェント向けガイド `plugins/ndf/CLAUDE.md` を参照してください。
+
+> **Note (v2.6.0)**: NDFプラグインはコアMCP（Serena、Codex）のみを含みます。その他のMCPは個別プラグインとして提供されています。
+
+**コアMCP（2つ）:**
+- ✅ **Serena MCP** - セマンティックコード操作、メモリー管理
+- ✅ **Codex CLI MCP** - コードレビュー、ファイル読み取り
+
+**個別プラグインとして提供（5つ）:**
+- 📦 **Chrome DevTools MCP** (`mcp-chrome-devtools`) - Web調査、パフォーマンステスト
+- 📦 **BigQuery MCP** (`mcp-bigquery`) - BigQueryデータ分析
+- 📦 **AWS Docs MCP** (`mcp-aws-docs`) - AWS公式ドキュメント検索
+- 📦 **DBHub MCP** (`mcp-dbhub`) - データベース操作
+- 📦 **Notion MCP** (`mcp-notion`) - Notionドキュメント管理
+
+> **Tip**: GitHub MCP、Context7 MCPは公式プラグインからインストールして使用してください：
+> ```bash
+> /plugin install github@anthropics/claude-plugins-official
+> /plugin install context7@anthropics/claude-plugins-official
+> ```
+
+#### 追加MCPのインストール方法
+
+必要に応じて個別のMCPプラグインをインストールできます：
+
+```bash
+# ブラウザ自動化とテスト
+/plugin install mcp-chrome-devtools@ai-plugins
+
+# データ分析
+/plugin install mcp-bigquery@ai-plugins
+
+# AWS公式ドキュメント調査
+/plugin install mcp-aws-docs@ai-plugins
+
+# データベース操作
+/plugin install mcp-dbhub@ai-plugins
+
+# Notion統合
+/plugin install mcp-notion@ai-plugins
+```
+
+各プラグインのインストール後、対応する環境変数を`.env`に設定してClaude Codeを再起動してください。
+
+**注意事項:**
+- 各MCPプラグインは独立しているため、必要なものだけをインストールできます
+- コンテキスト使用量を最適化するため、使わないMCPはインストールしないことを推奨します
+- 各プラグインの詳細な設定方法は、個別のREADMEを参照してください
+
+### 2. 専門エージェント (6種類)
+
+**重要**: このプラグインには`CLAUDE.ndf.md`が含まれており、メインエージェント（Claude）に対してサブエージェントの積極的な活用を促す指示が記載されています。
+
+**サブエージェントの活用方針:**
+- **複雑なタスクは`director`に委譲** - directorがMain Agentに報告し、Main Agentが他のエージェントを起動
+- **単純なタスクは専門エージェントに直接委譲**
+- **directorはMain Agentに報告する** - メモリエラー防止のため直接呼び出しは行わない
+
+詳細は `plugins/ndf/CLAUDE.ndf.md` を参照してください。
+
+#### `director` エージェント（指揮者）
+**専門領域:** タスク統括・設計立案・エージェント調整
+
+**特徴:**
+- **Main Agentに報告** - 必要なエージェントをMain Agentに報告し、Main Agentがサブエージェントを起動（メモリエラー防止）
+- Claude Code機能（Plan Mode、Explore Agent、TodoWrite）を活用
+- タスク規模に応じた適切な対応（小規模→直接処理、大規模→Plan Mode）
+- Main agentのコンテキスト消費を最小化
+- **計画・調査結果をファイルに保存** - 途中停止からの復帰を可能に
+
+**機能:**
+- タスク分析と規模判定（小/中/大）
+- 複数エージェントの並列/順次実行の計画立案
+- 進捗管理（TodoWrite）
+- 設計計画の策定と**ファイル保存**（`issues/`, `docs/`, `specs/`）
+- **Main Agentへの報告** - 必要なエージェントと実行順序を明示
+
+**使用例:**
+```
+@director ユーザー認証機能を追加してください。ベストプラクティスを調査し、実装してセキュリティレビューも行ってください
+```
+→ directorが調査・計画後、Main Agentに「researcher → corder → qaの順次実行が必要」と報告
+→ Main Agentが報告に基づきエージェントを起動
+
+#### `data-analyst` エージェント
+**専門領域:** データ分析とSQL操作
+
+**使用MCPツール:**
+- BigQuery MCP
+- DBHub MCP
+
+**機能:**
+- SQL生成と実行
+- クエリ結果の分析と解釈
+- データの傾向とパターン発見
+- CSV/JSON/Excel形式でのデータ出力
+- レポート生成とデータ可視化の準備
+
+**使用例:**
+```
+@data-analyst BigQueryで過去1ヶ月の売上データを分析してください
+```
+
+#### `corder` エージェント
+**専門領域:** 高品質コード生成
+
+**使用MCPツール:**
+- Codex CLI MCP（コードレビュー）
+
+> **Note (v2.0.0)**: Serena MCP、Context7 MCPは公式プラグインに移行しました。これらは引き続きcorderエージェントで使用可能ですが、別途インストールが必要です。
+
+**機能:**
+- クリーンで読みやすいコードの作成
+- 設計パターンとアーキテクチャの適用
+- AIによるコードレビューと品質保証
+- セキュリティ脆弱性のチェック
+- リファクタリング提案
+
+**使用例:**
+```
+@corder ユーザー認証機能を実装してください。セキュリティとテストも考慮して
+```
+
+#### `researcher` エージェント
+**専門領域:** 情報収集と分析
+
+**使用MCPツール:**
+- Codex CLI MCP（コードベース分析）
+- AWS Documentation MCP（AWS公式ドキュメント）
+- Chrome DevTools MCP（Webスクレイピング）
+
+**機能:**
+- 技術ドキュメントの調査と要約
+- Webサイトからの情報収集
+- コードベースのアーキテクチャ分析
+- 複数ソースからの情報統合
+- スクリーンショットとPDF取得
+
+**使用例:**
+```
+@researcher AWS Lambda関数のベストプラクティスを調査してください
+```
+
+#### `scanner` エージェント
+**専門領域:** ファイル読み取りとOCR
+
+**使用MCPツール:**
+- Codex CLI MCP（ファイル読み取り）
+
+**機能:**
+- PDFドキュメントのテキスト抽出
+- 画像内のテキスト認識（OCR）
+- PowerPoint/Excelファイルの読み取り
+- 読み取った内容の構造化
+- Markdown/CSV/JSON形式への変換
+
+**使用例:**
+```
+@scanner document.pdfの内容を読み取って要約してください
+```
+
+#### `qa` エージェント
+**専門領域:** 品質管理とテスト
+
+**使用MCPツール:**
+- Codex CLI MCP（コードレビュー、セキュリティチェック）
+- Serena MCP（コードベース分析）
+- Chrome DevTools MCP（パフォーマンステスト）
+- Claude Code MCP（プラグイン品質検証）
+
+**機能:**
+- コード品質レビューとリファクタリング提案
+- セキュリティ脆弱性検出（OWASP Top 10対応）
+- パフォーマンステスト（Core Web Vitals評価）
+- テストカバレッジとエッジケース検証
+- ドキュメント品質チェック
+- Claude Codeプラグイン仕様準拠確認
+
+**使用例:**
+```
+@qa このコードの品質とセキュリティをレビューしてください
+@qa Webアプリケーションのパフォーマンスを測定してください
+@qa プラグインがClaude Code仕様に準拠しているか確認してください
+```
+
+### 3. ワークフロースキル（9個）
+
+開発の各段階で使用するスキル群です。`/ndf:*` のスラッシュコマンドで呼び出します。
+
+| スキル | 用途 | 引数 |
+|--------|------|------|
+| `/ndf:serena` | Serena MCPで開発記憶を記録 | - |
+| `/ndf:pr` | commit, push, PR作成を一括実行 | `[base-branch]` |
+| `/ndf:pr-tests` | PRのTest Planを自動実行 | `[PR番号]` |
+| `/ndf:review` | PRをレビューしApprove/Request Changes判定 | `[PR番号]` |
+| `/ndf:fix` | PRレビューコメントの修正対応 | `[PR番号]` |
+| `/ndf:merged` | PRマージ後のローカルブランチクリーンアップ | `[PR番号]` |
+| `/ndf:clean` | マージ済みブランチの一括削除 | - |
+| `/ndf:mem-review` | 中期memoryのコミット数ベース自動レビュー | `[--threshold N]` |
+| `/ndf:mem-capture` | タスク終了時の知見をSerena memoryに保存 | `[--project NAME] [--type TYPE]` |
+
+<details>
+<summary><strong>mem-review / mem-capture の詳細</strong></summary>
+
+**`/ndf:mem-review`** - 中期Serena memoryをコミット数ベースでレビュー
+
+`.serena/memories/` の中期memory（`review_after_commits`付き）をチェックし、延長・長期化・更新・アーカイブ・削除の選択肢を提示します。
+
+```bash
+/ndf:mem-review                    # レビュー対象をチェック
+/ndf:mem-review --threshold 10     # 閾値を指定
+```
+
+**`/ndf:mem-capture`** - タスク終了時の知見をSerena memoryに保存
+
+判断・前提・制約をMemoryに保存。手順や実装詳細は保存しません。
+
+```bash
+/ndf:mem-capture --project myproject --type decision
+/ndf:mem-capture --project global --type principle --long
+/ndf:mem-capture --append .serena/memories/existing-memory.md
+```
+
+**推奨レビュー設定:** low→10コミット、medium→20コミット、high→30コミット
+
+</details>
+
+### 4. モデル起動型スキル（14個）
+
+Claudeが自律的に判断して起動するスキルです。自然言語リクエストに応じて自動的に活用されます。
+
+| カテゴリ | スキル名 | 概要 |
+|---------|---------|------|
+| Data Analyst | `data-analyst-sql-optimization` | SQL最適化パターン（N+1、INDEX、JOIN） |
+| | `data-analyst-export` | CSV/JSON/Excel/Markdownエクスポート |
+| Corder | `corder-code-templates` | REST API、React、DB、認証のテンプレート |
+| | `corder-test-generation` | ユニット/統合テスト自動生成（AAA） |
+| Researcher | `researcher-report-templates` | 調査レポートテンプレート |
+| Scanner | `scanner-pdf-analysis` | PDF解析・テーブル抽出 |
+| | `scanner-excel-extraction` | Excelデータ抽出・変換 |
+| QA | `qa-security-scan` | OWASP Top 10セキュリティスキャン |
+| Docs | `markdown-writing` | Markdown文書作成（mermaid/plantUML） |
+| Memory | `memory-handling` | Serena memory読み書きルール |
+| | `serena-memory-strategy` | Serena memoryの分類・メタデータ・レビュー戦略 |
+| Common | `python-execution` | Python実行環境の自動判定 |
+| | `docker-container-access` | Dockerコンテナアクセス判定 |
+| | `skill-development` | Skill開発ベストプラクティス |
+
+### 5. 自動フック
+
+Claude Codeの起動時と終了時に自動的に以下が実行されます：
+
+#### Stop: Slack通知
+
+作業終了時にSlackへ要約通知を送信します（`SLACK_BOT_TOKEN`設定時のみ）。
+
+**機能:**
+- Claude Codeとのやり取りをAIが自動要約（40文字）
+- Claude CLI + `--no-session-persistence`を使用（要約生成時に追加のセッションログを作成しない）
+- Claude Codeの認証設定を自動継承（API KeyでもBedrockでも対応）
+- 会話履歴、transcriptから最適な情報源を自動選択
+- リポジトリ名とタイムスタンプも含めて通知
+
+**設定:**
+- `.env`に`SLACK_BOT_TOKEN`、`SLACK_CHANNEL_ID`、`SLACK_USER_MENTION`を設定
+- 詳細な設定手順は上記の[SLACK_BOT_TOKENとSLACK_CHANNEL_IDの設定方法](#各認証情報の詳細設定)を参照
+- 設定後、Claude Codeを再起動で有効化
+
+**注意:**
+- プラグイン更新後も再起動が必要です
 
 ## 環境変数リファレンス
 
@@ -391,450 +685,6 @@ DSN形式の詳細については、各プラグインのREADMEを参照して�
 - ❌ トークンをコードやドキュメントにコミットしない
 - ❌ トークンをSlack/メール等で平文送信しない
 
-## 機能詳細
-
-### 1. 開発ワークフローコマンド
-
-開発の各段階で使用するコマンド群です。効率的なワークフローを実現します。
-
-#### `/serena`
-**用途:** Serena MCPを使用した開発記憶（メモリー）の記録  
-**使用タイミング:** 重要な実装内容や設計判断を記録したいとき
-
-#### `/pr`
-**用途:** 現在のブランチから自動的にプルリクエストを作成
-**使用タイミング:** 機能実装やバグ修正が完了し、レビューを依頼したいとき
-コミット履歴とdiffを分析し、適切なPR説明を自動生成します。
-
-#### `/pr-tests` ⭐ NEW in v2.3.0
-**用途:** `/pr`コマンドで作成されたPRのTest Planを自動実行
-**使用タイミング:** PRが作成された後、Test Planの項目を自動でテストしたいとき
-PRの本文に記載されたTest Plan（チェックリスト形式）を読み取り、各テスト項目を自動で実行します。成功したテストにはチェックマークを付け、失敗したテストについてはコードを修正またはコメントを追加します。
-
-**引数:**
-- PR番号（オプション）: 指定しない場合は現在のブランチから自動検出
-
-**使用例:**
-```bash
-# 現在のブランチのPRをテスト
-/ndf:pr-tests
-
-# 特定のPR番号を指定
-/ndf:pr-tests 123
-```
-
-#### `/review`
-**用途:** 指定されたPRの内容をレビュー  
-**使用タイミング:** 他の開発者のPRをレビューする必要があるとき  
-コード品質、セキュリティ、ベストプラクティスの観点から包括的にレビューします。
-
-#### `/fix`
-**用途:** PRのレビューコメントを確認し、指摘事項に対応  
-**使用タイミング:** PRにレビューコメントが付いたとき  
-レビュー内容を分析し、必要な修正を実施してコミット・プッシュします。
-
-#### `/merged`
-**用途:** PRマージ後のローカルブランチクリーンアップ  
-**使用タイミング:** 自分が作成したPRがマージされた直後  
-mainブランチを更新し、マージ済みのfeatureブランチを安全に削除します。
-
-#### `/clean`
-**用途:** マージ済みの古いブランチを一括クリーンアップ
-**使用タイミング:** ローカルに不要なブランチが溜まってきたとき
-リモートで削除済みのブランチをローカルからも削除します。
-
-#### `/mem-review` ⭐ NEW in v2.4.0
-**用途:** 中期Serena memory（review_after_commits付き）をコミット数ベースで自動レビュー
-**使用タイミング:** 開発活動量に応じて記憶をレビューし、延長・長期化・アーカイブ・削除を判断したいとき
-`.serena/memories/`にある中期memoryのレビュー条件（review_after_commits）をチェックし、レビューが必要なメモリーをリストアップします。各メモリーに対して延長、長期化、更新、アーカイブ、削除の選択肢を提示します。
-
-**コミット数ベースの利点:**
-- 開発が活発な時期: 頻繁にレビュー
-- 開発が停滞している時期: 無駄なレビューを回避
-- プロジェクトの実際の活動量に応じた自動調整
-
-**引数:**
-- `--threshold N`: 「レビュー間近」とみなすコミット数の閾値（デフォルト5コミット）
-- `--dir PATH`: memoryディレクトリ（デフォルト `.serena/memories`）
-
-**使用例:**
-```bash
-# レビューが必要なmemoryをチェック
-/ndf:mem-review
-
-# 閾値を指定（10コミット以内をレビュー間近とする）
-/ndf:mem-review --threshold 10
-```
-
-#### `/mem-capture` ⭐ NEW in v2.4.0
-**用途:** タスク終了時に、再利用価値のある知見をSerena memoryとして保存
-**使用タイミング:** 重要な意思決定や前提条件を記録したいとき
-判断・前提・制約をMemoryに保存し、Skillを肥大化させないようにします。手順や実装詳細は保存しません。コミット数ベースでレビュー時期を管理します。
-
-**引数:**
-- `--project NAME`: プロジェクト名
-- `--type TYPE`: decision/assumption/experiment/principle/constraint/policy
-- `--review-after N`: レビューまでのコミット数（中期memoryの場合）
-- `--long`: 長期memory（原則）として保存
-- `--append FILE`: 既存memoryに追記
-
-**推奨レビュー設定:**
-- 実験的な決定（confidence: low）: 10コミット
-- 通常の決定（confidence: medium）: 20コミット
-- 重要な決定（confidence: high）: 30コミット
-
-**使用例:**
-```bash
-# 中期memoryとして記録（20コミット後レビュー）
-/ndf:mem-capture --project myproject --type decision
-
-# 実験的な決定（10コミット後レビュー）
-/ndf:mem-capture --project myproject --type experiment --review-after 10
-
-# 長期memory（原則）として保存
-/ndf:mem-capture --project global --type principle --long
-
-# 既存memoryに追記
-/ndf:mem-capture --append .serena/memories/2025-01-15-myproject-api-design.md
-```
-
-### 3. 専門エージェント (6種類)
-
-**重要**: このプラグインには`CLAUDE.ndf.md`が含まれており、メインエージェント（Claude）に対してサブエージェントの積極的な活用を促す指示が記載されています。
-
-**サブエージェントの活用方針:**
-- **複雑なタスクは`director`に委譲** - directorがMain Agentに報告し、Main Agentが他のエージェントを起動
-- **単純なタスクは専門エージェントに直接委譲**
-- **directorはMain Agentに報告する** - メモリエラー防止のため直接呼び出しは行わない
-
-詳細は `plugins/ndf/CLAUDE.ndf.md` を参照してください。
-
-#### `director` エージェント（指揮者）⭐ NEW in v2.1.0
-**専門領域:** タスク統括・設計立案・エージェント調整
-
-**特徴:**
-- **Main Agentに報告** - 必要なエージェントをMain Agentに報告し、Main Agentがサブエージェントを起動（メモリエラー防止）
-- Claude Code機能（Plan Mode、Explore Agent、TodoWrite）を活用
-- タスク規模に応じた適切な対応（小規模→直接処理、大規模→Plan Mode）
-- Main agentのコンテキスト消費を最小化
-- **計画・調査結果をファイルに保存** - 途中停止からの復帰を可能に
-
-**機能:**
-- タスク分析と規模判定（小/中/大）
-- 複数エージェントの並列/順次実行の計画立案
-- 進捗管理（TodoWrite）
-- 設計計画の策定と**ファイル保存**（`issues/`, `docs/`, `specs/`）
-- **Main Agentへの報告** - 必要なエージェントと実行順序を明示
-
-**使用例:**
-```
-@director ユーザー認証機能を追加してください。ベストプラクティスを調査し、実装してセキュリティレビューも行ってください
-```
-→ directorが調査・計画後、Main Agentに「researcher → corder → qaの順次実行が必要」と報告
-→ Main Agentが報告に基づきエージェントを起動
-
-#### `data-analyst` エージェント
-**専門領域:** データ分析とSQL操作
-
-**使用MCPツール:**
-- BigQuery MCP
-- DBHub MCP
-
-**機能:**
-- SQL生成と実行
-- クエリ結果の分析と解釈
-- データの傾向とパターン発見
-- CSV/JSON/Excel形式でのデータ出力
-- レポート生成とデータ可視化の準備
-
-**使用例:**
-```
-@data-analyst BigQueryで過去1ヶ月の売上データを分析してください
-```
-
-#### `corder` エージェント
-**専門領域:** 高品質コード生成
-
-**使用MCPツール:**
-- Codex CLI MCP（コードレビュー）
-
-> **Note (v2.0.0)**: Serena MCP、Context7 MCPは公式プラグインに移行しました。これらは引き続きcorderエージェントで使用可能ですが、別途インストールが必要です。
-
-**機能:**
-- クリーンで読みやすいコードの作成
-- 設計パターンとアーキテクチャの適用
-- AIによるコードレビューと品質保証
-- セキュリティ脆弱性のチェック
-- リファクタリング提案
-
-**使用例:**
-```
-@corder ユーザー認証機能を実装してください。セキュリティとテストも考慮して
-```
-
-#### `researcher` エージェント
-**専門領域:** 情報収集と分析
-
-**使用MCPツール:**
-- Codex CLI MCP（コードベース分析）
-- AWS Documentation MCP（AWS公式ドキュメント）
-- Chrome DevTools MCP（Webスクレイピング）
-
-**機能:**
-- 技術ドキュメントの調査と要約
-- Webサイトからの情報収集
-- コードベースのアーキテクチャ分析
-- 複数ソースからの情報統合
-- スクリーンショットとPDF取得
-
-**使用例:**
-```
-@researcher AWS Lambda関数のベストプラクティスを調査してください
-```
-
-#### `scanner` エージェント
-**専門領域:** ファイル読み取りとOCR
-
-**使用MCPツール:**
-- Codex CLI MCP（ファイル読み取り）
-
-**機能:**
-- PDFドキュメントのテキスト抽出
-- 画像内のテキスト認識（OCR）
-- PowerPoint/Excelファイルの読み取り
-- 読み取った内容の構造化
-- Markdown/CSV/JSON形式への変換
-
-**使用例:**
-```
-@scanner document.pdfの内容を読み取って要約してください
-```
-
-#### `qa` エージェント
-**専門領域:** 品質管理とテスト
-
-**使用MCPツール:**
-- Codex CLI MCP（コードレビュー、セキュリティチェック）
-- Serena MCP（コードベース分析）
-- Chrome DevTools MCP（パフォーマンステスト）
-- Claude Code MCP（プラグイン品質検証）
-
-**機能:**
-- コード品質レビューとリファクタリング提案
-- セキュリティ脆弱性検出（OWASP Top 10対応）
-- パフォーマンステスト（Core Web Vitals評価）
-- テストカバレッジとエッジケース検証
-- ドキュメント品質チェック
-- Claude Codeプラグイン仕様準拠確認
-
-**使用例:**
-```
-@qa このコードの品質とセキュリティをレビューしてください
-@qa Webアプリケーションのパフォーマンスを測定してください
-@qa プラグインがClaude Code仕様に準拠しているか確認してください
-```
-
-### 4. Skills (13種類) 🎯
-
-**Claude Code Skills**は、Claudeが自律的に判断して起動する**モデル起動型**の機能モジュールです。各サブエージェントは、タスク内容に応じて適切なSkillsを自動的に活用します。
-
-> **Note (v2.0.0)**: `director-project-planning`と`qa-code-review-checklist`は重複機能のため削除されました。プロジェクト計画にはClaude CodeのPlan Modeを、コードレビューチェックには公式プラグイン（`pr-review-toolkit`等）を使用してください。
-
-#### Skills一覧
-
-**Data Analyst Skills (2個):**
-- ⚡ **data-analyst-sql-optimization** - SQL最適化パターンとベストプラクティス
-  - N+1クエリ削減、インデックス活用、JOIN最適化
-  - Before/After実例集（8パターン）
-- 💾 **data-analyst-export** - クエリ結果を様々な形式でエクスポート
-  - CSV（UTF-8 BOM、Excel互換）、JSON、Excel（複数シート）、Markdownテーブル
-
-**Corder Skills (2個):**
-- 📝 **corder-code-templates** - コード生成テンプレート集
-  - REST APIエンドポイント（Express.js、FastAPI）
-  - Reactコンポーネント（Hooks、状態管理）
-  - データベースモデル（Sequelize、TypeORM、Mongoose）
-  - 認証ミドルウェア（JWT、OAuth）
-- 🧪 **corder-test-generation** - テストコード自動生成
-  - ユニットテスト（Jest、Mocha、pytest）
-  - AAA（Arrange-Act-Assert）パターン
-  - テストフィクスチャ・モック生成
-
-**Common Skills (3個):** ⭐ NEW in v2.5.0
-- 🐍 **python-execution** - Python実行環境の自動判定
-  - uv/venv/システムPythonの自動検出
-  - pyproject.toml、.venvの有無に基づく実行方法選択
-  - uvセットアップガイド、トラブルシューティング
-- 🐳 **docker-container-access** - Dockerコンテナアクセス方法の判定
-  - DinD/DooD環境の自動検出
-  - 環境に応じた接続方法（localhost vs コンテナ名）
-  - bind mountの注意点と代替手段
-- 📚 **skill-development** - Agent Skill開発ベストプラクティス
-  - SKILL.md構造とYAMLフロントマター
-  - Progressive Disclosure（多段階読み込み）
-  - allowed-toolsとトリガーキーワード設定
-
-**Researcher Skills (1個):**
-- 📊 **researcher-report-templates** - 調査レポートテンプレート集
-  - 構造化された調査レポート
-  - 技術比較テーブル
-  - ベストプラクティスまとめ
-  - エグゼクティブサマリー
-
-**Scanner Skills (2個):**
-- 📄 **scanner-pdf-analysis** - PDF解析とデータ抽出
-  - テキスト抽出、テーブル検出とCSV変換
-  - セクション・見出し識別、重要ポイント要約
-- 📊 **scanner-excel-extraction** - Excelデータ抽出と構造化
-  - 複数シート読み込み、JSON/CSV形式変換
-  - 数式評価、大容量ファイル対応
-
-**QA Skills (1個):**
-- 🔒 **qa-security-scan** - セキュリティスキャンと脆弱性評価
-  - OWASP Top 10チェックリスト（詳細な修正方法付き）
-  - 認証・認可テスト、データ保護確認
-
-**Documentation Skills (1個):**
-- 📝 **markdown-writing** - Markdown文書作成のルールとベストプラクティス
-  - mermaid/plantUMLによる図表作成（ASCII ART禁止）
-  - 文書の適切な分割（300行超の場合、順序prefix付きで分割）
-  - 構造化されたドキュメント作成ガイド
-
-**Memory Management Skills (1個):** ⭐ NEW in v2.4.0
-- 🧠 **memory-handling** - 記憶戦略の運用ルール
-  - Serena MCP Memoryの読み書きタイミングを定義
-  - Skillは薄く保ち、判断・前提・制約はMemoryに保存
-  - 中期/長期記憶の使い分け戦略
-  - 「Skillは行動の型、Memoryは判断・前提」の原則
-
-#### Skillsの使い方
-
-**自動起動（推奨）:**
-Claudeは自然言語リクエストから適切なSkillsを自動判断して起動します。
-
-```
-このSQLクエリを最適化してください
-→ data-analyst-sql-optimizationが自動起動
-
-REST APIのテンプレートを使ってエンドポイントを作成してください
-→ corder-code-templatesが自動起動
-
-セキュリティスキャンを実行してください
-→ qa-security-scanが自動起動
-```
-
-**トリガーキーワード例:**
-- "optimize SQL", "slow query", "SQL最適化"
-- "export data", "save results", "データ出力"
-- "create API", "new component", "コードテンプレート"
-- "generate tests", "create unit test", "テスト生成"
-- "analyze PDF", "extract tables", "PDF解析"
-- "security scan", "OWASP", "セキュリティスキャン"
-
-#### Skillsの特徴
-
-- **Model-invoked**: Claudeが自律的に判断して呼び出す
-- **Progressive Disclosure**: メインドキュメント≤500行、詳細はテンプレート/スクリプトに分離
-- **Sub-agent specialization**: 各サブエージェントの既存機能を補完
-- **Templates & Scripts**: 実用的なテンプレートとスクリプトを提供
-
-詳細は各Skillの`SKILL.md`を参照してください。
-
-### 2. MCP統合 (2つのコアMCP)
-
-このプラグインは2つのコアMCPサーバーを統合しています。各MCPの詳細な使用方法やベストプラクティスは、エージェント向けガイド `plugins/ndf/CLAUDE.md` を参照してください。
-
-> **Note (v2.6.0)**: NDFプラグインはコアMCP（Serena、Codex）のみを含みます。その他のMCPは個別プラグインとして提供されています。
-
-**コアMCP（2つ）:**
-- ✅ **Serena MCP** - セマンティックコード操作、メモリー管理
-- ✅ **Codex CLI MCP** - コードレビュー、ファイル読み取り
-
-**個別プラグインとして提供（5つ）:**
-- 📦 **Chrome DevTools MCP** (`mcp-chrome-devtools`) - Web調査、パフォーマンステスト
-- 📦 **BigQuery MCP** (`mcp-bigquery`) - BigQueryデータ分析
-- 📦 **AWS Docs MCP** (`mcp-aws-docs`) - AWS公式ドキュメント検索
-- 📦 **DBHub MCP** (`mcp-dbhub`) - データベース操作
-- 📦 **Notion MCP** (`mcp-notion`) - Notionドキュメント管理
-
-> **Tip**: GitHub MCP、Context7 MCPは公式プラグインからインストールして使用してください：
-> ```bash
-> /plugin install github@anthropics/claude-plugins-official
-> /plugin install context7@anthropics/claude-plugins-official
-> ```
-
-#### 追加MCPのインストール方法
-
-必要に応じて個別のMCPプラグインをインストールできます：
-
-```bash
-# ブラウザ自動化とテスト
-/plugin install mcp-chrome-devtools@ai-plugins
-
-# データ分析
-/plugin install mcp-bigquery@ai-plugins
-
-# AWS公式ドキュメント調査
-/plugin install mcp-aws-docs@ai-plugins
-
-# データベース操作
-/plugin install mcp-dbhub@ai-plugins
-
-# Notion統合
-/plugin install mcp-notion@ai-plugins
-```
-
-各プラグインのインストール後、対応する環境変数を`.env`に設定してClaude Codeを再起動してください。
-
-**注意事項:**
-- 各MCPプラグインは独立しているため、必要なものだけをインストールできます
-- コンテキスト使用量を最適化するため、使わないMCPはインストールしないことを推奨します
-- 各プラグインの詳細な設定方法は、個別のREADMEを参照してください
-
-### 3. 自動フック
-
-Claude Codeの起動時と終了時に自動的に以下が実行されます：
-
-#### SessionStart: Memory Strategy初期化 ⭐ NEW in v2.4.0
-
-セッション開始時に、記憶戦略ドキュメントを自動的に`.serena/memories/`に配置します。
-
-**機能:**
-- `.serena/memories/memory-strategy.md`が存在しない場合のみ作成
-- コミット数ベースのレビュー戦略を含む完全な記憶戦略を定義
-- Skill vs Memory の使い分け原則を明記
-- 中期/長期記憶のメタデータ定義
-
-**動作:**
-- 既に存在する場合はスキップ（上書きしない）
-- エラーが発生してもセッション起動を妨げない
-- セッション開始時に自動実行（手動操作不要）
-
-**記憶戦略の内容:**
-- Memory層の定義（短期/中期/長期）
-- コミット数ベースのレビュー戦略
-- Skill vs Memory の決定チェックリスト
-- アンチパターンとベストプラクティス
-
-#### Stop: Slack通知
-
-作業終了時にSlackへ要約通知を送信します（`SLACK_BOT_TOKEN`設定時のみ）。
-
-**機能:**
-- Claude Codeとのやり取りをAIが自動要約（40文字）
-- Claude CLI + `--no-session-persistence`を使用（要約生成時に追加のセッションログを作成しない）
-- Claude Codeの認証設定を自動継承（API KeyでもBedrockでも対応）
-- 会話履歴、transcriptから最適な情報源を自動選択
-- リポジトリ名とタイムスタンプも含めて通知
-
-**設定:**
-- `.env`に`SLACK_BOT_TOKEN`、`SLACK_CHANNEL_ID`、`SLACK_USER_MENTION`を設定
-- 詳細な設定手順は上記の[SLACK_BOT_TOKENとSLACK_CHANNEL_IDの設定方法](#各認証情報の詳細設定)を参照
-- 設定後、Claude Codeを再起動で有効化
-
-**注意:**
-- プラグイン更新後も再起動が必要です
-
 ## 推奨プラグイン併用
 
 ### affaan-m プラグイン
@@ -856,28 +706,10 @@ NDFプラグインと併用することで、以下の機能が追加されま�
 
 | プラグイン | 役割 |
 |-----------|------|
-| **NDFプラグイン** | MCP統合、ワークフロー、専門エージェント |
+| **NDFプラグイン** | MCP統合、スキル（23個）、専門エージェント |
 | **affaan-mプラグイン** | コンテキスト管理、品質保証、TDDワークフロー |
 
 詳細は[affaan-mプラグインREADME](../affaan-m/README.md)を参照してください。
-
-## 利用方法
-
-セットアップが完了したら、Claude Codeで自然言語でリクエストするだけです：
-
-```
-このリポジトリのオープンなPRを確認して
-```
-
-Claude Codeが自動的に適切なMCPツールを選択・利用します。
-
-また、スラッシュコマンドも利用可能：
-
-```
-/pr
-/review 123
-/merge
-```
 
 ## セキュリティのベストプラクティス
 

@@ -1,23 +1,12 @@
 {
   "name": "ndf",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Integrated plugin with specialized agents, workflow commands, and skills. Includes Serena and Codex MCP servers. Additional MCPs available as separate plugins.",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
   },
   "keywords": ["mcp", "bigquery", "notion", "database", "chrome-devtools", "codex", "workflow", "slack", "notifications", "agents", "skills", "director", "orchestrator"],
-  "commands": [
-    "./commands/serena.md",
-    "./commands/pr.md",
-    "./commands/pr-tests.md",
-    "./commands/fix.md",
-    "./commands/review.md",
-    "./commands/merged.md",
-    "./commands/clean.md",
-    "./commands/mem-review.md",
-    "./commands/mem-capture.md"
-  ],
   "agents": [
     "./agents/director.md",
     "./agents/data-analyst.md",
@@ -27,6 +16,15 @@
     "./agents/qa.md"
   ],
   "skills": [
+    "./skills/pr",
+    "./skills/pr-tests",
+    "./skills/fix",
+    "./skills/review",
+    "./skills/merged",
+    "./skills/clean",
+    "./skills/serena",
+    "./skills/mem-review",
+    "./skills/mem-capture",
     "./skills/data-analyst-sql-optimization",
     "./skills/data-analyst-export",
     "./skills/corder-code-templates",
@@ -37,6 +35,7 @@
     "./skills/qa-security-scan",
     "./skills/markdown-writing",
     "./skills/memory-handling",
+    "./skills/serena-memory-strategy",
     "./skills/python-execution",
     "./skills/docker-container-access",
     "./skills/skill-development"
