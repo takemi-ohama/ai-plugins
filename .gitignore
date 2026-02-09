@@ -7,6 +7,7 @@
 *.key
 credentials.json
 service-account-key.json
+dbhub.toml
 
 # IDE
 .vscode/
