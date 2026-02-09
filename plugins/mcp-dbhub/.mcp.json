@@ -4,13 +4,15 @@
       "type": "stdio",
       "command": "npx",
       "args": [
-        "@bytebase/dbhub",
-        "--transport",
-        "http",
-        "--port",
-        "8080"
+        "@bytebase/dbhub"
       ],
-      "env": {},
+      "env": {
+        "DSN": "${DBHUB_DSN}",
+        "SSH_HOST": "${DBHUB_SSH_HOST}",
+        "SSH_PORT": "${DBHUB_SSH_PORT}",
+        "SSH_USER": "${DBHUB_SSH_USER}",
+        "SSH_KEY": "${DBHUB_SSH_KEY}"
+      },
       "envFile": "${workspaceFolder}/.env"
     }
   }
