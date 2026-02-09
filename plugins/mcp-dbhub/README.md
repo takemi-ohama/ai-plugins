@@ -52,10 +52,32 @@ Task(
 )
 ```
 
+## 環境変数の設定
+
+プロジェクトルートの`.env`ファイルに以下を設定してください：
+
+```bash
+# データベース接続文字列
+DBHUB_DSN=mysql://user:password@db-host:3306/dbname
+```
+
+### SSH踏み台経由の場合
+
+```bash
+# データベース接続（踏み台から見た内部ホスト名）
+DBHUB_DSN=mysql://user:password@db.internal:3306/dbname
+
+# SSH踏み台
+DBHUB_SSH_HOST=bastion.example.com
+DBHUB_SSH_PORT=22
+DBHUB_SSH_USER=ubuntu
+DBHUB_SSH_KEY=~/.ssh/id_rsa
+```
+
 ## 注意事項
 
-- デフォルトではHTTPトランスポートでポート8080を使用します
 - データベース接続情報は環境変数または`.env`ファイルで管理してください
+- SSH踏み台経由の場合、DSNのホスト名は踏み台から見た内部ホスト名を指定します
 
 ## 参考リンク
 
