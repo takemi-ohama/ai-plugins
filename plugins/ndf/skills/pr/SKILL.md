@@ -41,6 +41,19 @@ allowed-tools:
    - タイトル・説明: 日本語、body: Summary+Test plan
    - 機密情報（トークン、パスワード、APIキー等）を含めないこと
    - body末尾に `<!-- I want to review in Japanese. -->` を入れる
+   - **bodyは必ずHEREDOC形式で渡すこと**（`\n`リテラル混入防止）:
+     ```bash
+     gh pr create --title "タイトル" --body "$(cat <<'EOF'
+     ## Summary
+     - 変更内容
+
+     ## Test plan
+     - [ ] テスト項目
+
+     <!-- I want to review in Japanese. -->
+     EOF
+     )"
+     ```
 
 ## 命名規則
 
