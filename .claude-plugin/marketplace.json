@@ -49,6 +49,11 @@
       "name": "mcp-devin",
       "source": "./plugins/mcp-devin",
       "description": "Devin MCP server for accessing repository documentation and code knowledge via DeepWiki"
+    },
+    {
+      "name": "mcp-redash",
+      "source": "./plugins/mcp-redash",
+      "description": "Redash MCP server with multi-environment support (arbitrary suffix)"
     }
   ]
 }
