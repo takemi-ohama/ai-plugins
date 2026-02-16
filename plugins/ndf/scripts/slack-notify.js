@@ -390,60 +390,71 @@ ${context.substring(0, CONFIG.MAX_CONTEXT_LENGTH)}
 // Claude CLI Integration (with MCP tools disabled)
 // ============================================================================
 
-function buildCleanEnv() {
+// Auth priority: OAuth > Bedrock > API Key (cost optimization)
+const AUTH_CHECKS = [
+  {
+    name: 'oauth',
+    detect: () => {
+      try {
+        const creds = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', '.credentials.json'), 'utf8'));
+        const oauth = creds?.claudeAiOauth;
+        return oauth?.accessToken && oauth?.expiresAt > Date.now();
+      } catch (e) {
+        debugLog('OAuth detection failed:', e.message);
+        return false;
+      }
+    },
+    removeKeys: ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_USE_BEDROCK'],
+  },
+  {
+    name: 'bedrock',
+    detect: () => !!process.env.CLAUDE_CODE_USE_BEDROCK,
+    removeKeys: ['ANTHROPIC_API_KEY'],
+  },
+  {
+    name: 'apikey',
+    detect: () => process.env.ANTHROPIC_API_KEY?.startsWith('sk-ant-'),
+    removeKeys: ['CLAUDE_CODE_USE_BEDROCK'],
+  },
+];
+
+const SESSION_VARS = ['CLAUDECODE', 'CLAUDE_CODE_SSE_PORT', 'CLAUDE_CODE_ENTRYPOINT'];
+
+function buildCleanEnv(skip = []) {
   const env = { ...process.env };
-  // Remove Claude Code session vars to avoid nested session detection (Claude Code >= 2.1.x)
-  delete env.CLAUDECODE;
-  delete env.CLAUDE_CODE_SSE_PORT;
-  delete env.CLAUDE_CODE_ENTRYPOINT;
-  debugLog('Cleaned env: removed CLAUDECODE, CLAUDE_CODE_SSE_PORT, CLAUDE_CODE_ENTRYPOINT');
-  debugLog('CLAUDE_CODE_USE_BEDROCK:', env.CLAUDE_CODE_USE_BEDROCK || 'not set');
-  debugLog('AWS_REGION:', env.AWS_REGION || 'not set');
-  return env;
+  for (const key of SESSION_VARS) delete env[key];
+
+  const auth = AUTH_CHECKS.find(a => !skip.includes(a.name) && a.detect()) || { name: 'none', removeKeys: [] };
+  for (const key of auth.removeKeys) delete env[key];
+  if (auth.name === 'none' && env.ANTHROPIC_API_KEY && !env.ANTHROPIC_API_KEY.startsWith('sk-ant-')) {
+    delete env.ANTHROPIC_API_KEY;
+  }
+  debugLog(`Auth: ${auth.name} | removed: [${[...SESSION_VARS, ...auth.removeKeys].join(', ')}]`);
+  return { env, authName: auth.name };
 }
 
-function callClaudeCLI(prompt) {
+function spawnClaudeCLI(prompt, env) {
   return new Promise((resolve) => {
-    debugLog('=== Calling Claude CLI for summary generation ===');
-
     const args = [
-      '--print',
-      '--no-session-persistence',
-      '--strict-mcp-config',
-      '--mcp-config', '{"mcpServers":{}}',
-      '--tools', '',
-      '--model', 'haiku',
-      '-p', prompt
+      '--print', '--no-session-persistence',
+      '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
+      '--tools', '', '--model', 'haiku', '-p', prompt
     ];
 
-    debugLog('CLI args:', args.join(' '));
-    debugLog('Parent process env - CLAUDE_SESSION_ID:', process.env.CLAUDE_SESSION_ID || 'not set');
+    const claude = spawn('claude', args, { stdio: ['ignore', 'pipe', 'pipe'], env });
+    if (claude.pid) debugLog('Claude CLI spawned with PID:', claude.pid);
 
-    const env = buildCleanEnv();
-    const claude = spawn('claude', args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env
-    });
-
-    if (claude.pid) {
-      debugLog('Claude CLI spawned with PID:', claude.pid);
-    }
-
-    let stdout = '';
-    let stderr = '';
-    let resolved = false;
-
+    let stdout = '', stderr = '', resolved = false;
     const safeResolve = (value, reason) => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeoutId);
-        debugLog('CLI resolved:', reason, '| Output length:', value?.length || 0);
-        resolve(value);
-      }
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeoutId);
+      debugLog('CLI resolved:', reason, '| Output length:', value?.length || 0);
+      resolve(value);
     };
 
-    claude.stdout.on('data', (data) => { stdout += data; });
-    claude.stderr.on('data', (data) => { stderr += data; });
+    claude.stdout.on('data', (d) => { stdout += d; });
+    claude.stderr.on('data', (d) => { stderr += d; });
 
     const timeoutId = setTimeout(() => {
       debugLog('Claude CLI timeout after', CONFIG.CLI_TIMEOUT_MS, 'ms');
@@ -452,22 +463,12 @@ function callClaudeCLI(prompt) {
     }, CONFIG.CLI_TIMEOUT_MS);
 
     claude.on('close', (code, signal) => {
-      if (signal) {
-        debugLog('Claude CLI killed by signal:', signal);
-        safeResolve(null, 'signal:' + signal);
-        return;
-      }
-
+      if (signal) { safeResolve(null, 'signal:' + signal); return; }
       debugLog('Claude CLI exit code:', code);
       debugLog('CLI stdout:', stdout.substring(0, 200));
       debugLog('CLI stderr:', stderr.substring(0, 200));
-
-      if (code === 0 && stdout.trim()) {
-        safeResolve(stdout.trim(), 'success');
-      } else {
-        debugLog('Claude CLI error - code:', code, '| stderr:', stderr || 'none');
-        safeResolve(null, 'error:' + code);
-      }
+      (code === 0 && stdout.trim()) ? safeResolve(stdout.trim(), 'success')
+        : safeResolve(null, 'error:' + code);
     });
 
     claude.on('error', (err) => {
@@ -475,6 +476,21 @@ function callClaudeCLI(prompt) {
       safeResolve(null, 'spawn-error');
     });
   });
+}
+
+async function callClaudeCLI(prompt) {
+  debugLog('=== Calling Claude CLI for summary generation ===');
+  const skip = [];
+  // Try each auth method in priority order, falling back on failure
+  for (let i = 0; i <= AUTH_CHECKS.length; i++) {
+    const { env, authName } = buildCleanEnv(skip);
+    const result = await spawnClaudeCLI(prompt, env);
+    if (result) return result;
+    if (authName === 'none') break;
+    debugLog(`Auth ${authName} failed, trying next`);
+    skip.push(authName);
+  }
+  return null;
 }
 
 function cleanSummaryResponse(summary) {

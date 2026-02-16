@@ -1,6 +1,6 @@
 {
   "name": "ndf",
-  "version": "2.8.0",
+  "version": "2.8.1",
   "description": "Integrated plugin with specialized agents, workflow commands, and skills. Includes Serena and Codex MCP servers. Additional MCPs available as separate plugins.",
   "author": {
     "name": "takemi-ohama",
