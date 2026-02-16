@@ -390,15 +390,45 @@ ${context.substring(0, CONFIG.MAX_CONTEXT_LENGTH)}
 // Claude CLI Integration (with MCP tools disabled)
 // ============================================================================
 
+// Auth priority: OAuth > Bedrock > API Key (cost optimization)
+const AUTH_CHECKS = [
+  {
+    name: 'oauth',
+    detect: () => {
+      try {
+        const creds = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', '.credentials.json'), 'utf8'));
+        const oauth = creds?.claudeAiOauth;
+        return oauth?.accessToken && oauth?.expiresAt > Date.now();
+      } catch { return false; }
+    },
+    removeKeys: ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_USE_BEDROCK'],
+  },
+  {
+    name: 'bedrock',
+    detect: () => !!process.env.CLAUDE_CODE_USE_BEDROCK,
+    removeKeys: ['ANTHROPIC_API_KEY'],
+  },
+  {
+    name: 'apikey',
+    detect: () => process.env.ANTHROPIC_API_KEY?.startsWith('sk-ant-'),
+    removeKeys: ['CLAUDE_CODE_USE_BEDROCK'],
+  },
+];
+
+const SESSION_VARS = ['CLAUDECODE', 'CLAUDE_CODE_SSE_PORT', 'CLAUDE_CODE_ENTRYPOINT'];
+
 function buildCleanEnv() {
   const env = { ...process.env };
-  // Remove Claude Code session vars to avoid nested session detection (Claude Code >= 2.1.x)
-  delete env.CLAUDECODE;
-  delete env.CLAUDE_CODE_SSE_PORT;
-  delete env.CLAUDE_CODE_ENTRYPOINT;
-  debugLog('Cleaned env: removed CLAUDECODE, CLAUDE_CODE_SSE_PORT, CLAUDE_CODE_ENTRYPOINT');
-  debugLog('CLAUDE_CODE_USE_BEDROCK:', env.CLAUDE_CODE_USE_BEDROCK || 'not set');
-  debugLog('AWS_REGION:', env.AWS_REGION || 'not set');
+  // Remove Claude Code session vars to avoid nested session detection (>= 2.1.x)
+  for (const key of SESSION_VARS) delete env[key];
+
+  const auth = AUTH_CHECKS.find(a => a.detect()) || { name: 'none', removeKeys: [] };
+  for (const key of auth.removeKeys) delete env[key];
+  // Fallback: remove non-standard API key
+  if (auth.name === 'none' && env.ANTHROPIC_API_KEY && !env.ANTHROPIC_API_KEY.startsWith('sk-ant-')) {
+    delete env.ANTHROPIC_API_KEY;
+  }
+  debugLog(`Auth: ${auth.name} | removed: [${[...SESSION_VARS, ...auth.removeKeys].join(', ')}]`);
   return env;
 }
 
