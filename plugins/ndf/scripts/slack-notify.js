@@ -390,6 +390,18 @@ ${context.substring(0, CONFIG.MAX_CONTEXT_LENGTH)}
 // Claude CLI Integration (with MCP tools disabled)
 // ============================================================================
 
+function buildCleanEnv() {
+  const env = { ...process.env };
+  // Remove Claude Code session vars to avoid nested session detection (Claude Code >= 2.1.x)
+  delete env.CLAUDECODE;
+  delete env.CLAUDE_CODE_SSE_PORT;
+  delete env.CLAUDE_CODE_ENTRYPOINT;
+  debugLog('Cleaned env: removed CLAUDECODE, CLAUDE_CODE_SSE_PORT, CLAUDE_CODE_ENTRYPOINT');
+  debugLog('CLAUDE_CODE_USE_BEDROCK:', env.CLAUDE_CODE_USE_BEDROCK || 'not set');
+  debugLog('AWS_REGION:', env.AWS_REGION || 'not set');
+  return env;
+}
+
 function callClaudeCLI(prompt) {
   return new Promise((resolve) => {
     debugLog('=== Calling Claude CLI for summary generation ===');
@@ -407,8 +419,10 @@ function callClaudeCLI(prompt) {
     debugLog('CLI args:', args.join(' '));
     debugLog('Parent process env - CLAUDE_SESSION_ID:', process.env.CLAUDE_SESSION_ID || 'not set');
 
+    const env = buildCleanEnv();
     const claude = spawn('claude', args, {
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env
     });
 
     if (claude.pid) {
