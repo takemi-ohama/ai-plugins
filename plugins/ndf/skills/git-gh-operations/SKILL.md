@@ -76,15 +76,83 @@ EOF
 
 ## gh CLI / GitHub API の注意点
 
+### パラメータ: `-f` vs `-F`
+
+```bash
+# -f: 文字列パラメータ
+gh api repos/OWNER/REPO/pulls/PR/comments -f body="テキスト"
+
+# -F: 非文字列パラメータ（数値、boolean、null、ファイル）
+gh api repos/OWNER/REPO/pulls/PR/comments -F in_reply_to=2826074026
+
+# 混在OK
+gh api repos/OWNER/REPO/pulls/PR/comments -f body="返信テキスト" -F in_reply_to=2826074026
+```
+
+### PRレビューコメントの取得
+
+```bash
+# コメント一覧を取得（id, path, body の先頭を表示）
+gh api repos/OWNER/REPO/pulls/PR/comments \
+  --jq '.[] | {id: .id, path: .path, body: (.body | split("\n")[0][:80])}'
+```
+
 ### PRレビューコメントへの返信
 
 ```bash
-# NG: -X POST がない
+# NG: /replies エンドポイントは存在しない（404になる）
 gh api repos/OWNER/REPO/pulls/comments/{id}/replies -f body='...'
 # => 404 Not Found
 
-# OK: -X POST を明示
+# NG: -X POST を付けても同じ（エンドポイント自体が存在しない）
 gh api -X POST repos/OWNER/REPO/pulls/comments/{id}/replies -f body='...'
+# => 404 Not Found
+
+# OK: in_reply_to パラメータを使って新規コメントとして投稿
+gh api repos/OWNER/REPO/pulls/PR/comments \
+  -f body="返信テキスト" \
+  -F in_reply_to=COMMENT_ID
+```
+
+### レビュースレッドの Resolve（GraphQL）
+
+```bash
+# 1. 未解決スレッドのID一覧を取得
+gh api graphql -f query='
+query {
+  repository(owner: "OWNER", name: "REPO") {
+    pullRequest(number: PR) {
+      reviewThreads(first: 50) {
+        nodes {
+          id
+          isResolved
+          comments(first: 1) {
+            nodes { path body }
+          }
+        }
+      }
+    }
+  }
+}' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | {id, path: .comments.nodes[0].path}'
+
+# 2. スレッドを Resolve
+gh api graphql -f query='
+mutation {
+  resolveReviewThread(input: {threadId: "PRRT_xxx"}) {
+    thread { isResolved }
+  }
+}'
+```
+
+### PR の CI チェック結果
+
+```bash
+# チェック一覧（失敗のみ）
+gh pr checks PR --repo OWNER/REPO 2>&1 | grep fail
+
+# 失敗ジョブのログ（エラー行のみ抽出）
+gh run view RUN_ID --repo OWNER/REPO --log-failed 2>/dev/null \
+  | grep -E '(FAIL|Error|Tests:)' | head -20
 ```
 
 ### 自分のPRは Approve できない
@@ -134,7 +202,8 @@ for e in data['events']:
 | エラーメッセージ | 原因 | 対策 |
 |----------------|------|------|
 | `fatal: pathspec '...' did not match any files` | CWD とパスの不一致 | `pwd` 確認後、CWD相対パスで指定 |
-| `404 Not Found` (gh api) | HTTP メソッド未指定 | `-X POST` を明示 |
+| `404 Not Found` (gh api replies) | `/comments/{id}/replies` は存在しない | `in_reply_to` パラメータで投稿 |
+| `422 Unprocessable` (gh api) | `-f` で数値を渡した | 数値は `-F` を使う |
 | `Can not approve your own pull request` | 自己 Approve 不可 | `COMMENT` イベントに変更 |
 | `Unknown options: , , ,` (aws cli) | `[$LATEST]` のシェルエスケープ | `--output json` + python パース |
 
