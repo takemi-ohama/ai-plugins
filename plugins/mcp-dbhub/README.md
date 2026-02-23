@@ -142,5 +142,6 @@ Task(
 
 ## 参考リンク
 
-- [@bytebase/dbhub](https://www.npmjs.com/package/@bytebase/dbhub)
+- [takemi-ohama/dbhub](https://github.com/takemi-ohama/dbhub) - 現在使用中のフォーク版（SSH keep-alive対応）
+- [@bytebase/dbhub](https://www.npmjs.com/package/@bytebase/dbhub) - 本家パッケージ
 - [Bytebase](https://www.bytebase.com/)
