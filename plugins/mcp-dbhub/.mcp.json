@@ -5,7 +5,7 @@
       "command": "npx",
       "args": [
         "--yes",
-        "github:takemi-ohama/dbhub"
+        "@bytebase/dbhub"
       ]
     }
   }
