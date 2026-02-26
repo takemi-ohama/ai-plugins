@@ -19,11 +19,30 @@ allowed-tools:
 
 ## 概要
 
-scannerエージェントがExcelファイルからデータを抽出し、構造化されたフォーマット（JSON、CSV）に変換する際に使用します。
+scannerエージェントがExcelファイルからデータを抽出し、構造化されたフォーマット（Markdown、JSON、CSV）に変換する際に使用します。
+
+## ツール優先順位
+
+1. **MarkItDown MCP（最優先）** - `mcp-markitdown@ai-plugins` プラグイン
+2. **Python スクリプト（フォールバック）** - MarkItDown MCPが利用できない場合
 
 ## クイックリファレンス
 
-### 基本コマンド
+### 方法1: MarkItDown MCP（推奨）
+
+```bash
+# ローカルファイルをMarkdownに変換
+mcp__plugin_mcp-markitdown_markitdown__convert_to_markdown uri="file:///path/to/data.xlsx"
+
+# URLからExcelファイルを変換
+mcp__plugin_mcp-markitdown_markitdown__convert_to_markdown uri="https://example.com/data.xlsx"
+```
+
+MarkItDown MCPはExcelの全シートをMarkdownテーブルに変換します。追加ライブラリのインストールは不要です。
+
+### 方法2: Python スクリプト（フォールバック）
+
+MarkItDown MCPが利用できない場合や、数式評価・特定シート抽出など高度な処理が必要な場合に使用します。
 
 ```bash
 # 全シートをJSONに変換
@@ -36,9 +55,16 @@ python scripts/extract-excel.py data.xlsx --sheet="Sheet1" --output=csv
 python scripts/extract-excel.py data.xlsx --evaluate-formulas
 ```
 
+**必要なライブラリ**:
+```bash
+pip install pandas openpyxl xlrd
+```
+
 ### 出力形式
 
-**JSON形式**:
+**Markdown形式（MarkItDown MCP）**: テーブル形式でシートごとに出力
+
+**JSON形式（Python）**:
 ```json
 {
   "Sheet1": [
@@ -47,13 +73,7 @@ python scripts/extract-excel.py data.xlsx --evaluate-formulas
 }
 ```
 
-**CSV形式**: 各シートごとに `data_Sheet1.csv`, `data_Sheet2.csv` を生成
-
-### 必要なライブラリ
-
-```bash
-pip install pandas openpyxl xlrd
-```
+**CSV形式（Python）**: 各シートごとに `data_Sheet1.csv`, `data_Sheet2.csv` を生成
 
 ## ベストプラクティス
 

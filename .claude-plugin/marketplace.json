@@ -54,6 +54,11 @@
       "name": "mcp-redash",
       "source": "./plugins/mcp-redash",
       "description": "Redash MCP server with multi-environment support (arbitrary suffix)"
+    },
+    {
+      "name": "mcp-markitdown",
+      "source": "./plugins/mcp-markitdown",
+      "description": "MarkItDown MCP server for converting documents (PDF, Office, images, etc.) to Markdown"
     }
   ]
 }

@@ -21,9 +21,28 @@ allowed-tools:
 
 scannerエージェントがPDFドキュメントを分析し、構造化されたデータを抽出する際に使用します。テーブル抽出、セクション識別、要約生成などの機能を提供します。
 
+## ツール優先順位
+
+1. **MarkItDown MCP（最優先）** - `mcp-markitdown@ai-plugins` プラグイン
+2. **Python スクリプト（フォールバック）** - MarkItDown MCPが利用できない場合
+
 ## クイックリファレンス
 
-### 基本コマンド
+### 方法1: MarkItDown MCP（推奨）
+
+```bash
+# ローカルPDFをMarkdownに変換
+mcp__plugin_mcp-markitdown_markitdown__convert_to_markdown uri="file:///path/to/report.pdf"
+
+# URLからPDFを変換
+mcp__plugin_mcp-markitdown_markitdown__convert_to_markdown uri="https://example.com/report.pdf"
+```
+
+MarkItDown MCPはPDFのテキスト・テーブルをMarkdownに変換します。追加ライブラリのインストールは不要です。
+
+### 方法2: Python スクリプト（フォールバック）
+
+MarkItDown MCPが利用できない場合や、テーブル個別抽出など高度な処理が必要な場合に使用します。
 
 ```bash
 # 基本的な分析
@@ -36,8 +55,7 @@ python scripts/analyze-pdf.py report.pdf --extract-tables --summarize
 python scripts/analyze-pdf.py report.pdf --output=analysis-result.md
 ```
 
-### 必要なライブラリ
-
+**必要なライブラリ**:
 ```bash
 pip install PyPDF2 tabula-py pdfplumber
 ```
