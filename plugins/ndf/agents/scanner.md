@@ -38,21 +38,25 @@ description: |
 
 ## 使用可能なツール
 
-### 1. Claude Code Read Tool（優先）
+### 1. MarkItDown MCP（ドキュメント変換の最優先）
+- **PDF、Officeファイル（Excel, Word, PowerPoint）等のドキュメント変換**に最適
+  - `mcp__plugin_mcp-markitdown_markitdown__convert_to_markdown` ツールを使用
+  - `uri` パラメータにファイルパス（`file:///path/to/file`）またはURLを指定
+  - PDF, Word(.docx), Excel(.xlsx), PowerPoint(.pptx), HTML, CSV, JSON, XML等に対応
+  - Markdownに変換して構造化されたテキストを取得
+- **インストール**: `mcp-markitdown@ai-plugins` プラグインが必要
+
+### 2. Claude Code Read Tool（画像の最優先）
 - **画像ファイルの直接読み取り**に最適
   - PNG, JPG, JPEG, GIF, WebP等を直接読み取り可能
   - Claude Codeはmultimodal LLMなので画像を直接理解できる
   - `Read` toolで画像ファイルパスを指定するだけで内容を取得
 
-### 2. Codex CLI MCP
-- **PDF、Officeファイル等の高度な処理**に使用
+### 3. Codex CLI MCP（フォールバック）
+- **MarkItDown MCPが利用できない場合**のフォールバック
   - `mcp__plugin_ndf_codex__codex` - ファイル内容の読み取りと分析
   - `prompt`パラメータでファイル読み取り指示を送信
   - `cwd`パラメータでファイルのディレクトリを指定
-  - PDFの構造化テキスト抽出、Excelデータの変換等に強み
-
-### 3. その他のMCP（状況に応じて）
-- 利用可能なMCPがあれば活用
 
 ### 4. LLM API直接呼び出し（最後の手段）
 - 他の手段が利用できない場合のフォールバック
@@ -62,7 +66,7 @@ description: |
 1. **ファイル確認**: ファイルパスと形式を確認
 2. **ツール選択**: ファイルタイプに応じて最適なツールを選択
    - **画像** → Read tool（優先）
-   - **PDF/Office** → Codex MCP
+   - **PDF/Office（Excel, Word, PowerPoint）** → MarkItDown MCP（優先）→ Codex MCP（フォールバック）
    - **その他** → 状況に応じて最適な手段
 3. **読み取り実行**: 選択したツールでファイル読み取りを実行
 4. **内容抽出**: テキスト、データ、画像情報を抽出
@@ -71,15 +75,14 @@ description: |
 
 ## 使用例
 
-### PDFファイル読み取り
+### PDFファイル読み取り（MarkItDown MCP使用）
 ```
 ユーザー: 「document.pdfの内容を読み取ってください」
 
 1. ファイルの存在確認
-2. Codexに読み取り指示:
-   prompt: "document.pdfの内容を読み取り、テキストと構造を抽出してください"
-   cwd: ファイルのディレクトリ
-3. 結果を整理して報告
+2. MarkItDown MCPで変換:
+   mcp__plugin_mcp-markitdown_markitdown__convert_to_markdown(uri="file:///path/to/document.pdf")
+3. Markdown化された結果を整理して報告
 ```
 
 ### 画像ファイル読み取り（Read Tool使用）
@@ -95,25 +98,25 @@ description: |
 
 **注意**: 画像ファイル（PNG, JPG, GIF, WebP等）は**Read toolを優先**して使用してください。Codex MCPより高速で正確です。
 
-### Excelファイル読み取り
+### Excelファイル読み取り（MarkItDown MCP使用）
 ```
 ユーザー: 「data.xlsxのデータを抽出してください」
 
 1. ファイルの存在確認
-2. Codexにデータ抽出指示:
-   prompt: "data.xlsxの全シートを読み取り、データをJSON形式で出力してください"
-3. データを構造化して報告
+2. MarkItDown MCPで変換:
+   mcp__plugin_mcp-markitdown_markitdown__convert_to_markdown(uri="file:///path/to/data.xlsx")
+3. Markdown化されたデータを構造化して報告
 4. 必要に応じてCSVファイルに保存
 ```
 
-### PowerPointファイル読み取り
+### PowerPointファイル読み取り（MarkItDown MCP使用）
 ```
 ユーザー: 「presentation.pptxのスライド内容を要約してください」
 
 1. ファイルの存在確認
-2. Codexにスライド読み取り指示:
-   prompt: "presentation.pptxの各スライドを読み取り、内容を要約してください"
-3. スライドごとに内容を整理
+2. MarkItDown MCPで変換:
+   mcp__plugin_mcp-markitdown_markitdown__convert_to_markdown(uri="file:///path/to/presentation.pptx")
+3. Markdown化されたスライドごとの内容を整理
 4. 全体の要約を作成
 ```
 
