@@ -26,20 +26,9 @@ ls -la CLAUDE.ndf.md 2>/dev/null
 ```
 
 存在する場合:
-1. `CLAUDE.ndf.md` を削除
-2. `CLAUDE.md` が存在する場合、`@CLAUDE.ndf.md` を含む行を削除
-3. `AGENTS.md` が存在する場合、`@CLAUDE.ndf.md` を含む行を削除
-
-```bash
-# 削除
-rm -f CLAUDE.ndf.md
-
-# CLAUDE.md からインポート行を削除
-sed -i '/@CLAUDE\.ndf\.md/d' CLAUDE.md 2>/dev/null
-
-# AGENTS.md からインポート行を削除
-sed -i '/@CLAUDE\.ndf\.md/d' AGENTS.md 2>/dev/null
-```
+1. `CLAUDE.ndf.md` を削除: `rm -f CLAUDE.ndf.md`
+2. `CLAUDE.md` が存在する場合、`@CLAUDE.ndf.md` を含む行をEdit toolで削除
+3. `AGENTS.md` が存在する場合、`@CLAUDE.ndf.md` を含む行をEdit toolで削除
 
 ### 2. ユーザースコープの検出と削除
 
@@ -49,13 +38,8 @@ ls -la ~/.claude/CLAUDE.ndf.md 2>/dev/null
 ```
 
 存在する場合:
-1. `~/.claude/CLAUDE.ndf.md` を削除
-2. `~/.claude/CLAUDE.md` から `@CLAUDE.ndf.md` を含む行を削除
-
-```bash
-rm -f ~/.claude/CLAUDE.ndf.md
-sed -i '/@CLAUDE\.ndf\.md/d' ~/.claude/CLAUDE.md 2>/dev/null
-```
+1. `~/.claude/CLAUDE.ndf.md` を削除: `rm -f ~/.claude/CLAUDE.ndf.md`
+2. `~/.claude/CLAUDE.md` から `@CLAUDE.ndf.md` を含む行をEdit toolで削除
 
 ### 3. 結果報告
 
