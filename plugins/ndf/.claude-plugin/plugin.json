@@ -37,7 +37,6 @@
     "./skills/docker-container-access",
     "./skills/skill-development",
     "./skills/deepwiki-transfer",
-    "./skills/knowledge-reorg",
-    "./skills/git-gh-operations"
+    "./skills/knowledge-reorg"
   ]
 }
