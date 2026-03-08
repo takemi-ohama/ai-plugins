@@ -39,6 +39,7 @@
     "./skills/python-execution",
     "./skills/docker-container-access",
     "./skills/skill-development",
-    "./skills/deepwiki-transfer"
+    "./skills/deepwiki-transfer",
+    "./skills/knowledge-reorg"
   ]
 }
