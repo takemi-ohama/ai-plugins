@@ -59,6 +59,11 @@
       "name": "mcp-markitdown",
       "source": "./plugins/mcp-markitdown",
       "description": "MarkItDown MCP server for converting documents (PDF, Office, images, etc.) to Markdown"
+    },
+    {
+      "name": "mcp-serena",
+      "source": "./plugins/mcp-serena",
+      "description": "Serena MCP server for semantic code intelligence (symbol search, reference search, refactoring)"
     }
   ]
 }
