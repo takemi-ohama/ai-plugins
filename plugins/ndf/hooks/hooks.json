@@ -1,17 +1,14 @@
 {
-  "description": "NDF Plugin hooks: Auto-setup and notifications",
+  "description": "NDF Plugin hooks: CLAUDE.ndf.md detection and notifications",
   "hooks": {
     "SessionStart": [
       {
-        "description": "Inject NDF Plugin Guide to project CLAUDE.md",
-        "matcher": "startup|resume",
-        "priority": 50,
-        "enabled": true,
+        "description": "Detect deprecated CLAUDE.ndf.md and warn user",
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/inject-plugin-guide.js",
-            "description": "Auto-inject NDF plugin guidelines to project CLAUDE.md",
+            "command": "if [ -f \"${workspaceFolder}/CLAUDE.ndf.md\" ] || [ -f \"$HOME/.claude/CLAUDE.ndf.md\" ]; then echo '[NDF] CLAUDE.ndf.md が検出されました。廃止済みです。/ndf:cleanup を実行して削除してください。'; fi",
+            "description": "Warn about deprecated CLAUDE.ndf.md",
             "continueOnError": true,
             "suppressOutput": false
           }

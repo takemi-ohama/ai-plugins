@@ -1,12 +1,12 @@
 {
   "name": "ndf",
-  "version": "2.9.0",
-  "description": "Integrated plugin with specialized agents, workflow commands, and skills. Includes Serena and Codex MCP servers. Additional MCPs available as separate plugins.",
+  "version": "3.0.0",
+  "description": "Integrated plugin with specialized agents, workflow skills, and Codex MCP. Serena MCP is now a separate plugin (mcp-serena).",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
   },
-  "keywords": ["mcp", "bigquery", "notion", "database", "chrome-devtools", "codex", "workflow", "slack", "notifications", "agents", "skills", "director", "orchestrator"],
+  "keywords": ["mcp", "codex", "workflow", "slack", "notifications", "agents", "skills", "director", "orchestrator"],
   "agents": [
     "./agents/director.md",
     "./agents/data-analyst.md",
@@ -22,9 +22,8 @@
     "./skills/review",
     "./skills/merged",
     "./skills/clean",
-    "./skills/serena",
-    "./skills/mem-review",
-    "./skills/mem-capture",
+    "./skills/cleanup",
+    "./skills/ndf-policies",
     "./skills/data-analyst-sql-optimization",
     "./skills/data-analyst-export",
     "./skills/corder-code-templates",
@@ -34,12 +33,11 @@
     "./skills/scanner-excel-extraction",
     "./skills/qa-security-scan",
     "./skills/markdown-writing",
-    "./skills/memory-handling",
-    "./skills/serena-memory-strategy",
     "./skills/python-execution",
     "./skills/docker-container-access",
     "./skills/skill-development",
     "./skills/deepwiki-transfer",
-    "./skills/knowledge-reorg"
+    "./skills/knowledge-reorg",
+    "./skills/git-gh-operations"
   ]
 }
