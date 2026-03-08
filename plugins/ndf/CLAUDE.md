@@ -37,7 +37,7 @@ plugins/ndf/
 │   ├── researcher.md
 │   ├── scanner.md
 │   └── qa.md
-├── skills/                      # スキル（22個）
+├── skills/                      # スキル（23個）
 │   ├── pr/                      # ワークフロー系（8個、/ndf:* で呼出）
 │   ├── pr-tests/
 │   ├── fix/
@@ -59,7 +59,8 @@ plugins/ndf/
 │   ├── python-execution/
 │   ├── docker-container-access/
 │   ├── skill-development/
-│   └── knowledge-reorg/
+│   ├── knowledge-reorg/
+│   └── git-gh-operations/
 ├── CLAUDE.md                    # このファイル（開発者向け）
 └── README.md                    # プラグイン説明書
 ```
@@ -112,7 +113,7 @@ plugins/ndf/
 - `ndf-policies`スキル追加（ポリシー常時注入）
 - `/ndf:cleanup`スキル追加（CLAUDE.ndf.md後始末）
 - SessionStartフックをCLAUDE.ndf.md検出警告に変更
-- Skills: 25個→22個
+- Skills: 25個→23個
 
 ### v2.8.0
 - `deepwiki-transfer`スキル追加
