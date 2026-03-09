@@ -110,3 +110,36 @@ EOF
 ```
 
 注意: `<<'EOF'` （シングルクォート付き）で変数展開を抑制する。
+
+## 6. gh pr checks が exit code 1 で止まる
+
+### 事象
+```
+gh pr checks 11765 2>&1
+# => チェック結果は表示されるが、1つでもfailがあると exit code 1 で終了
+# => Claude Code が「コマンド失敗」と判定して処理を中断
+```
+
+### 原因
+`gh pr checks` は CI チェックに失敗があると非0の exit code を返す仕様。
+Claude Code の Bash ツールはコマンドの exit code が 0 以外だとエラーとして扱う。
+
+### 対策
+常に `|| true` を付けて exit code を 0 にする:
+```bash
+# チェック一覧を取得（failがあっても止まらない）
+gh pr checks 11765 2>&1 || true
+
+# --watch で完了待ちする場合も同様
+gh pr checks 11765 --watch 2>&1 || true
+
+# 失敗のみフィルタする場合
+gh pr checks 11765 2>&1 | grep -i fail || true
+```
+
+### 補足
+同様の問題が発生する gh コマンド:
+- `gh run view RUN_ID --log-failed` （失敗ログ取得時）
+- `gh pr diff` （差分が大きい場合にパイプ破損）
+
+いずれも `2>&1 || true` を付けることで安全に実行できる。
