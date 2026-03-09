@@ -146,13 +146,27 @@ mutation {
 
 ### PR の CI チェック結果
 
-```bash
-# チェック一覧（失敗のみ）
-gh pr checks PR --repo OWNER/REPO 2>&1 | grep fail
+`gh pr checks` は1つでもfailがあると **exit code 1** で終了する。
+Claude Codeではコマンド失敗と判定されて処理が止まるため、必ず `|| true` を付ける。
 
+```bash
+# NG: failがあるとexit code 1で止まる
+gh pr checks PR --repo OWNER/REPO
+
+# OK: exit codeを常に0にして出力を取得
+gh pr checks PR --repo OWNER/REPO 2>&1 || true
+
+# OK: 失敗のみフィルタ
+gh pr checks PR --repo OWNER/REPO 2>&1 | grep -i fail || true
+
+# OK: --watch で完了まで待つ場合も同様
+gh pr checks PR --repo OWNER/REPO --watch 2>&1 || true
+```
+
+```bash
 # 失敗ジョブのログ（エラー行のみ抽出）
-gh run view RUN_ID --repo OWNER/REPO --log-failed 2>/dev/null \
-  | grep -E '(FAIL|Error|Tests:)' | head -20
+gh run view RUN_ID --repo OWNER/REPO --log-failed 2>&1 \
+  | grep -E '(FAIL|Error|Tests:)' | head -20 || true
 ```
 
 ### 自分のPRは Approve できない
@@ -205,6 +219,7 @@ for e in data['events']:
 | `404 Not Found` (gh api replies) | `/comments/{id}/replies` は存在しない | `in_reply_to` パラメータで投稿 |
 | `422 Unprocessable` (gh api) | `-f` で数値を渡した | 数値は `-F` を使う |
 | `Can not approve your own pull request` | 自己 Approve 不可 | `COMMENT` イベントに変更 |
+| `gh pr checks` が exit code 1 | 1つでもfailがあると非0終了 | `gh pr checks ... 2>&1 \|\| true` |
 | `Unknown options: , , ,` (aws cli) | `[$LATEST]` のシェルエスケープ | `--output json` + python パース |
 
 ## 詳細ガイド
