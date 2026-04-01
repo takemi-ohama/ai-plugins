@@ -25,10 +25,59 @@ allowed-tools:
 5. PRにSummaryコメントを追加
 6. 対応したコードコメントに個別に返信
 7. reviewerに再レビューを依頼
-8. copilotに再レビューを依頼
-9. 対応完了したコードコメントを「Resolve Conversation」にする
+8. 対応完了したコードコメントを「Resolve Conversation」にする
 
 - 4はgit、1と5以降はgithub mcpまたはghを利用
+
+## ghコマンド例
+
+### コメントへの返信
+
+```bash
+# PRのレビューコメント一覧を取得
+gh api repos/{owner}/{repo}/pulls/{pr_number}/comments
+
+# 特定のコメントに返信（in_reply_to にコメントIDを指定）
+gh api repos/{owner}/{repo}/pulls/{pr_number}/comments \
+  -f body="修正しました。" \
+  -F in_reply_to={comment_id}
+```
+
+### Resolve Conversation
+
+```bash
+# GraphQL APIでスレッドをresolveする
+gh api graphql -f query='
+  mutation {
+    resolveReviewThread(input: {threadId: "{thread_node_id}"}) {
+      thread { isResolved }
+    }
+  }
+'
+```
+
+### thread_node_idの取得方法
+
+```bash
+# PRのレビュースレッド一覧を取得（node_id含む）
+gh api graphql -f query='
+  query {
+    repository(owner: "{owner}", name: "{repo}") {
+      pullRequest(number: {pr_number}) {
+        reviewThreads(first: 100) {
+          nodes {
+            id
+            isResolved
+            comments(first: 1) {
+              nodes { body }
+            }
+          }
+        }
+      }
+    }
+  }
+'
+```
 
 **方針**:
 - 品質・可読性・セキュリティ向上、既存機能影響なし

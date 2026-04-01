@@ -8,7 +8,7 @@ description: |
   - 実行コマンドの自動選択
   - uv環境のセットアップガイド
 
-  Triggers: "run python", "execute python", "python script", "uv run", "Python実行", "スクリプト実行", "python環境"
+  Triggers: "python", "uv", "スクリプト", "python環境"
 allowed-tools:
   - Read
   - Bash
