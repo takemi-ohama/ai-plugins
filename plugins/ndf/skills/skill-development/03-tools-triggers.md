@@ -4,13 +4,21 @@
 
 ### 基本構文
 
+YAMLリスト形式とスペース区切り文字列の両方が有効。
+
 ```yaml
+# YAMLリスト形式
 ---
 allowed-tools:
   - Read
   - Write
   - Grep
   - Glob
+---
+
+# スペース区切り文字列形式
+---
+allowed-tools: Read Write Grep Glob
 ---
 ```
 
@@ -42,22 +50,16 @@ allowed-tools:
 - スキル外のツールは通常の承認フローに従う
 - `/compact`や`/init`などの組み込みコマンドは利用不可
 
-## トリガーキーワードの設定
+## description による自動呼び出し制御
 
-### description に含める
+### 「Use when」形式で使用タイミングを明示（公式推奨）
 
 ```yaml
 ---
 name: code-review
 description: |
   コードレビューを実施し、品質とセキュリティをチェックします。
-
-  使用タイミング:
-  - コードの品質チェックを依頼された時
-  - プルリクエストのレビューを依頼された時
-  - 「レビューして」と言われた時
-
-  Triggers: "code review", "review PR", "check code", "コードレビュー", "レビュー"
+  Use when reviewing code quality, checking pull requests, or when asked to review code.
 ---
 ```
 
@@ -108,6 +110,7 @@ $ARGUMENTS[0] を分析してレポートを生成します。
 
 ```yaml
 ${CLAUDE_SESSION_ID}   # セッションID
+${CLAUDE_SKILL_DIR}    # SKILL.mdのあるディレクトリの絶対パス
 ```
 
 ### 引数ヒント

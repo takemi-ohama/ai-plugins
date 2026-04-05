@@ -18,7 +18,7 @@
 
 ```
 my-skill/
-├── SKILL.md              # メイン指示（~100行）
+├── SKILL.md              # メイン指示（500行以下推奨）
 ├── 01-quick-start.md     # クイックスタート
 ├── 02-detailed-guide.md  # 詳細ガイド
 ├── 03-api-reference.md   # APIリファレンス
@@ -66,7 +66,7 @@ name: database-ops
 description: |
   データベース操作のヘルパー。クエリ最適化、マイグレーション、バックアップを支援。
 
-  Triggers: "database", "SQL", "migration", "データベース"
+  Use when working with databases, writing SQL queries, running migrations, or managing backups.
 allowed-tools:
   - Read
   - Bash(psql *)
@@ -119,7 +119,8 @@ postgresql://user:password@host:5432/database
 
 ### 上限
 
-- スキルの`description`合計が**15,000文字**を超えると一部除外
+- description単体は**250文字**でtruncateされる
+- 全スキルのdescription合計はコンテキストウィンドウの**1%**（フォールバック**8,000文字**）を超えると一部除外
 - 環境変数`SLASH_COMMAND_TOOL_CHAR_BUDGET`で調整可能
 
 ### 確認方法
@@ -133,14 +134,14 @@ postgresql://user:password@host:5432/database
 
 ### DO（推奨）
 
-- **SKILL.mdは100行以下**に保つ
+- **SKILL.mdは500行以下**に保つ（公式推奨）
 - **詳細は順序prefix付きファイル**に分割
 - **テーブル形式で参照ファイルを明示**
 - **クイックリファレンスをSKILL.mdに含める**
 
 ### DON'T（非推奨）
 
-- **500行超のSKILL.md**
+- **500行超のSKILL.md**（公式上限）
 - **全情報を1ファイルに詰め込む**
 - **参照ファイルへのリンクなし**
 - **曖昧なファイル名（`details.md`等）**
