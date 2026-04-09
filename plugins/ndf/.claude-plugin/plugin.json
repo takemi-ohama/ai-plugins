@@ -1,6 +1,6 @@
 {
   "name": "ndf",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Integrated plugin with specialized agents, workflow skills, and Codex MCP. Serena MCP is now a separate plugin (mcp-serena).",
   "author": {
     "name": "takemi-ohama",
@@ -38,6 +38,7 @@
     "./skills/skill-development",
     "./skills/deepwiki-transfer",
     "./skills/knowledge-reorg",
-    "./skills/git-gh-operations"
+    "./skills/git-gh-operations",
+    "./skills/google-auth"
   ]
 }
