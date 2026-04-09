@@ -8,7 +8,7 @@ name: my-skill-name
 description: |
   スキルの説明。Claudeがいつ使用するか判断するために使用。
 
-  Triggers: "keyword1", "keyword2"
+  Use when asked about keyword1 or keyword2.
 allowed-tools:
   - Read
   - Write
@@ -72,6 +72,9 @@ disable-model-invocation: true
 | `context` | なし | `fork`でサブエージェントとして実行 |
 | `agent` | なし | `context: fork`時のエージェントタイプ |
 | `model` | 継承 | 使用するモデル |
+| `effort` | 継承 | `low` / `medium` / `high` / `max`（maxはOpus 4.6のみ） |
+| `paths` | なし | globパターンで自動有効化を特定ファイルに制限 |
+| `shell` | `bash` | `!`command``のシェル（`bash` or `powershell`） |
 
 ```yaml
 # サブエージェントとして実行
@@ -82,17 +85,45 @@ agent: Explore
 ---
 ```
 
+```yaml
+# 特定ファイルパターンでのみ自動有効化
+---
+name: react-helper
+paths: "src/components/**/*.tsx, src/hooks/**/*.ts"
+---
+```
+
+```yaml
+# effortレベル指定
+---
+name: deep-analysis
+effort: high
+context: fork
+agent: Explore
+---
+```
+
 ### フック
+
+settings.jsonと同じ構造をYAMLフロントマター内に記述する。
 
 ```yaml
 ---
 hooks:
-  pre-invoke:
-    command: ./scripts/setup.sh
-  post-invoke:
-    command: ./scripts/cleanup.sh
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "./scripts/security-check.sh"
+  PostToolUse:
+    - matcher: "Write"
+      hooks:
+        - type: command
+          command: "./scripts/lint.sh"
 ---
 ```
+
+> **注意**: `pre-invoke`/`post-invoke`というイベント名は存在しない。`PreToolUse`, `PostToolUse`等のイベント名を使用すること。
 
 ## name フィールドのルール
 
@@ -118,11 +149,9 @@ name: my skill      # スペース
 
 ```yaml
 description: |
-  コードを視覚的な図と例えで説明します。
-  コードの仕組みを説明する時、コードベースについて教える時、
-  または「これはどう動くの？」と聞かれた時に使用。
-
-  Triggers: "explain code", "how does this work", "コード説明"
+  Explains code with visual diagrams and analogies.
+  Use when explaining how code works, teaching about a codebase,
+  or when the user asks "how does this work?"
 ```
 
 ### 悪い例
@@ -131,7 +160,7 @@ description: |
 # 曖昧すぎる
 description: コードに関するスキル
 
-# 長すぎる（100文字以内推奨）
+# 長すぎる（250文字でtruncateされる）
 description: このスキルは...（長文）
 ```
 
