@@ -1,7 +1,53 @@
 {
-  "description": "AI Plugins開発用デフォルトエージェント",
+  "name": "default",
+  "description": "NDF統合開発エージェント（Kiro CLI用）",
   "resources": [
     "file://AGENTS.md",
-    "file://README.md"
-  ]
+    "file://README.md",
+    "skill://plugins/ndf/skills/pr/SKILL.md",
+    "skill://plugins/ndf/skills/pr-tests/SKILL.md",
+    "skill://plugins/ndf/skills/fix/SKILL.md",
+    "skill://plugins/ndf/skills/review/SKILL.md",
+    "skill://plugins/ndf/skills/merged/SKILL.md",
+    "skill://plugins/ndf/skills/clean/SKILL.md",
+    "skill://plugins/ndf/skills/cleanup/SKILL.md",
+    "file://plugins/ndf/skills/ndf-policies/SKILL.md",
+    "skill://plugins/ndf/skills/data-analyst-sql-optimization/SKILL.md",
+    "skill://plugins/ndf/skills/data-analyst-export/SKILL.md",
+    "skill://plugins/ndf/skills/corder-code-templates/SKILL.md",
+    "skill://plugins/ndf/skills/corder-test-generation/SKILL.md",
+    "skill://plugins/ndf/skills/researcher-report-templates/SKILL.md",
+    "skill://plugins/ndf/skills/scanner-pdf-analysis/SKILL.md",
+    "skill://plugins/ndf/skills/qa-security-scan/SKILL.md",
+    "skill://plugins/ndf/skills/markdown-writing/SKILL.md",
+    "skill://plugins/ndf/skills/python-execution/SKILL.md",
+    "skill://plugins/ndf/skills/docker-container-access/SKILL.md",
+    "skill://plugins/ndf/skills/skill-development/SKILL.md",
+    "skill://plugins/ndf/skills/deepwiki-transfer/SKILL.md",
+    "skill://plugins/ndf/skills/knowledge-reorg/SKILL.md",
+    "skill://plugins/ndf/skills/git-gh-operations/SKILL.md",
+    "skill://plugins/ndf/skills/google-auth/SKILL.md"
+  ],
+  "hooks": {
+    "agentSpawn": [
+      {
+        "command": "if [ -f \"${PWD}/CLAUDE.ndf.md\" ] || [ -f \"$HOME/.claude/CLAUDE.ndf.md\" ]; then echo \"[NDF] CLAUDE.ndf.md が検出されました。廃止済みです。cleanup を実行して削除してください。\"; fi"
+      }
+    ],
+    "stop": [
+      {
+        "command": "node plugins/ndf/scripts/slack-notify.js session_end",
+        "timeout_ms": 70000
+      }
+    ]
+  },
+  "mcpServers": {
+    "codex": {
+      "command": "codex",
+      "args": [
+        "mcp-server"
+      ],
+      "env": {}
+    }
+  }
 }
