@@ -4,29 +4,8 @@
   "resources": [
     "file://AGENTS.md",
     "file://README.md",
-    "skill://plugins/ndf/skills/pr/SKILL.md",
-    "skill://plugins/ndf/skills/pr-tests/SKILL.md",
-    "skill://plugins/ndf/skills/fix/SKILL.md",
-    "skill://plugins/ndf/skills/review/SKILL.md",
-    "skill://plugins/ndf/skills/merged/SKILL.md",
-    "skill://plugins/ndf/skills/clean/SKILL.md",
-    "skill://plugins/ndf/skills/cleanup/SKILL.md",
-    "file://plugins/ndf/skills/ndf-policies/SKILL.md",
-    "skill://plugins/ndf/skills/data-analyst-sql-optimization/SKILL.md",
-    "skill://plugins/ndf/skills/data-analyst-export/SKILL.md",
-    "skill://plugins/ndf/skills/corder-code-templates/SKILL.md",
-    "skill://plugins/ndf/skills/corder-test-generation/SKILL.md",
-    "skill://plugins/ndf/skills/researcher-report-templates/SKILL.md",
-    "skill://plugins/ndf/skills/scanner-pdf-analysis/SKILL.md",
-    "skill://plugins/ndf/skills/qa-security-scan/SKILL.md",
-    "skill://plugins/ndf/skills/markdown-writing/SKILL.md",
-    "skill://plugins/ndf/skills/python-execution/SKILL.md",
-    "skill://plugins/ndf/skills/docker-container-access/SKILL.md",
-    "skill://plugins/ndf/skills/skill-development/SKILL.md",
-    "skill://plugins/ndf/skills/deepwiki-transfer/SKILL.md",
-    "skill://plugins/ndf/skills/knowledge-reorg/SKILL.md",
-    "skill://plugins/ndf/skills/git-gh-operations/SKILL.md",
-    "skill://plugins/ndf/skills/google-auth/SKILL.md"
+    "file://.kiro/skills/ndf-policies/SKILL.md",
+    "skill://.kiro/skills/**/SKILL.md"
   ],
   "hooks": {
     "agentSpawn": [

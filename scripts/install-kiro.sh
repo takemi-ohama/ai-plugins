@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLUGIN_DIR="$PROJECT_ROOT/plugins/ndf"
 KIRO_DIR="$PROJECT_ROOT/.kiro"
+SKILLS_DIR="$KIRO_DIR/skills"
 AGENT_FILE="$KIRO_DIR/agents/default.json"
 PLUGIN_JSON="$PLUGIN_DIR/.claude-plugin/plugin.json"
 
@@ -37,56 +38,54 @@ if [ ! -f "$PLUGIN_JSON" ]; then
   exit 1
 fi
 
-# Create .kiro/agents/ if needed
-mkdir -p "$KIRO_DIR/agents"
-
-# Build resources array from plugin.json skills
-echo "Skills を検出中..."
-RESOURCES='"file://AGENTS.md"'
-RESOURCES="$RESOURCES, \"file://README.md\""
-
-# Read skills from plugin.json and generate skill:// entries
+# --- Step 1: Create symlinks in .kiro/skills/ ---
+mkdir -p "$SKILLS_DIR"
+echo "Skills シンボリックリンクを作成中..."
+SKILL_COUNT=0
 while IFS= read -r skill_path; do
-  # Remove ./  prefix and quotes
   skill_path="${skill_path#./}"
-  skill_md="plugins/ndf/${skill_path}/SKILL.md"
+  skill_name=$(basename "$skill_path")
+  src_dir="$PLUGIN_DIR/$skill_path"
 
-  if [ ! -f "$PROJECT_ROOT/$skill_md" ]; then
-    echo "  SKIP: $skill_md (ファイルなし)"
+  if [ ! -f "$src_dir/SKILL.md" ]; then
+    echo "  SKIP: $skill_name (SKILL.mdなし)"
     continue
   fi
 
-  # ndf-policies is always-on (file://), others are on-demand (skill://)
-  if [[ "$skill_path" == *"ndf-policies"* ]]; then
-    RESOURCES="$RESOURCES, \"file://$skill_md\""
-    echo "  常時: $skill_path"
-  else
-    RESOURCES="$RESOURCES, \"skill://$skill_md\""
-    echo "  登録: $skill_path"
-  fi
+  # Relative symlink from .kiro/skills/ to plugins/ndf/skills/
+  ln -sfn "../../plugins/ndf/$skill_path" "$SKILLS_DIR/$skill_name"
+  echo "  linked: $skill_name"
+  SKILL_COUNT=$((SKILL_COUNT + 1))
 done < <(grep -oP '"\.\/skills\/[^"]+' "$PLUGIN_JSON" | sed 's/"//g')
 
-# Build hooks
-HOOKS=""
-# agentSpawn: CLAUDE.ndf.md deprecation warning
-AGENTSPAWN_CMD='if [ -f \"${PWD}/CLAUDE.ndf.md\" ] || [ -f \"$HOME/.claude/CLAUDE.ndf.md\" ]; then echo \"[NDF] CLAUDE.ndf.md が検出されました。廃止済みです。cleanup を実行して削除してください。\"; fi'
-HOOKS="\"agentSpawn\": [{\"command\": \"$AGENTSPAWN_CMD\"}]"
+# --- Step 2: Create prompts in .kiro/prompts/ for workflow skills ---
+PROMPTS_DIR="$KIRO_DIR/prompts"
+mkdir -p "$PROMPTS_DIR"
+echo "ワークフロープロンプトを作成中..."
 
-if [ "$WITH_SLACK" = true ]; then
-  HOOKS="$HOOKS, \"stop\": [{\"command\": \"node plugins/ndf/scripts/slack-notify.js session_end\", \"timeout_ms\": 70000}]"
-  echo "Slack通知: 有効"
-else
-  echo "Slack通知: 無効 (--with-slack で有効化)"
-fi
+declare -A PROMPT_DESCS=(
+  [pr]="commit, push, PR作成を一括実行してください。"
+  [pr-tests]="PRのTest Planを自動実行し、結果をPRコメントに反映してください。"
+  [fix]="PRのレビューコメントを確認し、修正対応を実行してください。"
+  [review]="PRを専門家としてレビューし、Approve/Request Changesを判定してください。"
+  [merged]="PRマージ後のクリーンアップを実行してください（main更新、ブランチ削除）。"
+  [clean]="mainマージ済みブランチをローカル/リモート一括削除してください。"
+)
 
-# Build mcpServers
-MCP=""
-if [ "$WITH_CODEX" = true ]; then
-  MCP="\"mcpServers\": {\"codex\": {\"command\": \"codex\", \"args\": [\"mcp-server\"], \"env\": {}}}"
-  echo "Codex MCP: 有効"
-else
-  echo "Codex MCP: 無効 (--with-codex で有効化)"
-fi
+for name in "${!PROMPT_DESCS[@]}"; do
+  cat > "$PROMPTS_DIR/$name.md" << PROMPT_EOF
+${PROMPT_DESCS[$name]}
+
+${name}スキルの手順に従って実行してください。引数があればそのまま使用します。
+PROMPT_EOF
+  echo "  prompt: $name"
+done
+
+# --- Step 3: Generate agent config ---
+mkdir -p "$KIRO_DIR/agents"
+
+if [ "$WITH_SLACK" = true ]; then echo "Slack通知: 有効"; else echo "Slack通知: 無効 (--with-slack で有効化)"; fi
+if [ "$WITH_CODEX" = true ]; then echo "Codex MCP: 有効"; else echo "Codex MCP: 無効 (--with-codex で有効化)"; fi
 
 # Backup existing config
 if [ -f "$AGENT_FILE" ]; then
@@ -94,27 +93,33 @@ if [ -f "$AGENT_FILE" ]; then
   echo "既存設定をバックアップ: ${AGENT_FILE}.bak"
 fi
 
-# Generate agent JSON
-{
-  echo "{"
-  echo "  \"name\": \"default\","
-  echo "  \"description\": \"NDF統合開発エージェント（Kiro CLI用）\","
-  echo "  \"resources\": [$RESOURCES],"
-  echo "  \"hooks\": {$HOOKS}"
-  [ -n "$MCP" ] && echo "  , $MCP"
-  echo "}"
-} > "$AGENT_FILE"
+# Write agent JSON
+python3 -c "
+import json, sys
+config = {
+    'name': 'default',
+    'description': 'NDF統合開発エージェント（Kiro CLI用）',
+    'resources': [
+        'file://AGENTS.md',
+        'file://README.md',
+        'file://.kiro/skills/ndf-policies/SKILL.md',
+        'skill://.kiro/skills/**/SKILL.md'
+    ],
+    'hooks': {
+        'agentSpawn': [{'command': 'if [ -f \"\${PWD}/CLAUDE.ndf.md\" ] || [ -f \"\$HOME/.claude/CLAUDE.ndf.md\" ]; then echo \"[NDF] CLAUDE.ndf.md が検出されました。廃止済みです。cleanup を実行して削除してください。\"; fi'}]
+    }
+}
+if sys.argv[1] == 'true':
+    config['hooks']['stop'] = [{'command': 'node plugins/ndf/scripts/slack-notify.js session_end', 'timeout_ms': 70000}]
+if sys.argv[2] == 'true':
+    config['mcpServers'] = {'codex': {'command': 'codex', 'args': ['mcp-server'], 'env': {}}}
+json.dump(config, open(sys.argv[3], 'w'), indent=2, ensure_ascii=False)
+" "$WITH_SLACK" "$WITH_CODEX" "$AGENT_FILE"
 
-# Pretty-print with python if available, otherwise leave as-is
-if command -v python3 &>/dev/null; then
-  python3 -c "import json,sys; d=json.load(open(sys.argv[1])); json.dump(d,open(sys.argv[1],'w'),indent=2,ensure_ascii=False)" "$AGENT_FILE" 2>/dev/null || true
-fi
-
-SKILL_COUNT=$(grep -c 'skill://' "$AGENT_FILE" || echo 0)
 echo ""
 echo "=== インストール完了 ==="
 echo "  エージェント設定: $AGENT_FILE"
-echo "  登録Skills数: $SKILL_COUNT"
+echo "  Skills数: $SKILL_COUNT (シンボリックリンク: .kiro/skills/)"
 echo ""
 echo "Kiro CLIを起動して動作確認してください:"
 echo "  kiro-cli chat"
