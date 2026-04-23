@@ -110,11 +110,11 @@ plugins/ndf/
 ## 開発履歴
 
 ### v3.4.0
-- 外部リソース調査で定番とされるSkill2個を追加
-  - **mcp-builder**: Anthropic公式 `anthropics/skills` (Apache-2.0) から取込。MCPサーバー雛形生成ガイド。LICENSE.txt同梱・原著作権保持
-  - **office-docs-generation**: NDF独自執筆。python-docx/python-pptx/openpyxlによるWord/PowerPoint/Excel新規生成ガイド（抽出ではなく生成側）
-- **注意**: Anthropic公式の docx/pptx/xlsx Skillはプロプライエタリライセンスのため取込不可。独自ガイドで代替
-- Skills: 23個 → 25個
+- Anthropic公式の定番Skill `mcp-builder` を取込（Apache-2.0）
+  - MCPサーバー雛形生成ガイド（Python FastMCP / Node TypeScript SDK）
+  - LICENSE.txt同梱・原著作権保持
+- プロプライエタリSkill（docx/pptx/xlsx等）は取込せず、個別インストール手順を `docs/official-skills-installation.md` で案内
+- Skills: 23個 → 24個
 
 ### v3.3.0
 - 定番サブエージェント3個を追加（いずれも `model: sonnet`）
