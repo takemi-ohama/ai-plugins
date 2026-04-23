@@ -7,7 +7,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 3.2.0
+- **現在バージョン**: 3.3.0
 - **種類**: 統合プラグイン（Codex MCP + Skills + Agents + Hooks）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -30,13 +30,16 @@ plugins/ndf/
 │   └── hooks.json               # プロジェクトフック定義
 ├── scripts/
 │   └── slack-notify.js          # Slack通知スクリプト
-├── agents/                      # サブエージェント（6個）
-│   ├── director.md
-│   ├── data-analyst.md
-│   ├── corder.md
-│   ├── researcher.md
-│   ├── scanner.md
-│   └── qa.md
+├── agents/                      # サブエージェント（9個、モデル階層化）
+│   ├── director.md              # opus: 計画・統括
+│   ├── corder.md                # sonnet: Codex第二意見レビュー
+│   ├── data-analyst.md          # sonnet: BigQuery/SQL
+│   ├── researcher.md            # sonnet: AWS Docs/Chrome DevTools
+│   ├── qa.md                    # sonnet: セキュリティ/品質
+│   ├── debugger.md              # sonnet: 根本原因分析
+│   ├── devops-engineer.md       # sonnet: Docker/CI/K8s
+│   ├── code-reviewer.md         # sonnet: diff/PRレビュー
+│   └── scanner.md               # haiku: Office抽出
 ├── skills/                      # スキル（23個）
 │   ├── pr/                      # ワークフロー系（8個、/ndf:* で呼出）
 │   ├── pr-tests/
@@ -105,6 +108,13 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v3.3.0
+- 定番サブエージェント3個を追加（いずれも `model: sonnet`）
+  - **debugger**: エラー・バグの根本原因分析
+  - **devops-engineer**: Dockerfile/CI/CD/Kubernetes
+  - **code-reviewer**: git diff / PR一般レビュー（corderと差別化: Codex非使用）
+- Agents: 6個 → 9個
 
 ### v3.2.0
 - サブエージェントに `model:` 指定を追加し、コスト最適化
