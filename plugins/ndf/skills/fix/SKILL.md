@@ -20,16 +20,20 @@ allowed-tools:
 
 1. review comment確認
 2. **CIエラー確認**（`gh pr checks <PR>` で失敗ジョブを検出）
+   - 実行中(PENDING/IN_PROGRESS)のチェックが残っている場合は次ステップに進まず完了を待つ
 3. 修正可否判断（review指摘 + CIエラー両方）
 4. 問題点修正
-5. コミット・プッシュ
-6. **CI再実行結果の確認**（push後、CIが通るまで待機 or 失敗したら追加修正）
-7. PRにSummaryコメントを追加
-8. 対応したコードコメントに個別に返信
-9. reviewerに再レビューを依頼
-10. 対応完了したコードコメントを「Resolve Conversation」にする
+5. **コミット前のCI状態再確認**（修正作業中にCIが完了して新しい失敗が出ているかも）
+   - 実行中があればさらに完了を待つ
+   - 新しい失敗が出ていれば手順3に戻る
+6. コミット・プッシュ
+7. **CI再実行結果の確認**（push後、CIが通るまで待機 or 失敗したら追加修正）
+8. PRにSummaryコメントを追加
+9. 対応したコードコメントに個別に返信
+10. reviewerに再レビューを依頼
+11. 対応完了したコードコメントを「Resolve Conversation」にする
 
-- 4〜5はgit、1〜2と7以降はgithub mcpまたはghを利用
+- 4〜6はgit、1〜2/5と8以降はgithub mcpまたはghを利用
 
 ## CIエラーチェック
 
@@ -45,7 +49,25 @@ gh pr checks <PR番号> --json name,state,link,completedAt
 # 失敗ジョブのみ抽出
 gh pr checks <PR番号> --json name,state | \
   python3 -c "import json,sys; [print(c['name']) for c in json.load(sys.stdin) if c['state']=='FAILURE']"
+
+# 実行中ジョブのみ抽出（完了待ちに使用）
+gh pr checks <PR番号> --json name,state | \
+  python3 -c "import json,sys; [print(c['name']) for c in json.load(sys.stdin) if c['state'] in ('PENDING','IN_PROGRESS','QUEUED')]"
 ```
+
+### CI完了を待つ
+
+`gh pr checks --watch` で全チェックの完了までブロック待機できる:
+
+```bash
+# 完了まで待機（全部PASSでexit 0、失敗があればexit 1）
+gh pr checks <PR番号> --watch
+
+# タイムアウト付きで待つ（例: 最大10分）
+timeout 600 gh pr checks <PR番号> --watch || echo "timed out or failed"
+```
+
+修正作業の途中や、コミット直前の再確認で活用する。
 
 ### 失敗ログの取得
 
