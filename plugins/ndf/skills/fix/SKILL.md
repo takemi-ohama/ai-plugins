@@ -19,15 +19,64 @@ allowed-tools:
 ## 手順
 
 1. review comment確認
-2. 修正可否判断
-3. 問題点修正
-4. コミット・プッシュ
-5. PRにSummaryコメントを追加
-6. 対応したコードコメントに個別に返信
-7. reviewerに再レビューを依頼
-8. 対応完了したコードコメントを「Resolve Conversation」にする
+2. **CIエラー確認**（`gh pr checks <PR>` で失敗ジョブを検出）
+3. 修正可否判断（review指摘 + CIエラー両方）
+4. 問題点修正
+5. コミット・プッシュ
+6. **CI再実行結果の確認**（push後、CIが通るまで待機 or 失敗したら追加修正）
+7. PRにSummaryコメントを追加
+8. 対応したコードコメントに個別に返信
+9. reviewerに再レビューを依頼
+10. 対応完了したコードコメントを「Resolve Conversation」にする
 
-- 4はgit、1と5以降はgithub mcpまたはghを利用
+- 4〜5はgit、1〜2と7以降はgithub mcpまたはghを利用
+
+## CIエラーチェック
+
+### 失敗ジョブの検出
+
+```bash
+# PRの全チェック状態を確認（FAIL/PASS/PENDING）
+gh pr checks <PR番号>
+
+# JSON形式で詳細取得
+gh pr checks <PR番号> --json name,state,link,completedAt
+
+# 失敗ジョブのみ抽出
+gh pr checks <PR番号> --json name,state | \
+  python3 -c "import json,sys; [print(c['name']) for c in json.load(sys.stdin) if c['state']=='FAILURE']"
+```
+
+### 失敗ログの取得
+
+```bash
+# ワークフロー実行ID取得
+RUN_ID=$(gh run list --branch <branch-name> --limit 1 --json databaseId --jq '.[0].databaseId')
+
+# 失敗ステップのログだけ表示（効率的）
+gh run view $RUN_ID --log-failed
+
+# 特定ジョブのログ
+gh run view $RUN_ID --job <job-id> --log
+```
+
+### CIエラーの分類と対応方針
+
+| エラー種別 | 対応方針 |
+|---|---|
+| **lint/format** | 自動修正ツール実行（`ruff`, `prettier`, `eslint --fix` 等）→ コミット |
+| **型チェック** | 型定義・アノテーションを修正。無視コメントは原則禁止（根本対応） |
+| **テスト失敗** | 失敗テストを読み、実装/テストどちらが正しいか判断してから修正。テスト側の問題なら仕様確認 |
+| **ビルドエラー** | 依存関係・構文・設定ファイルを確認 |
+| **依存脆弱性** | 可能ならバージョン更新、無理なら除外ルール追加（理由明記） |
+| **タイムアウト/flaky** | retry設定、テスト分割、リトライ追加 |
+| **インフラ一時障害** | 再実行で解消することがあるため `gh run rerun $RUN_ID` を先に試す |
+
+### review指摘との統合
+
+review指摘とCIエラーは**同じPRで一緒に修正**する:
+- 同じファイル・機能に関する指摘とCIエラーは1コミットにまとめる
+- 独立しているなら別コミットに分離（git log で追いやすい）
 
 ## ghコマンド例
 
@@ -88,6 +137,7 @@ gh api graphql -f query='
 
 PRにSummaryコメントを追加:
 - 対応した指摘の一覧（優先度、ファイル、指摘内容、対応状況）
+- **対応したCIエラーの一覧**（ジョブ名、エラー内容、修正方法）
 - 各修正の問題点と修正内容
-- テスト結果
+- **CI再実行結果**（全チェックPASSの確認）
 - 修正ファイル一覧
