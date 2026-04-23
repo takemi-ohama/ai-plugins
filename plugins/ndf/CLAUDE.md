@@ -119,7 +119,8 @@ plugins/ndf/
   - シンボリックリンク方式で軽量
 - プロプライエタリSkill（docx/pptx/xlsx/pdf）は再配布せず、上記インストーラで個人利用者環境に配置
 - インストール手順・ライセンス方針を `docs/official-skills-installation.md` にまとめ
-- Skills: 23個 → 24個
+- `official-skills-autoloader` Skillを追加: Word/Excel/PowerPoint/PDF等の要求時に必要な公式Skillを自動ダウンロード→読込して即使用可能（利用者はインストール作業不要）
+- Skills: 23個 → 25個
 
 ### v3.3.0
 - 定番サブエージェント3個を追加（いずれも `model: sonnet`）

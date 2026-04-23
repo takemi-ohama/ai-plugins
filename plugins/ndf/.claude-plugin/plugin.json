@@ -1,7 +1,7 @@
 {
   "name": "ndf",
   "version": "3.4.0",
-  "description": "Integrated plugin with 9 specialized agents (model-tiered: opus/sonnet/haiku), 24 skills including official mcp-builder, and Codex MCP. Serena MCP is now a separate plugin (mcp-serena).",
+  "description": "Integrated plugin with 9 specialized agents (model-tiered: opus/sonnet/haiku), 25 skills including official mcp-builder and on-demand loader for Anthropic official skills, and Codex MCP. Serena MCP is now a separate plugin (mcp-serena).",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
@@ -43,6 +43,7 @@
     "./skills/knowledge-reorg",
     "./skills/git-gh-operations",
     "./skills/google-auth",
-    "./skills/mcp-builder"
+    "./skills/mcp-builder",
+    "./skills/official-skills-autoloader"
   ]
 }
