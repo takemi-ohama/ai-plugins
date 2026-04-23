@@ -7,7 +7,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 3.4.0
+- **現在バージョン**: 3.5.0
 - **種類**: 統合プラグイン（Codex MCP + Skills + Agents + Hooks）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -30,7 +30,7 @@ plugins/ndf/
 │   └── hooks.json               # プロジェクトフック定義
 ├── scripts/
 │   └── slack-notify.js          # Slack通知スクリプト
-├── agents/                      # サブエージェント（9個、モデル階層化）
+├── agents/                      # サブエージェント（8個、モデル階層化）
 │   ├── director.md              # opus: 計画・統括
 │   ├── corder.md                # sonnet: Codex第二意見レビュー
 │   ├── data-analyst.md          # sonnet: BigQuery/SQL
@@ -38,9 +38,8 @@ plugins/ndf/
 │   ├── qa.md                    # sonnet: セキュリティ/品質
 │   ├── debugger.md              # sonnet: 根本原因分析
 │   ├── devops-engineer.md       # sonnet: Docker/CI/K8s
-│   ├── code-reviewer.md         # sonnet: diff/PRレビュー
-│   └── scanner.md               # haiku: Office抽出
-├── skills/                      # スキル（23個）
+│   └── code-reviewer.md         # sonnet: diff/PRレビュー
+├── skills/                      # スキル（20個）
 │   ├── pr/                      # ワークフロー系（8個、/ndf:* で呼出）
 │   ├── pr-tests/
 │   ├── fix/
@@ -49,21 +48,18 @@ plugins/ndf/
 │   ├── clean/
 │   ├── cleanup/
 │   ├── deepwiki-transfer/
-│   ├── ndf-policies/            # ポリシー常時注入（model-invoked）
-│   ├── data-analyst-sql-optimization/  # モデル起動型（13個）
+│   ├── ndf-policies/            # ポリシー常時注入
+│   ├── data-analyst-sql-optimization/
 │   ├── data-analyst-export/
-│   ├── corder-code-templates/
-│   ├── corder-test-generation/
-│   ├── researcher-report-templates/
-│   ├── scanner-pdf-analysis/
-│   ├── scanner-excel-extraction/
 │   ├── qa-security-scan/
 │   ├── markdown-writing/
 │   ├── python-execution/
 │   ├── docker-container-access/
-│   ├── skill-development/
 │   ├── knowledge-reorg/
-│   └── git-gh-operations/
+│   ├── git-gh-operations/
+│   ├── google-auth/
+│   ├── mcp-builder/             # Anthropic公式（Apache-2.0）
+│   └── official-skills-autoloader/  # 公式Skill自動ロード
 ├── CLAUDE.md                    # このファイル（開発者向け）
 └── README.md                    # プラグイン説明書
 ```
@@ -108,6 +104,20 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v3.5.0 (破壊的変更: scanner削除)
+- Claude Code Read toolのmultimodal/PDF native対応、および v3.4.0で追加された `official-skills-autoloader` により冗長になったAgent/Skillを整理
+- **削除Agent**:
+  - `scanner` (Office抽出) → autoloader + 公式docx/pptx/xlsx Skillで代替
+- **削除Skills**:
+  - `scanner-pdf-analysis` → Read tool の PDF native対応で代替
+  - `scanner-excel-extraction` → autoloader + 公式xlsx Skillで代替（plugin.jsonのdangling ref整理）
+  - `skill-development` → 公式 `skill-creator` Skillで代替（autoloader取得可能）
+  - `corder-code-templates`, `corder-test-generation` → Claude本体のコード生成能力で代替
+  - `researcher-report-templates` → researcher agent description／Claude本体で代替
+- Agents: 9個 → **8個**
+- Skills: 25個 → **20個**
+- 移行ガイド: `/ndf:scanner` を呼んでいた処理は、autoloaderまたはRead toolへ切替
 
 ### v3.4.0
 - Anthropic公式の定番Skill `mcp-builder` を取込（Apache-2.0、LICENSE.txt同梱）
