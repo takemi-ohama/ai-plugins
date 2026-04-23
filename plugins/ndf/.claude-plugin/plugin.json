@@ -1,7 +1,7 @@
 {
   "name": "ndf",
-  "version": "3.3.0",
-  "description": "Integrated plugin with 9 specialized agents (model-tiered: opus/sonnet/haiku), workflow skills, and Codex MCP. Serena MCP is now a separate plugin (mcp-serena).",
+  "version": "3.4.0",
+  "description": "Integrated plugin with 9 specialized agents (model-tiered: opus/sonnet/haiku), 25 skills including official mcp-builder, and Codex MCP. Serena MCP is now a separate plugin (mcp-serena).",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
@@ -42,6 +42,8 @@
     "./skills/deepwiki-transfer",
     "./skills/knowledge-reorg",
     "./skills/git-gh-operations",
-    "./skills/google-auth"
+    "./skills/google-auth",
+    "./skills/mcp-builder",
+    "./skills/office-docs-generation"
   ]
 }

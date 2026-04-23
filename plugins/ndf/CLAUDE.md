@@ -7,7 +7,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 3.3.0
+- **現在バージョン**: 3.4.0
 - **種類**: 統合プラグイン（Codex MCP + Skills + Agents + Hooks）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -108,6 +108,13 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v3.4.0
+- 外部リソース調査で定番とされるSkill2個を追加
+  - **mcp-builder**: Anthropic公式 `anthropics/skills` (Apache-2.0) から取込。MCPサーバー雛形生成ガイド。LICENSE.txt同梱・原著作権保持
+  - **office-docs-generation**: NDF独自執筆。python-docx/python-pptx/openpyxlによるWord/PowerPoint/Excel新規生成ガイド（抽出ではなく生成側）
+- **注意**: Anthropic公式の docx/pptx/xlsx Skillはプロプライエタリライセンスのため取込不可。独自ガイドで代替
+- Skills: 23個 → 25個
 
 ### v3.3.0
 - 定番サブエージェント3個を追加（いずれも `model: sonnet`）
