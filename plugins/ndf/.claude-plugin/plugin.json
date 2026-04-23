@@ -1,7 +1,7 @@
 {
   "name": "ndf",
-  "version": "3.1.0",
-  "description": "Integrated plugin with specialized agents, workflow skills, and Codex MCP. Serena MCP is now a separate plugin (mcp-serena).",
+  "version": "3.2.0",
+  "description": "Integrated plugin with specialized agents (model-tiered: opus/sonnet/haiku), workflow skills, and Codex MCP. Serena MCP is now a separate plugin (mcp-serena).",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"

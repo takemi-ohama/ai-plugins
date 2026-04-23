@@ -1,5 +1,6 @@
 ---
 name: director
+model: opus
 description: |
   Claude Code機能を活用したタスク統括・設計立案の指揮者エージェント。
   **Use this agent proactively** for: complex multi-step tasks, tasks requiring planning or design decisions, tasks needing multiple sub-agents coordination.

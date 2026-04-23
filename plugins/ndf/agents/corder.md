@@ -1,9 +1,10 @@
 ---
 name: corder
+model: sonnet
 description: |
-  Codex、Serena、Context7を活用した高品質コード生成の専門エージェント。
-  **Use this agent proactively** for: code implementation, refactoring, code review, applying design patterns, writing new features.
-  積極的に委譲すべき場面: コード実装、リファクタリング、コードレビュー、設計パターン適用、新機能開発。
+  Codex MCPによる外部AI第二意見レビューや、Serena/Context7 MCPを活用する大規模コード調査の専門エージェント。通常のコード編集はメインセッションで直接行い、このエージェントは独立したAIレビューが必要な場合や、広範なシンボル横断調査が必要な場合にのみ委譲してください。
+  **Use this agent proactively** for: Codex-based independent code review (second opinion), large-scale symbol analysis via Serena, library API lookup via Context7.
+  積極的に委譲すべき場面: CodexによるAIコードレビュー（第二意見）、Serenaを使う大規模シンボル解析、Context7によるライブラリAPI調査。
 ---
 
 # コーディングエージェント

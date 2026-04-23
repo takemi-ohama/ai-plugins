@@ -7,7 +7,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 3.0.0
+- **現在バージョン**: 3.2.0
 - **種類**: 統合プラグイン（Codex MCP + Skills + Agents + Hooks）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -105,6 +105,20 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v3.2.0
+- サブエージェントに `model:` 指定を追加し、コスト最適化
+  - director: `opus`（計画・設計判断）
+  - corder, data-analyst, researcher, qa: `sonnet`
+  - scanner: `haiku`
+- scannerエージェントをOffice専用に縮小
+  - 画像・PDFはClaude Code built-inのRead tool（multimodal, pages）で処理する方針に変更
+- corderのdescriptionを「Codex第二意見レビュー／大規模調査」用途に明確化
+- researcherのdescriptionをAWS Docs / Chrome DevTools専用に縮小
+
+### v3.1.0
+- Kiro CLI対応（`.kiro/` 配下のインストーラ、プロンプト、スキルリンク）
+- `google-auth` スキル追加
 
 ### v3.0.0 (破壊的変更)
 - Serena MCPを`mcp-serena`プラグインに分離

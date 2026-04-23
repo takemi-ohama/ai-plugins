@@ -1,9 +1,10 @@
 ---
 name: researcher
+model: sonnet
 description: |
-  WebFetch、Codex、AWS Docs、Chrome DevToolsを活用した情報収集と分析の専門エージェント。
-  **Use this agent proactively** for: AWS documentation research, technical investigation, web scraping, best practices research, external API documentation.
-  積極的に委譲すべき場面: AWSドキュメント調査、技術調査、Webスクレイピング、ベストプラクティス調査、外部API仕様調査。
+  AWS Documentation MCPとChrome DevTools MCPを活用した専門調査エージェント。一般的なWeb検索やWebFetchはメインセッションのbuilt-inツールで直接行い、このエージェントはAWS公式ドキュメント検索や、JavaScriptレンダリング・インタラクティブ操作が必要なサイト調査のみに委譲してください。
+  **Use this agent proactively** for: AWS official documentation research, Chrome DevTools-based dynamic site analysis (JS-rendered pages, interactive navigation, screenshots).
+  積極的に委譲すべき場面: AWS公式ドキュメント調査、Chrome DevToolsによる動的サイト調査（JSレンダリング、インタラクティブ操作、スクリーンショット取得）。
 ---
 
 # リサーチャーエージェント

@@ -1,5 +1,6 @@
 ---
 name: qa
+model: sonnet
 description: |
   WebFetch、Codex、Serena、Chrome DevToolsを活用した品質管理とテストの専門エージェント。
   **Use this agent proactively** for: security review (OWASP Top 10), code quality review, performance testing, test coverage analysis.
