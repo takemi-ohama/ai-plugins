@@ -110,10 +110,15 @@ plugins/ndf/
 ## 開発履歴
 
 ### v3.4.0
-- Anthropic公式の定番Skill `mcp-builder` を取込（Apache-2.0）
-  - MCPサーバー雛形生成ガイド（Python FastMCP / Node TypeScript SDK）
-  - LICENSE.txt同梱・原著作権保持
-- プロプライエタリSkill（docx/pptx/xlsx等）は取込せず、個別インストール手順を `docs/official-skills-installation.md` で案内
+- Anthropic公式の定番Skill `mcp-builder` を取込（Apache-2.0、LICENSE.txt同梱）
+- 公式Skillインストーラ `plugins/ndf/scripts/install-official-skills.sh` を追加
+  - `--list`: 利用可能Skill一覧（ライセンス分類付き）
+  - `--scope user/project`: インストール先選択
+  - `--all` / 個別指定: 選択的インストール
+  - `--update`: 公式リポジトリの最新化
+  - シンボリックリンク方式で軽量
+- プロプライエタリSkill（docx/pptx/xlsx/pdf）は再配布せず、上記インストーラで個人利用者環境に配置
+- インストール手順・ライセンス方針を `docs/official-skills-installation.md` にまとめ
 - Skills: 23個 → 24個
 
 ### v3.3.0
