@@ -7,7 +7,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 3.0.0
+- **現在バージョン**: 3.5.0
 - **種類**: 統合プラグイン（Codex MCP + Skills + Agents + Hooks）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -30,14 +30,16 @@ plugins/ndf/
 │   └── hooks.json               # プロジェクトフック定義
 ├── scripts/
 │   └── slack-notify.js          # Slack通知スクリプト
-├── agents/                      # サブエージェント（6個）
-│   ├── director.md
-│   ├── data-analyst.md
-│   ├── corder.md
-│   ├── researcher.md
-│   ├── scanner.md
-│   └── qa.md
-├── skills/                      # スキル（23個）
+├── agents/                      # サブエージェント（8個、モデル階層化）
+│   ├── director.md              # opus: 計画・統括
+│   ├── corder.md                # sonnet: Codex第二意見レビュー
+│   ├── data-analyst.md          # sonnet: BigQuery/SQL
+│   ├── researcher.md            # sonnet: AWS Docs/Chrome DevTools
+│   ├── qa.md                    # sonnet: セキュリティ/品質
+│   ├── debugger.md              # sonnet: 根本原因分析
+│   ├── devops-engineer.md       # sonnet: Docker/CI/K8s
+│   └── code-reviewer.md         # sonnet: diff/PRレビュー
+├── skills/                      # スキル（20個）
 │   ├── pr/                      # ワークフロー系（8個、/ndf:* で呼出）
 │   ├── pr-tests/
 │   ├── fix/
@@ -46,21 +48,18 @@ plugins/ndf/
 │   ├── clean/
 │   ├── cleanup/
 │   ├── deepwiki-transfer/
-│   ├── ndf-policies/            # ポリシー常時注入（model-invoked）
-│   ├── data-analyst-sql-optimization/  # モデル起動型（13個）
+│   ├── ndf-policies/            # ポリシー常時注入
+│   ├── data-analyst-sql-optimization/
 │   ├── data-analyst-export/
-│   ├── corder-code-templates/
-│   ├── corder-test-generation/
-│   ├── researcher-report-templates/
-│   ├── scanner-pdf-analysis/
-│   ├── scanner-excel-extraction/
 │   ├── qa-security-scan/
 │   ├── markdown-writing/
 │   ├── python-execution/
 │   ├── docker-container-access/
-│   ├── skill-development/
 │   ├── knowledge-reorg/
-│   └── git-gh-operations/
+│   ├── git-gh-operations/
+│   ├── google-auth/
+│   ├── mcp-builder/             # Anthropic公式（Apache-2.0）
+│   └── official-skills-autoloader/  # 公式Skill自動ロード
 ├── CLAUDE.md                    # このファイル（開発者向け）
 └── README.md                    # プラグイン説明書
 ```
@@ -105,6 +104,54 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v3.5.0 (破壊的変更: scanner削除)
+- Claude Code Read toolのmultimodal/PDF native対応、および v3.4.0で追加された `official-skills-autoloader` により冗長になったAgent/Skillを整理
+- **削除Agent**:
+  - `scanner` (Office抽出) → autoloader + 公式docx/pptx/xlsx Skillで代替
+- **削除Skills**:
+  - `scanner-pdf-analysis` → Read tool の PDF native対応で代替
+  - `scanner-excel-extraction` → autoloader + 公式xlsx Skillで代替（plugin.jsonのdangling ref整理）
+  - `skill-development` → 公式 `skill-creator` Skillで代替（autoloader取得可能）
+  - `corder-code-templates`, `corder-test-generation` → Claude本体のコード生成能力で代替
+  - `researcher-report-templates` → researcher agent description／Claude本体で代替
+- Agents: 9個 → **8個**
+- Skills: 25個 → **20個**
+- 移行ガイド: `/ndf:scanner` を呼んでいた処理は、autoloaderまたはRead toolへ切替
+
+### v3.4.0
+- Anthropic公式の定番Skill `mcp-builder` を取込（Apache-2.0、LICENSE.txt同梱）
+- 公式Skillインストーラ `plugins/ndf/scripts/install-official-skills.sh` を追加
+  - `--list`: 利用可能Skill一覧（ライセンス分類付き）
+  - `--scope user/project`: インストール先選択
+  - `--all` / 個別指定: 選択的インストール
+  - `--update`: 公式リポジトリの最新化
+  - シンボリックリンク方式で軽量
+- プロプライエタリSkill（docx/pptx/xlsx/pdf）は再配布せず、上記インストーラで個人利用者環境に配置
+- インストール手順・ライセンス方針を `docs/official-skills-installation.md` にまとめ
+- `official-skills-autoloader` Skillを追加: Word/Excel/PowerPoint/PDF等の要求時に必要な公式Skillを自動ダウンロード→読込して即使用可能（利用者はインストール作業不要）
+- Skills: 23個 → 25個
+
+### v3.3.0
+- 定番サブエージェント3個を追加（いずれも `model: sonnet`）
+  - **debugger**: エラー・バグの根本原因分析
+  - **devops-engineer**: Dockerfile/CI/CD/Kubernetes
+  - **code-reviewer**: git diff / PR一般レビュー（corderと差別化: Codex非使用）
+- Agents: 6個 → 9個
+
+### v3.2.0
+- サブエージェントに `model:` 指定を追加し、コスト最適化
+  - director: `opus`（計画・設計判断）
+  - corder, data-analyst, researcher, qa: `sonnet`
+  - scanner: `haiku`
+- scannerエージェントをOffice専用に縮小
+  - 画像・PDFはClaude Code built-inのRead tool（multimodal, pages）で処理する方針に変更
+- corderのdescriptionを「Codex第二意見レビュー／大規模調査」用途に明確化
+- researcherのdescriptionをAWS Docs / Chrome DevTools専用に縮小
+
+### v3.1.0
+- Kiro CLI対応（`.kiro/` 配下のインストーラ、プロンプト、スキルリンク）
+- `google-auth` スキル追加
 
 ### v3.0.0 (破壊的変更)
 - Serena MCPを`mcp-serena`プラグインに分離
