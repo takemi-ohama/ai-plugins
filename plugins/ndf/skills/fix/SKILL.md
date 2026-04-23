@@ -74,7 +74,8 @@ timeout 600 gh pr checks <PR番号> --watch || echo "timed out or failed"
 
 ```bash
 # ワークフロー実行ID取得
-RUN_ID=$(gh run list --branch <branch-name> --limit 1 --json databaseId --jq '.[0].databaseId')
+RUN_ID=$(gh run list --branch <branch-name> --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+[ -z "$RUN_ID" ] && { echo "No CI run found for this branch"; exit 0; }
 
 # 失敗ステップのログだけ表示（効率的）
 gh run view $RUN_ID --log-failed
