@@ -1,7 +1,20 @@
 {
-  "description": "NDF Plugin hooks: CLAUDE.ndf.md detection and notifications",
+  "description": "NDF Plugin hooks: CLAUDE.ndf.md detection, transcript retention guard, and Slack notifications",
   "hooks": {
     "SessionStart": [
+      {
+        "matcher": "startup",
+        "description": "Ensure ~/.claude/settings.json cleanupPeriodDays >= 90 (guarded by 7-day timestamp flag)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/ensure-retention.sh",
+            "description": "NDF: ensure transcript retention >= 90 days",
+            "continueOnError": true,
+            "suppressOutput": false
+          }
+        ]
+      },
       {
         "description": "Detect deprecated CLAUDE.ndf.md and warn user",
         "hooks": [

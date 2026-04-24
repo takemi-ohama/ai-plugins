@@ -1,7 +1,7 @@
 {
   "name": "ndf",
-  "version": "3.6.0",
-  "description": "Integrated plugin with 8 specialized agents (model-tiered: opus/sonnet/haiku), 33 skills including official mcp-builder, on-demand loader for Anthropic official skills, generic workflow/principle skills, and Codex MCP. Serena MCP is now a separate plugin (mcp-serena).",
+  "version": "3.7.0",
+  "description": "Integrated plugin with 8 specialized agents (model-tiered: opus/sonnet/haiku), 34 skills including official mcp-builder, on-demand loader for Anthropic official skills, generic workflow/principle skills, skill usage statistics, and Codex MCP. Transcript retention is automatically kept at >= 90 days. Serena MCP is now a separate plugin (mcp-serena).",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
@@ -50,6 +50,7 @@
     "./skills/review-pr-comments",
     "./skills/resolve-pr-comments",
     "./skills/browser-test",
-    "./skills/codex"
+    "./skills/codex",
+    "./skills/skill-stats"
   ]
 }

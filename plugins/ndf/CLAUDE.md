@@ -7,7 +7,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 3.6.0
+- **現在バージョン**: 3.7.0
 - **種類**: 統合プラグイン（Codex MCP + Skills + Agents + Hooks）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -122,6 +122,20 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v3.7.0
+- **Transcript保持期間の自動管理**:
+  - `SessionStart` hook (matcher: `startup`) + `scripts/ensure-retention.sh` を追加
+  - `~/.claude/settings.json` の `cleanupPeriodDays` を最低 90 日に保つ (既に 90 以上ならそのまま)
+  - 7 日タイムスタンプガード (`~/.claude/.ndf-retention-checked`) で多重実行防止
+  - Claude Code 本体の公開 API/ドキュメントには「プラグインインストール時」hook が存在しないため、`SessionStart + startup` matcher が事実上の最適解
+- **`/ndf:skill-stats` skillを追加**:
+  - `~/.claude/projects/**/*.jsonl` transcript から NDF skill 利用統計を集計
+  - 項目: 呼び出し数 / 関連話題数 / ヒット数 / ヒット率
+  - 関連話題判定は SKILL.md frontmatter の `Triggers: '..', '..'` 行を使用 (明示されていない skill は計算対象外)
+  - Python 実装、標準ライブラリのみ
+  - skill description の網羅性を評価するツールとして機能
+- Skills: 33個 → **34個**
 
 ### v3.6.0
 - carmo-system-consoleから汎用skill/commandを抽出してNDFに統合
