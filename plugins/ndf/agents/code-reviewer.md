@@ -2,7 +2,7 @@
 name: code-reviewer
 model: sonnet
 description: |
-  git diff / PR差分の一般的なコードレビューに特化したエージェント。可読性、設計、バグ、セキュリティ、テスト観点からチェックし、重要度順に指摘を返します。Codex MCPによる外部AI第二意見が欲しい場合は代わりにcorderエージェントを使ってください。
+  git diff / PR差分の一般的なコードレビューに特化したエージェント。可読性、設計、バグ、セキュリティ、テスト観点からチェックし、重要度順に指摘を返します。Codex CLIによる外部AI第二意見が欲しい場合は代わりにcorderエージェントを使ってください。
   **Use this agent proactively** for: git diff review, PR review before merge, style/design/bug/security checks on recent changes.
   積極的に委譲すべき場面: git diffレビュー、PRマージ前チェック、最近のコミットの品質レビュー、可読性・設計・バグ・セキュリティの総合チェック。
 ---

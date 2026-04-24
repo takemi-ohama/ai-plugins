@@ -7,8 +7,8 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 3.7.0
-- **種類**: 統合プラグイン（Codex MCP + Skills + Agents + Hooks）
+- **現在バージョン**: 4.0.0
+- **種類**: 統合プラグイン（Skills + Agents + Hooks / v4.0.0 で Codex MCP 廃止）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
 > **Note (v3.0.0)**: Serena MCPは`mcp-serena`プラグインに分離。memory系スキルは廃止。CLAUDE.ndf.md注入は廃止。
@@ -122,6 +122,18 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v4.0.0 (BREAKING: Codex MCP 廃止)
+- **Codex MCP サーバを削除** (`.mcp.json` から `codex` エントリを削除)
+  - 理由: `/ndf:codex` skill (CLI直接実行) で十分であり、MCP 経由の制約 (ホスト側ファイル読み取り制限等) よりも CLI 直接実行の方が有用
+  - 影響: `mcp__codex__codex` / `mcp__codex__codex-reply` は利用不可
+  - 代替: `/ndf:codex` skill の手順で `codex exec` をバックグラウンド実行、または `corder` エージェント経由で呼び出し
+- **corder エージェントを CLI ベースに書き換え**
+  - MCP 呼び出しを `/ndf:codex` skill 参照に変更
+  - Serena / Context7 MCP は引き続き利用
+- 他エージェント (researcher, qa, devops-engineer, debugger, code-reviewer, director) の description から Codex MCP 言及を削除 / CLI ベースに更新
+- `skills/codex` の MCP 版との使い分け節を corder エージェントとの使い分けに書き換え
+- `skills/qa-security-scan/03-report-template.md` の JS 疑似コードを `codex exec` bash 例に置換
 
 ### v3.7.0
 - **Transcript保持期間の自動管理**:

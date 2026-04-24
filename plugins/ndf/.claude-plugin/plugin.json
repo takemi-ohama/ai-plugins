@@ -1,7 +1,7 @@
 {
   "name": "ndf",
-  "version": "3.7.0",
-  "description": "Integrated plugin with 8 specialized agents (model-tiered: opus/sonnet/haiku), 34 skills including official mcp-builder, on-demand loader for Anthropic official skills, generic workflow/principle skills, skill usage statistics, and Codex MCP. Transcript retention is automatically kept at >= 90 days. Serena MCP is now a separate plugin (mcp-serena).",
+  "version": "4.0.0",
+  "description": "Integrated plugin with 8 specialized agents (model-tiered: opus/sonnet/haiku), 34 skills including official mcp-builder, on-demand loader for Anthropic official skills, generic workflow/principle skills, skill usage statistics, and Codex CLI integration via /ndf:codex skill. Transcript retention is automatically kept at >= 90 days. BREAKING (v4.0.0): Codex MCP server is removed; use /ndf:codex skill (direct CLI exec) instead. Serena MCP is a separate plugin (mcp-serena).",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"

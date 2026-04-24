@@ -52,7 +52,7 @@ description: |
 - `Grep` - 既存設定の参照
 
 ### MCPツール
-- Codex MCP（第二意見によるマニフェストレビュー）
+- Codex CLI（`/ndf:codex` skill または `corder` エージェント経由で第二意見マニフェストレビュー）
 
 ## セキュリティ方針
 
