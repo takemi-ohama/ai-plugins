@@ -289,16 +289,14 @@ Claude Codeが自動的に適切なMCPツールを選択・利用します。
 - コンテキスト使用量を最適化するため、使わないMCPはインストールしないことを推奨します
 - 各プラグインの詳細な設定方法は、個別のREADMEを参照してください
 
-### 2. 専門エージェント (6種類)
-
-**重要**: このプラグインには`CLAUDE.ndf.md`が含まれており、メインエージェント（Claude）に対してサブエージェントの積極的な活用を促す指示が記載されています。
+### 2. 専門エージェント (8種類)
 
 **サブエージェントの活用方針:**
 - **複雑なタスクは`director`に委譲** - directorがMain Agentに報告し、Main Agentが他のエージェントを起動
 - **単純なタスクは専門エージェントに直接委譲**
 - **directorはMain Agentに報告する** - メモリエラー防止のため直接呼び出しは行わない
 
-詳細は `plugins/ndf/CLAUDE.ndf.md` を参照してください。
+詳細はメインセッションに自動注入される `ndf-policies` skill および `plugins/ndf/CLAUDE.md` を参照してください。
 
 #### `director` エージェント（指揮者）
 **専門領域:** タスク統括・設計立案・エージェント調整
@@ -484,7 +482,6 @@ Claudeが自律的に判断して起動するスキル群。
 | | `codex` | Codex CLI直接実行（corderエージェントとの使い分け） |
 | 知識管理 | `deepwiki-transfer` | DeepWikiからの知識転送 |
 | | `knowledge-reorg` | 知識再編成 |
-| | `cleanup` | CLAUDE.ndf.md後始末 |
 | 公式連携 | `mcp-builder` | MCPサーバー作成ガイド（Anthropic公式、Apache-2.0） |
 | | `official-skills-autoloader` | Anthropic公式Skillの自動ロード |
 

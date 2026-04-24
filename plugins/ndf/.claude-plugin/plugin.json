@@ -1,12 +1,22 @@
 {
   "name": "ndf",
   "version": "4.0.0",
-  "description": "Integrated plugin with 8 specialized agents (model-tiered: opus/sonnet/haiku), 34 skills including official mcp-builder, on-demand loader for Anthropic official skills, generic workflow/principle skills, skill usage statistics, and Codex CLI integration via /ndf:codex skill. Transcript retention is automatically kept at >= 90 days. BREAKING (v4.0.0): Codex MCP server is removed; use /ndf:codex skill (direct CLI exec) instead. Serena MCP is a separate plugin (mcp-serena).",
+  "description": "Integrated plugin with 8 specialized agents (model-tiered: opus/sonnet/haiku), 33 skills including official mcp-builder, on-demand loader for Anthropic official skills, generic workflow/principle skills, skill usage statistics, and Codex CLI integration via /ndf:codex skill. Transcript retention is automatically kept at >= 90 days. BREAKING (v4.0.0): Codex MCP server is removed (use /ndf:codex skill); legacy CLAUDE.ndf.md detection hook and /ndf:cleanup skill are removed (obsolete since v3.0.0). Serena MCP is a separate plugin (mcp-serena).",
   "author": {
     "name": "takemi-ohama",
     "url": "https://github.com/takemi-ohama"
   },
-  "keywords": ["mcp", "codex", "workflow", "slack", "notifications", "agents", "skills", "director", "orchestrator"],
+  "keywords": [
+    "mcp",
+    "codex",
+    "workflow",
+    "slack",
+    "notifications",
+    "agents",
+    "skills",
+    "director",
+    "orchestrator"
+  ],
   "agents": [
     "./agents/director.md",
     "./agents/data-analyst.md",
@@ -24,7 +34,6 @@
     "./skills/review",
     "./skills/merged",
     "./skills/clean",
-    "./skills/cleanup",
     "./skills/ndf-policies",
     "./skills/data-analyst-sql-optimization",
     "./skills/data-analyst-export",

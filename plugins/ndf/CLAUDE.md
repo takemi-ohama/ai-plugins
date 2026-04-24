@@ -53,7 +53,6 @@ plugins/ndf/
 │   ├── sync-main/               # main取り込み
 │   ├── merged/                  # マージ後クリーンアップ
 │   ├── clean/                   # マージ済みブランチ一括削除
-│   ├── cleanup/                 # CLAUDE.ndf.md後始末
 │   # 原則・ガイドライン系
 │   ├── ndf-policies/            # ポリシー常時注入
 │   ├── branch-fix-strategy/     # ブランチ修正適用戦略
@@ -123,7 +122,7 @@ plugins/ndf/
 
 ## 開発履歴
 
-### v4.0.0 (BREAKING: Codex MCP 廃止)
+### v4.0.0 (BREAKING: Codex MCP廃止 + レガシー救済機構削除)
 - **Codex MCP サーバを削除** (`.mcp.json` から `codex` エントリを削除)
   - 理由: `/ndf:codex` skill (CLI直接実行) で十分であり、MCP 経由の制約 (ホスト側ファイル読み取り制限等) よりも CLI 直接実行の方が有用
   - 影響: `mcp__codex__codex` / `mcp__codex__codex-reply` は利用不可
@@ -134,6 +133,11 @@ plugins/ndf/
 - 他エージェント (researcher, qa, devops-engineer, debugger, code-reviewer, director) の description から Codex MCP 言及を削除 / CLI ベースに更新
 - `skills/codex` の MCP 版との使い分け節を corder エージェントとの使い分けに書き換え
 - `skills/qa-security-scan/03-report-template.md` の JS 疑似コードを `codex exec` bash 例に置換
+- **レガシー CLAUDE.ndf.md 救済機構を削除** (v3.0.0 で本体廃止、以降の救済装置を除去)
+  - `hooks/hooks.json` の CLAUDE.ndf.md 検出 hook を削除
+  - `skills/cleanup/` を削除 (`plugin.json` の参照も削除)
+  - まだ残っているユーザーは今後手動で `CLAUDE.ndf.md` を削除してください
+- Skills: 34個 → **33個** (`cleanup` 削除)
 
 ### v3.7.0
 - **Transcript保持期間の自動管理**:
