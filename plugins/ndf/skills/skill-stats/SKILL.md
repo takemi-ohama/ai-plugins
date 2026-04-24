@@ -20,17 +20,29 @@ Claude Code の transcript JSONL ファイル (`~/.claude/projects/*.jsonl`) を
 ## 使用方法
 
 ```bash
-# 過去90日分を集計 (デフォルト、transcript保持期間に合わせる)
+# 過去90日分を全プロジェクト合算 (デフォルト、transcript保持期間に合わせる)
 /ndf:skill-stats
 
-# 期間指定
-/ndf:skill-stats --days 30
+# --- 期間フィルタ ---
+/ndf:skill-stats --days 30                            # 直近30日
+/ndf:skill-stats --from 2026-04-01                    # 2026-04-01 以降
+/ndf:skill-stats --from 2026-04-01 --to 2026-04-30    # 絶対範囲 (両端inclusive)
 
-# 特定のskillだけ見る
-/ndf:skill-stats --skill pr
+# --- skill / プロジェクト フィルタ ---
+/ndf:skill-stats --skill pr                           # skill名部分一致
+/ndf:skill-stats --project carmo                      # プロジェクト名部分一致
 
-# JSON出力
-/ndf:skill-stats --format json
+# --- プロジェクト別集計 ---
+/ndf:skill-stats --by-project                         # プロジェクトごとに表を分けて出力
+/ndf:skill-stats --by-project --project carmo         # carmo を含むプロジェクトだけ分解
+
+# --- 出力形式 ---
+/ndf:skill-stats --format json                        # JSON (projects配列 + grand_skills)
+/ndf:skill-stats --show-keywords                      # 抽出されたTriggersも併記
+
+# --include-fallback: Triggers 未定義 skill でも description から語彙抽出してマッチ
+# (ノイズが多いので通常は不要)
+/ndf:skill-stats --include-fallback
 ```
 
 内部的には以下のコマンドを実行する:
@@ -38,6 +50,10 @@ Claude Code の transcript JSONL ファイル (`~/.claude/projects/*.jsonl`) を
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/skill-stats/scripts/skill-stats.py "$@"
 ```
+
+### プロジェクトの決定方法
+
+transcript JSONL 先頭の `cwd` フィールドを優先してプロジェクトラベルを決める (例: `/work/ai-plugins` → `ai-plugins`)。取得できない場合は transcript ディレクトリ名 (例: `-work-ai-plugins`) を復元 (`-` → `/`) して使用する。
 
 ## 集計項目
 
