@@ -7,7 +7,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 3.5.0
+- **現在バージョン**: 3.6.0
 - **種類**: 統合プラグイン（Codex MCP + Skills + Agents + Hooks）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -39,25 +39,43 @@ plugins/ndf/
 │   ├── debugger.md              # sonnet: 根本原因分析
 │   ├── devops-engineer.md       # sonnet: Docker/CI/K8s
 │   └── code-reviewer.md         # sonnet: diff/PRレビュー
-├── skills/                      # スキル（20個）
-│   ├── pr/                      # ワークフロー系（8個、/ndf:* で呼出）
-│   ├── pr-tests/
-│   ├── fix/
-│   ├── review/
-│   ├── merged/
-│   ├── clean/
-│   ├── cleanup/
-│   ├── deepwiki-transfer/
+├── skills/                      # スキル（33個）
+│   # PRワークフロー系
+│   ├── pr/                      # commit+push+PR作成/更新
+│   ├── pr-tests/                # Test Plan自動実行
+│   ├── fix/                     # PRコメント修正対応
+│   ├── review/                  # PR単位レビュー（Approve/RC判定）
+│   ├── review-branch/           # ローカル差分レビュー（PR前）
+│   ├── review-pr-comments/      # PRコメント分類（READ-ONLY）
+│   ├── resolve-pr-comments/     # 対応済みコメント返信+Resolve
+│   ├── cherry-pick-pr/          # 環境ブランチへのcherry-pick PR
+│   ├── deploy/                  # 環境ブランチへのデプロイPR
+│   ├── sync-main/               # main取り込み
+│   ├── merged/                  # マージ後クリーンアップ
+│   ├── clean/                   # マージ済みブランチ一括削除
+│   ├── cleanup/                 # CLAUDE.ndf.md後始末
+│   # 原則・ガイドライン系
 │   ├── ndf-policies/            # ポリシー常時注入
+│   ├── branch-fix-strategy/     # ブランチ修正適用戦略
+│   ├── implementation-plan/     # 実装プラン管理(issues/)
+│   ├── investigation-rules/     # 調査時のエビデンス主義
+│   ├── problem-solving/         # 根本原因分析・多層防御
+│   ├── logging-guidelines/      # ログ運用ガイドライン(言語非依存)
+│   # データ分析・品質
 │   ├── data-analyst-sql-optimization/
 │   ├── data-analyst-export/
 │   ├── qa-security-scan/
+│   # ドキュメント・環境
 │   ├── markdown-writing/
 │   ├── python-execution/
 │   ├── docker-container-access/
+│   ├── deepwiki-transfer/
 │   ├── knowledge-reorg/
 │   ├── git-gh-operations/
 │   ├── google-auth/
+│   ├── browser-test/            # ブラウザ動作確認(Playwright/Chrome DevTools)
+│   ├── codex/                   # Codex CLI直接実行（MCP版との使い分け）
+│   # Anthropic公式連携
 │   ├── mcp-builder/             # Anthropic公式（Apache-2.0）
 │   └── official-skills-autoloader/  # 公式Skill自動ロード
 ├── CLAUDE.md                    # このファイル（開発者向け）
@@ -104,6 +122,22 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v3.6.0
+- carmo-system-consoleから汎用skill/commandを抽出してNDFに統合
+- **新規Skills（13個）**:
+  - 原則系（5個）: `branch-fix-strategy`, `implementation-plan`, `investigation-rules`, `problem-solving`, `logging-guidelines`
+  - ワークフロー系（7個）: `sync-main`, `cherry-pick-pr`, `deploy`, `review-branch`, `review-pr-comments`, `resolve-pr-comments`, `browser-test`
+  - 外部AI委譲（1個）: `codex`（CLI直接実行、MCP版corderとの使い分け）
+- **既存Skill改修**:
+  - `pr`: `--draft`フラグ対応、既存PR説明の自動更新、base非mainの場合`cherry-pick-pr`誘導、`.github/pull_request_template.md`サポート
+- Skills: 20個 → **33個**
+- PR/コードレビュー系の責務分担を明確化:
+  - `review` = PR単位レビュー（Approve/Request Changes判定）
+  - `review-branch` = ローカル差分レビュー（PR前のセルフレビュー）
+  - `review-pr-comments` = 既存PRコメントの分類（READ-ONLY）
+  - `fix` = コメント対応の修正実施
+  - `resolve-pr-comments` = 修正完了後の返信+Resolve（クロージング）
 
 ### v3.5.0 (破壊的変更: scanner削除)
 - Claude Code Read toolのmultimodal/PDF native対応、および v3.4.0で追加された `official-skills-autoloader` により冗長になったAgent/Skillを整理
