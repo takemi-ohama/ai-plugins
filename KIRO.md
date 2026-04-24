@@ -9,7 +9,7 @@
 ### 前提条件
 - Kiro CLI がインストール済み
 - Node.js（Slack通知を使う場合）
-- codex CLI（Codex MCPを使う場合）
+- Codex CLI（`/ndf:codex` skill で外部AI委譲を使う場合、または `--with-codex` で Kiro に Codex MCP サーバ設定を生成する場合）: `npm install -g @openai/codex`
 
 ### インストール
 
@@ -20,7 +20,10 @@ bash scripts/install-kiro.sh
 # Slack通知も有効化
 bash scripts/install-kiro.sh --with-slack
 
-# 全部入り（Slack + Codex MCP）
+# 全部入り（Slack通知 + Kiro 側 Codex MCP 設定生成）
+# 注: NDF v4.0.0 本体は Codex MCP に依存せず、/ndf:codex skill 経由で
+# CLI 直接実行に一本化。--with-codex は Kiro セッションで
+# `mcp__codex__*` を直接呼びたい場合のみ有効化すればよい。
 bash scripts/install-kiro.sh --with-slack --with-codex
 ```
 

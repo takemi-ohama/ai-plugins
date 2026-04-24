@@ -7,8 +7,8 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 3.6.0
-- **種類**: 統合プラグイン（Codex MCP + Skills + Agents + Hooks）
+- **現在バージョン**: 4.0.0
+- **種類**: 統合プラグイン（Skills + Agents + Hooks / v4.0.0 で Codex MCP 廃止）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
 > **Note (v3.0.0)**: Serena MCPは`mcp-serena`プラグインに分離。memory系スキルは廃止。CLAUDE.ndf.md注入は廃止。
@@ -53,7 +53,6 @@ plugins/ndf/
 │   ├── sync-main/               # main取り込み
 │   ├── merged/                  # マージ後クリーンアップ
 │   ├── clean/                   # マージ済みブランチ一括削除
-│   ├── cleanup/                 # CLAUDE.ndf.md後始末
 │   # 原則・ガイドライン系
 │   ├── ndf-policies/            # ポリシー常時注入
 │   ├── branch-fix-strategy/     # ブランチ修正適用戦略
@@ -122,6 +121,37 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v4.0.0 (BREAKING: Codex MCP廃止 + レガシー救済機構削除)
+- **Codex MCP サーバを削除** (`.mcp.json` から `codex` エントリを削除)
+  - 理由: `/ndf:codex` skill (CLI直接実行) で十分であり、MCP 経由の制約 (ホスト側ファイル読み取り制限等) よりも CLI 直接実行の方が有用
+  - 影響: `mcp__codex__codex` / `mcp__codex__codex-reply` は利用不可
+  - 代替: `/ndf:codex` skill の手順で `codex exec` をバックグラウンド実行、または `corder` エージェント経由で呼び出し
+- **corder エージェントを CLI ベースに書き換え**
+  - MCP 呼び出しを `/ndf:codex` skill 参照に変更
+  - Serena / Context7 MCP は引き続き利用
+- 他エージェント (researcher, qa, devops-engineer, debugger, code-reviewer, director) の description から Codex MCP 言及を削除 / CLI ベースに更新
+- `skills/codex` の MCP 版との使い分け節を corder エージェントとの使い分けに書き換え
+- `skills/qa-security-scan/03-report-template.md` の JS 疑似コードを `codex exec` bash 例に置換
+- **レガシー CLAUDE.ndf.md 救済機構を削除** (v3.0.0 で本体廃止、以降の救済装置を除去)
+  - `hooks/hooks.json` の CLAUDE.ndf.md 検出 hook を削除
+  - `skills/cleanup/` を削除 (`plugin.json` の参照も削除)
+  - まだ残っているユーザーは今後手動で `CLAUDE.ndf.md` を削除してください
+- Skills: 34個 → **33個** (`cleanup` 削除)
+
+### v3.7.0
+- **Transcript保持期間の自動管理**:
+  - `SessionStart` hook (matcher: `startup`) + `scripts/ensure-retention.sh` を追加
+  - `~/.claude/settings.json` の `cleanupPeriodDays` を最低 90 日に保つ (既に 90 以上ならそのまま)
+  - 7 日タイムスタンプガード (`~/.claude/.ndf-retention-checked`) で多重実行防止
+  - Claude Code 本体の公開 API/ドキュメントには「プラグインインストール時」hook が存在しないため、`SessionStart + startup` matcher が事実上の最適解
+- **`/ndf:skill-stats` skillを追加**:
+  - `~/.claude/projects/**/*.jsonl` transcript から NDF skill 利用統計を集計
+  - 項目: 呼び出し数 / 関連話題数 / ヒット数 / ヒット率
+  - 関連話題判定は SKILL.md frontmatter の `Triggers: '..', '..'` 行を使用 (明示されていない skill は計算対象外)
+  - Python 実装、標準ライブラリのみ
+  - skill description の網羅性を評価するツールとして機能
+- Skills: 33個 → **34個**
 
 ### v3.6.0
 - carmo-system-consoleから汎用skill/commandを抽出してNDFに統合
