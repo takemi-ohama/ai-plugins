@@ -84,10 +84,6 @@ base_modes:
 default_modes:
 - interactive
 - editing
-
-# Used as default for tools where the apply method has a default maximal answer length.
-# Even though the value of the max_answer_chars can be changed when calling the tool, it may make sense to adjust this default
-# through the global configuration.
 default_max_tool_answer_chars: 150000
 
 # the name of the token count estimator to use for tool usage statistics.
@@ -147,3 +143,18 @@ ignored_memory_patterns: []
 # Note that Serena's own files (e.g. memories and configuration files) always use native line endings.
 # This setting can be overridden on a per-project basis in project.yml files.
 line_ending: native
+
+# defines the interface (application mode) used for the web dashboard (if enabled).
+# If empty/null, use platform-dependent default. Otherwise, possible values:
+#  * browser: the dashboard is opened in the default browser (if `web_dashboard_open_on_launch` is true)
+#      This is supported on all platforms.
+#  * app: the dashboard is opened in a separate native-like app window with accompanying tray icon, whose
+#      lifecycle is tied to the Serena process.
+#      If `web_dashboard_open_on_launch` is false, the dashboard can be conveniently accessed via the tray icon.
+#      This is supported on Windows and macOS, but note that on macOS, where tray icons are very visible,
+#      this may result in too many icons being displayed when using multi-agent setups.
+#  * tray_manager: use a global tray icon to provide access to the dashboards of all running Serena instances,
+#      opening the dashboard in browser tabs when selected from the tray menu.
+#      This is EXPERIMENTAL. It is tested on Windows only. We will establish macOS support, but it is yet untested.
+#      On Linux, this cannot be universally supported, but it may work in some desktop environments.
+web_dashboard_interface:
