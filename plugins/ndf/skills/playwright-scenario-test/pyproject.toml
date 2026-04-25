@@ -1,0 +1,30 @@
+[project]
+name = "playwright-scenario-test"
+version = "0.1.0"
+description = "Playwright + curl による Web シナリオ E2E テストの汎用フレームワーク (Claude Code skill)"
+requires-python = ">=3.11"
+dependencies = [
+    "playwright>=1.50,<2.0",
+    "pyyaml>=6.0",
+    # webm → mp4 変換用。Playwright 録画は webm のみ生成するが、
+    # Google Drive のプレビュアでは mp4 (H.264) の方が安定するため変換する。
+    "imageio-ffmpeg>=0.4",
+]
+
+# Drive 連携を行う場合は --extra drive を付けて uv sync する
+[project.optional-dependencies]
+drive = [
+    "google-api-python-client>=2.0",
+    "google-auth>=2.0",
+    "google-auth-oauthlib>=1.0",
+]
+
+[project.scripts]
+scenario-test = "scenario_test.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["scenario_test"]

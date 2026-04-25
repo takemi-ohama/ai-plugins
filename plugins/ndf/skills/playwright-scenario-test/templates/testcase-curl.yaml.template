@@ -1,0 +1,51 @@
+id: TC-00
+title: 疎通検査 (curl)
+phase: 0
+type: curl
+priority: high
+description: |
+  HTTPS 到達性、Basic 認証ゲート、ログインフォーム HTML の存在を curl で検査する。
+  Playwright 起動の前段で実行する軽量チェック。
+
+# 各 check が ID 付き sub-test 扱いとなり、レポートでは個別 PASS/FAIL を出す
+checks:
+  - id: TC-00-01
+    name: ルート URL HTTPS 応答 (認証なし)
+    path: /
+    basic_auth: optional
+    expect_status_in: [200, 301, 302, 401]
+
+  - id: TC-00-02
+    name: 管理者画面 Basic 認証ゲート (無認証→401)
+    path: /admin/login
+    basic_auth: skip
+    expect_status_in: [401]
+
+  - id: TC-00-03
+    name: 管理者画面 Basic 認証通過後 (→200, ログインフォームあり)
+    path: /admin/login
+    basic_auth: required
+    expect_status_in: [200]
+    body_must_contain:
+      - 'name="LoginID"'
+      - 'name="Password"'
+
+  - id: TC-00-04
+    name: 一般ユーザログイン公開アクセス (無認証→200, フォームあり)
+    path: /user/login
+    basic_auth: skip
+    expect_status_in: [200]
+    body_must_contain:
+      - 'name="LoginID"'
+      - 'name="Password"'
+
+# ===========================================================================
+# 各 check フィールド説明
+# ===========================================================================
+# id              : サブ test ID (レポート上で個別 PASS/FAIL 表示)
+# name            : 表示名
+# path            : 訪問パス
+# basic_auth      : "skip" (認証ヘッダ無) | "required" (config の basic_auth を使う) |
+#                   "optional" (リダイレクト・401 何でも OK 用)
+# expect_status_in: 期待 HTTP ステータスのリスト (1 つでもマッチすれば OK)
+# body_must_contain: レスポンス本文に必ず含まれる文字列のリスト

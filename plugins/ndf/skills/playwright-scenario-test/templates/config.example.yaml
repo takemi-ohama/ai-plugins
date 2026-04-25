@@ -1,0 +1,122 @@
+# scenario-test 共通設定 (テンプレート)
+#
+# 使い方:
+#   cp config.example.yaml config.yaml
+#   uv run scenario-test --config config.yaml --workers 4
+#
+# config.yaml は .gitignore 対象 (認証情報を含むため)。
+# 個別のテストケース定義は testcases/ 配下の YAML を参照。
+
+# --- 接続先 ----------------------------------------------------------
+target:
+  base_url: https://example.com
+
+  # サイト全体に Basic 認証が掛かっている場合のみ指定 (掛かっていなければ削除)
+  basic_auth:
+    user: replace-me
+    password: replace-me
+
+# --- TLS 検査 (false で curl -k 相当) ---------------------------
+verify_tls: false
+
+# --- ロール別ログイン情報 ---------------------------------------
+# テストケース YAML から `role: <id>` で参照する
+roles:
+  admin:
+    label: 管理者
+    login:
+      path: /admin/login
+      requires_basic_auth: true   # /admin/ 配下のみ Basic 認証ゲートが掛かる場合
+      fields:
+        LoginID: admin@example.com
+        Password: replace-me
+      # 任意: 独自フォーム名がある場合の優先セレクタ。省略時は汎用フォールバック
+      # ('form input[type="image"]' / 'form button[type="submit"]' / 'form input[type="submit"]')
+      # で nav_helpers.submit_login が試行する。
+      # submit_selectors:
+      #   - 'form[name="MyAdminLoginForm"] button[type="submit"]'
+      # ログイン成功判定: URL がこの文字列を含めば「失敗」とみなす
+      fail_if_url_contains: /admin/login
+
+  user:
+    label: 一般ユーザ
+    login:
+      path: /user/login
+      requires_basic_auth: false
+      fields:
+        LoginID: user@example.com
+        Password: replace-me
+      fail_if_url_contains: /user/login
+
+# --- Playwright 設定 -----------------------------------------------
+playwright:
+  headless: true
+  # 1280x720 = HD 720p (16:9)。Google Drive のプレイヤが transcoding 不要で
+  # 即時再生しやすい標準解像度。
+  viewport:
+    width: 1280
+    height: 720
+  # Playwright の slow_mo: 1 操作ごとに ms 待機 (内部的なクリック・入力ごと)
+  slow_mo_ms: 0
+  video_size:
+    width: 1280
+    height: 720
+  navigation_timeout_ms: 30000
+  # 各ナビゲーション完了後にこの ms だけ待機する。動画で遷移が一瞬で過ぎないように
+  # 表示時間を稼ぐ。0 にすると待機なし。CI で速度優先なら 0、エビデンス重視なら
+  # 1500〜3000 程度を推奨。
+  step_delay_ms: 1800
+  # 動画にカーソル丸印 + 字幕オーバーレイ (直前/次へ の 2 行) を焼き込む
+  enable_overlay: true
+  # Playwright Trace (trace.zip) を出力する。 `playwright show-trace trace.zip`
+  # でクリック箇所のハイライト・DOM スナップショット・コンソールを対話確認可能。
+  enable_trace: true
+  # ページが viewport より長い場合、ナビゲーション直前に「下までスクロール →
+  # クリック対象 (なければ最上部) に戻る」アニメーションを差し込む。
+  # 動画でページ全体像を見せたい場合に有効。所要時間は +2〜3秒/ステップ。
+  enable_scroll_demo: true
+  # 録画動画のフォーマット: "mp4" 推奨 (Google Drive プレビュアで再生互換性が高い)。
+  # "webm" にすると変換せず Playwright 既定の webm のまま。
+  video_format: mp4
+
+# --- 並列実行ランナー設定 ------------------------------------------
+runner:
+  workers: 4
+  testcases_dir: ./testcases
+
+# --- ページ本文エラー検出 (省略可) -----------------------------------
+# 各ナビゲーション後に body_text を見て自動 FAIL 判定する。
+# 各リストが空のままなら無効化される。プロジェクトの言語/フレームワークに合わせて
+# 検出パターンを書き加える。
+body_check:
+  # 本文中にあれば致命的エラーとみなす文字列
+  fatal_patterns: []
+  # 本文先頭 300 文字に出ていれば「ページが壊れた」とみなす警告文字列
+  warning_patterns: []
+  # 本文中にあれば File not found 系とみなす文字列
+  not_found_strings: []
+
+# 例: PHP プロジェクトの場合 (Fatal/Warning/Notice/Deprecated を捕捉)
+# body_check:
+#   fatal_patterns: ["Fatal error", "Uncaught", "Parse error"]
+#   warning_patterns: ["STRICT:", "Warning:", "Notice:", "Deprecated:"]
+#   not_found_strings: ["File not found"]
+
+# --- スクショファイル名のスラッグ生成ルール (省略可) ------------------
+# path から作るスラッグの正規化ルール。空のままなら拡張子もクエリも残る。
+slug:
+  # 削除する拡張子の配列。例: PHP プロジェクトなら [".php"]
+  strip_extensions: []
+  # クエリ部分から拾うサフィックス (例: r"Cmd=(\w+)" で /foo.php?Cmd=Edit → foo-Edit)
+  query_capture_re: null
+
+# --- レポート設定 (省略可) -------------------------------------------
+# render_report が見出し・計画書リンク・Phase ラベルに使う。
+report:
+  title: "シナリオ E2E テスト 実施報告書"
+  test_plan_link: "./test-plan.md"
+  # phase 番号 → セクション見出し (未定義 phase は "phase {N}" で表示)
+  phase_labels:
+    # 0: "疎通検査 (curl)"
+    # 10: "管理者シナリオ"
+    # 20: "一般ユーザシナリオ"
