@@ -14,6 +14,24 @@ from scenario_test.testcase import CurlCheck, StepRecord, TestCase, TestCaseResu
 _STATUS_MARKER = "__CURL_STATUS__:"
 
 
+def _validate_url_part(part: str, label: str) -> None:
+    """URL に制御文字 (CR/LF/NUL/タブ) や空白が混入していないか検査する。
+
+    `subprocess.run` は list 引数 + `shell=False` (default) で呼んでいるためシェル経由
+    の command injection は構造的に発生しないが、CRLF injection (HTTP request
+    smuggling) や NUL バイト切断などの URL 層での攻撃を未然に防ぐため、明らかに
+    不正な制御文字を拒否する (defense in depth, CWE-93)。
+    """
+    if any(c in part for c in ("\r", "\n", "\x00", "\t")):
+        raise ValueError(
+            f"{label} に制御文字 (CR/LF/NUL/Tab) が含まれています: {part!r}"
+        )
+    if " " in part or '"' in part:
+        raise ValueError(
+            f"{label} に空白または引用符が含まれています: {part!r}"
+        )
+
+
 def _curl(
     base_url: str,
     path: str,
@@ -22,7 +40,15 @@ def _curl(
     verify_tls: bool,
     timeout: int = 20,
 ) -> tuple[int, str]:
-    """curl で指定パスを叩き (HTTP コード, 全 body) を返す。"""
+    """curl で指定パスを叩き (HTTP コード, 全 body) を返す。
+
+    Note: `subprocess.run(cmd, shell=False)` (default) で呼ぶため、`cmd` の各要素は
+    シェルを介さず execve() に直接渡される。シェルメタ文字 (` ; | & $` 等) は文字列
+    として curl に渡るだけで、コマンド注入は発生しない。CRLF/NUL 等は
+    `_validate_url_part` で別途検査して URL 層での悪用を防ぐ。
+    """
+    _validate_url_part(base_url, "base_url")
+    _validate_url_part(path, "path")
     cmd = ["curl", "-sS", "-o", "-", "-w", f"\n{_STATUS_MARKER}%{{http_code}}"]
     if not verify_tls:
         cmd.append("-k")
@@ -31,6 +57,7 @@ def _curl(
     cmd.extend(["--max-time", str(timeout), f"{base_url}{path}"])
 
     try:
+        # shell=False (default): cmd の各要素は execve() に直接渡される。
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 5)
     except subprocess.TimeoutExpired:
         return 0, "<timeout>"

@@ -108,9 +108,15 @@ def _resolve_client_secret(client_secret: str | os.PathLike | None) -> Path:
 
 
 def _save_token(creds: Credentials, token_file: Path) -> None:
-    token_file.parent.mkdir(parents=True, exist_ok=True)
+    """OAuth トークンを `0600` permission で保存する。
+
+    トークンは access_token / refresh_token を含むため、他ユーザから読まれない
+    よう所有者のみ read/write 可とする (CWE-732 対策)。親ディレクトリも `0700` で作成。
+    """
+    token_file.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     token_file.write_text(creds.to_json())
-    print(f'Token saved: {token_file}', file=sys.stderr)
+    token_file.chmod(0o600)
+    print(f'Token saved: {token_file} (mode 0600)', file=sys.stderr)
 
 
 def _pick_free_port() -> int:
@@ -126,25 +132,35 @@ def _authorize_manual(flow: InstalledAppFlow) -> Credentials:
     redirect_uri は `http://127.0.0.1:<空きポート>/` で動的割当 (どのポートにもサーバを
     立てないので競合しない)。ブラウザは「このサイトにアクセスできません」になるが、
     アドレスバーの URL をユーザに貼り付けてもらえば認可コードを取り出せる。
+
+    `OAUTHLIB_INSECURE_TRANSPORT` は localhost redirect_uri (loopback IP) のための
+    一時許可。プロセス全体に影響しないよう try/finally で元の値に復元する (CWE-319 対策)。
     """
-    os.environ.setdefault('OAUTHLIB_INSECURE_TRANSPORT', '1')
-    flow.redirect_uri = f'http://127.0.0.1:{_pick_free_port()}/'
-    auth_url, _ = flow.authorization_url(
-        access_type='offline', prompt='consent', include_granted_scopes='true'
-    )
-    print('', file=sys.stderr)
-    print('=== 手動認証フロー ===', file=sys.stderr)
-    print('1. 以下の URL をブラウザで開いて承認してください:', file=sys.stderr)
-    print('', file=sys.stderr)
-    print(auth_url, file=sys.stderr)
-    print('', file=sys.stderr)
-    print(f'2. 承認後、ブラウザは {flow.redirect_uri}?code=... へリダイレクトします', file=sys.stderr)
-    print('   (ローカルにサーバを立てていないため接続失敗ページになりますが、', file=sys.stderr)
-    print('    アドレスバーの URL をそのままコピーしてください)', file=sys.stderr)
-    print('', file=sys.stderr)
-    response_url = input('3. その URL をここに貼り付けて Enter: ').strip()
-    flow.fetch_token(authorization_response=response_url)
-    return flow.credentials
+    old_insecure = os.environ.get('OAUTHLIB_INSECURE_TRANSPORT')
+    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+    try:
+        flow.redirect_uri = f'http://127.0.0.1:{_pick_free_port()}/'
+        auth_url, _ = flow.authorization_url(
+            access_type='offline', prompt='consent', include_granted_scopes='true'
+        )
+        print('', file=sys.stderr)
+        print('=== 手動認証フロー ===', file=sys.stderr)
+        print('1. 以下の URL をブラウザで開いて承認してください:', file=sys.stderr)
+        print('', file=sys.stderr)
+        print(auth_url, file=sys.stderr)
+        print('', file=sys.stderr)
+        print(f'2. 承認後、ブラウザは {flow.redirect_uri}?code=... へリダイレクトします', file=sys.stderr)
+        print('   (ローカルにサーバを立てていないため接続失敗ページになりますが、', file=sys.stderr)
+        print('    アドレスバーの URL をそのままコピーしてください)', file=sys.stderr)
+        print('', file=sys.stderr)
+        response_url = input('3. その URL をここに貼り付けて Enter: ').strip()
+        flow.fetch_token(authorization_response=response_url)
+        return flow.credentials
+    finally:
+        if old_insecure is None:
+            os.environ.pop('OAUTHLIB_INSECURE_TRANSPORT', None)
+        else:
+            os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = old_insecure
 
 
 def get_credentials(
