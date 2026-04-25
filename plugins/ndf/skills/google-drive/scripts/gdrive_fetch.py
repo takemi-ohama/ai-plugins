@@ -80,7 +80,6 @@ def download_file(file_id, output, port=None):
 
 def upload_file(filepath, public=True, port=None):
     """ファイルをGoogle Driveにアップロード"""
-    import os
     creds = get_credentials(SCOPES_FILE, port=port) if port else get_credentials(SCOPES_FILE)
     service = build('drive', 'v3', credentials=creds)
 

@@ -1,11 +1,7 @@
 ---
 name: google-chat
-description: |
-  Google Chat API へのアクセス (スペースのメッセージ読み取り・スペース一覧)。
-  認証は `ndf:google-auth` スキルの共通モジュールを使用。WebFetch では
-  認証付きの Chat ページにアクセスできないため、Chat API + OAuth2 ユーザー認証で取得する。
-
-  Triggers: "Google Chat", "chat.spaces", "chat.messages", "Chatスペース", "メッセージ取得", "チャット履歴"
+description: "Google Chat API でスペースのメッセージ読み取り・スペース一覧を取得する。WebFetch は認証付き Chat ページに非対応のため、Chat API + OAuth2 ユーザー認証で取得する (認証は ndf:google-auth に委譲)。"
+when_to_use: "Google Chat スペースのメッセージ取得・スペース一覧が必要なとき。Triggers: 'Google Chat', 'chat.spaces', 'chat.messages', 'Chatスペース', 'メッセージ取得', 'チャット履歴'"
 allowed-tools:
   - Read
   - Bash(python *)

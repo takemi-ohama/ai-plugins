@@ -47,7 +47,7 @@ SCOPES = [
     'chat.spaces.readonly',
 ]
 
-DEFAULT_SPACE_ID = 'AAQA6AWG1iE'
+DEFAULT_SPACE_ID = os.environ.get('GCHAT_DEFAULT_SPACE') or None
 DEFAULT_OUTPUT = '/tmp/gchat_messages.json'
 
 
@@ -130,7 +130,8 @@ def list_messages(space_id, page_size=200, filter_str=None, order_by='createTime
 
 def main():
     parser = argparse.ArgumentParser(description='Google Chat メッセージ読み取り')
-    parser.add_argument('--space', default=DEFAULT_SPACE_ID, help='Space ID (URLの末尾)')
+    parser.add_argument('--space', default=DEFAULT_SPACE_ID,
+                        help='Space ID (URL末尾。env GCHAT_DEFAULT_SPACE で既定値も指定可)')
     parser.add_argument('--output', default=DEFAULT_OUTPUT, help='出力ファイルパス')
     parser.add_argument('--after', help='この日時以降のメッセージを取得 (RFC-3339形式)')
     parser.add_argument('--before', help='この日時以前のメッセージを取得 (RFC-3339形式)')
@@ -141,6 +142,9 @@ def main():
     if args.list_spaces:
         list_spaces()
         return
+
+    if not args.space:
+        parser.error("--space が必要です (または env GCHAT_DEFAULT_SPACE で既定値を指定)")
 
     # フィルタ構築
     filters = []

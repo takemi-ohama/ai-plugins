@@ -1,6 +1,11 @@
 ---
 name: playwright-scenario-test
-description: Playwright + curl で Web アプリのシナリオ E2E テストを並列実行し、字幕・カーソル付き動画と Markdown レポートを生成、Google Drive へアップロードして Google Docs 化するまでの一式の Know-How とテンプレート。Use when 構築する E2E テスト・動画エビデンス・Google Drive 共有レポートが必要なとき (検証環境の動作確認、第三者向けエビデンス収集、定期回帰テスト、リリース前確認など)。
+description: "Playwright + curl で Web アプリのシナリオ E2E テストを並列実行し、字幕・カーソル付き動画と Markdown レポートを生成、Google Drive へアップロードして Google Docs 化するまでの一式の Know-How とテンプレート。"
+when_to_use: "E2E テスト・動画エビデンス・Google Drive 共有レポートが必要なとき (検証環境の動作確認、第三者向けエビデンス収集、定期回帰テスト、リリース前確認など)。Triggers: 'E2E テスト', 'シナリオテスト', '動画エビデンス', 'Playwright', 'リリース前確認', '回帰テスト'"
+allowed-tools:
+  - Read
+  - Bash(uv *)
+  - Bash(python *)
 ---
 
 # Playwright シナリオテスト + 動画レポート Skill

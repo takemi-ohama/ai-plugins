@@ -1,10 +1,7 @@
 ---
 name: google-drive
-description: |
-  Google Drive / Google Docs API へのアクセス (ファイルエクスポート・ダウンロード・アップロード)。
-  認証は `ndf:google-auth` スキルの共通モジュールを使用。
-
-  Triggers: "Google Drive", "Google Docs", "drive.file", "ファイルエクスポート", "ダウンロード", "アップロード", "公開共有リンク"
+description: "Google Drive / Google Docs API でファイルのエクスポート・ダウンロード・アップロード (公開共有リンク付与) を行う。認証は ndf:google-auth に委譲。"
+when_to_use: "Google Drive / Docs のファイル操作が必要なとき。Triggers: 'Google Drive', 'Google Docs', 'drive.file', 'ファイルエクスポート', 'ダウンロード', 'アップロード', '公開共有リンク'"
 allowed-tools:
   - Read
   - Bash(python *)

@@ -126,6 +126,12 @@ plugins/ndf/
 ## 開発履歴
 
 ### v4.1.0
+- **公式 Agent Skill 仕様準拠**: 14 skill の frontmatter を Pattern A (description 単体に Triggers 埋め込み) から Pattern B (description + 公式 `when_to_use` フィールド分離) へ移行。対象 skill: codex / data-analyst-export / data-analyst-sql-optimization / deepwiki-transfer / docker-container-access / git-gh-operations / google-auth / google-chat / google-drive / markdown-writing / official-skills-autoloader / playwright-scenario-test / python-execution / qa-security-scan / skill-stats。`description` は概要に集中、`when_to_use` に Trigger phrase を分離して auto-invoke 精度向上 (公式 1,536 字上限内)。`mcp-builder` は Anthropic 公式 (Apache-2.0) のため改変せず。
+- **コード品質改善**:
+  - `google-chat/scripts/gchat_read.py`: `DEFAULT_SPACE_ID` のハードコード (`AAQA6AWG1iE`) を撤去。env `GCHAT_DEFAULT_SPACE` で指定するか `--space` を required にする運用に変更
+  - `google-auth/SKILL.md`: `allowed-tools` から不要な `Bash(pip *)` を削除 (uv で完結)
+  - `google-drive/scripts/gdrive_fetch.py`: `upload_file` 内の dead な再 `import os` を削除
+  - `playwright-scenario-test/SKILL.md`: 不足していた `allowed-tools` (Read / Bash(uv *) / Bash(python *)) を追加
 - **新規 Skill `playwright-scenario-test`** (self-contained uv project):
   - Playwright + curl で Web シナリオ E2E テストを並列実行
   - HUD オーバーレイ (カーソル + 字幕) 焼き込み済み動画 + Markdown レポート生成
