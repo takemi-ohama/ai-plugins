@@ -126,6 +126,13 @@ plugins/ndf/
 ## 開発履歴
 
 ### v4.1.0
+- **`playwright-scenario-test` v0.2.0** (理論ベース化):
+  - `docs/` 配下に方法論を 6 ファイル (総論 / page role / 技法 / Playwright API / bug report) + checklists 11 ファイル (lp/list/item/edit/form/search/dashboard/auth/cart-checkout/modal-wizard/common) として整備
+  - 出典: HTSM v6.3 (James Bach), ISTQB CTFL 4.2, ISO/IEC/IEEE 29119-3:2021, WCAG 2.2, OWASP Top 10:2025, FEW HICCUPPS, Hendrickson Cheat Sheet
+  - 新規スクリプト: `classify_page_role.py` (a11y tree から自動 role 判定), `generate_test_plan.py` (Pairwise 込み YAML 自動生成), `run_a11y_scan.py` (axe-core), `check_cwv.py` (LCP/CLS/TTFB), `record_scenario.py` (Playwright codegen ラッパー), `trace_link.py` (trace.zip → playwright.dev URL)
+  - 役割別 testcase YAML テンプレート 4 件 (list/edit/form/auth) を追加
+  - SKILL.md は実行手順とナビゲーションに集中 (332 → 245 行)
+  - pyproject.toml に optional-dependencies `a11y` (axe-playwright-python) を追加
 - **公式 Agent Skill 仕様準拠**: 14 skill の frontmatter を Pattern A (description 単体に Triggers 埋め込み) から Pattern B (description + 公式 `when_to_use` フィールド分離) へ移行。対象 skill: codex / data-analyst-export / data-analyst-sql-optimization / deepwiki-transfer / docker-container-access / git-gh-operations / google-auth / google-chat / google-drive / markdown-writing / official-skills-autoloader / playwright-scenario-test / python-execution / qa-security-scan / skill-stats。`description` は概要に集中、`when_to_use` に Trigger phrase を分離して auto-invoke 精度向上 (公式 1,536 字上限内)。`mcp-builder` は Anthropic 公式 (Apache-2.0) のため改変せず。
 - **コード品質改善**:
   - `google-chat/scripts/gchat_read.py`: `DEFAULT_SPACE_ID` のハードコード (`AAQA6AWG1iE`) を撤去。env `GCHAT_DEFAULT_SPACE` で指定するか `--space` を required にする運用に変更
