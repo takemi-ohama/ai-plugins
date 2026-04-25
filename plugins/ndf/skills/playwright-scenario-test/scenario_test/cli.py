@@ -30,7 +30,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("-w", "--workers", type=int, default=None,
                    help="並列ワーカ数 (default: config.runner.workers)")
     p.add_argument("--filter", default="",
-                   help='テストケース絞り込み。例: "phase:50,51 role:user", "id:TC-50-01"')
+                   help='テストケース絞り込み。例: "phase:50,51 role:user", '
+                        '"id:TC-50-01", "page_role:list,form"')
     p.add_argument("--list", action="store_true",
                    help="テストケースを表示するだけで実行しない")
     p.add_argument("--base-url", default=None, help="config.target.base_url を上書き")
@@ -62,6 +63,7 @@ def _load_and_filter(config: Config, filter_spec: str) -> list[TestCase]:
         roles=flt.get("role"),
         types=flt.get("type"),
         tags=flt.get("tag"),
+        page_roles=flt.get("page_role"),
     )
 
 

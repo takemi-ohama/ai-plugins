@@ -82,6 +82,10 @@ class TestCase:
     description: str = ""
     source_path: Path | None = None
 
+    # docs/02-page-roles.md 上の page role (lp/list/item/edit/form/...)。
+    # 単一文字列または複数 role の list。計画書から実行・report までトレース可能にする。
+    page_role: list[str] = field(default_factory=list)
+
     # curl 用
     checks: list[CurlCheck] = field(default_factory=list)
 
@@ -106,6 +110,14 @@ class TestCase:
             if type_ == "playwright" else []
         )
 
+        page_role_raw = raw.get("page_role")
+        if isinstance(page_role_raw, str):
+            page_role = [page_role_raw]
+        elif isinstance(page_role_raw, list):
+            page_role = [str(r) for r in page_role_raw]
+        else:
+            page_role = []
+
         return cls(
             id=str(raw["id"]),
             title=str(raw.get("title", raw["id"])),
@@ -116,6 +128,7 @@ class TestCase:
             tags=list(raw.get("tags") or []),
             description=str(raw.get("description", "")),
             source_path=path.resolve(),
+            page_role=page_role,
             checks=checks,
             post_login_url_must_not_contain=list(post_login.get("url_must_not_contain") or []),
             steps=steps,
@@ -151,6 +164,10 @@ class TestCaseResult:
     video_relpath: str | None              # case_dir からの相対パス
     steps: list[StepRecord]
     nav_vars: dict[str, str] = field(default_factory=dict)
+    page_role: list[str] = field(default_factory=list)
+    har_relpath: str | None = None         # HAR ファイルの相対パス
+    console_errors: list[str] = field(default_factory=list)
+    page_errors: list[str] = field(default_factory=list)
 
     @property
     def duration_sec(self) -> float:
@@ -186,9 +203,11 @@ def filter_testcases(
     roles: list[str] | None = None,
     types: list[str] | None = None,
     tags: list[str] | None = None,
+    page_roles: list[str] | None = None,
 ) -> list[TestCase]:
     """指定された条件に合致するケースのみを返す。"""
     tag_set = set(tags) if tags else None
+    page_role_set = set(page_roles) if page_roles else None
 
     def matches(c: TestCase) -> bool:
         # 親 ID と curl サブ ID (例 TC-00-01) のどちらかにヒットすれば OK
@@ -201,6 +220,8 @@ def filter_testcases(
         if types and c.type not in types:
             return False
         if tag_set and not (tag_set & set(c.tags)):
+            return False
+        if page_role_set and not (page_role_set & set(c.page_role)):
             return False
         return True
 

@@ -11,10 +11,12 @@
 target:
   base_url: https://example.com
 
-  # サイト全体に Basic 認証が掛かっている場合のみ指定 (掛かっていなければ削除)
-  basic_auth:
-    user: replace-me
-    password: replace-me
+  # サイト全体に Basic 認証が掛かっている場合のみ指定 (掛かっていなければ削除可)。
+  # 省略時は空文字列が入り、role 側で `requires_basic_auth: true` を指定した
+  # テストケースのみが Basic 認証ヘッダを要求する。
+  # basic_auth:
+  #   user: replace-me
+  #   password: replace-me
 
 # --- TLS 検査 (false で curl -k 相当) ---------------------------
 verify_tls: false
@@ -52,7 +54,7 @@ roles:
 playwright:
   headless: true
   # 1280x720 = HD 720p (16:9)。Google Drive のプレイヤが transcoding 不要で
-  # 即時再生しやすい標準解像度。
+  # 即時再生しやすい標準解像度。video_size と必ず一致させる。
   viewport:
     width: 1280
     height: 720

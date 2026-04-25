@@ -57,6 +57,9 @@ def _result(
     video_relpath: str | None = None,
     steps: list[StepRecord] | None = None,
     nav_vars: dict[str, str] | None = None,
+    har_relpath: str | None = None,
+    console_errors: list[str] | None = None,
+    page_errors: list[str] | None = None,
 ) -> TestCaseResult:
     """TestCaseResult を簡潔に構築するファクトリ。"""
     return TestCaseResult(
@@ -67,6 +70,10 @@ def _result(
         video_relpath=video_relpath,
         steps=steps or [],
         nav_vars=nav_vars or {},
+        page_role=list(tc.page_role),
+        har_relpath=har_relpath,
+        console_errors=console_errors or [],
+        page_errors=page_errors or [],
     )
 
 
@@ -465,6 +472,10 @@ def run_playwright_testcase(
     steps_records: list[StepRecord] = []
     error_msg = ""
     final_video_rel: str | None = None
+    har_path = case_dir / f"{tc.id}.har"
+    har_relpath: str | None = None
+    console_errors: list[str] = []
+    page_errors: list[str] = []
     next_action_text = _next_action_text_factory(tc)
 
     # 重要: video.path() は sync_playwright() ブロック内でしか呼べない。
@@ -479,6 +490,10 @@ def run_playwright_testcase(
                 "viewport": {"width": pw.viewport_width, "height": pw.viewport_height},
                 "record_video_dir": str(videos_dir),
                 "record_video_size": {"width": pw.video_width, "height": pw.video_height},
+                # HAR (HTTP Archive) を自動収集。bug report で network 往復を再現するため。
+                # docs/05-bug-report.md の evidence 必須項目。
+                "record_har_path": str(har_path),
+                "record_har_content": "omit",   # body は trace 側で持つので重複回避
             }
             if role.login.requires_basic_auth:
                 ctx_kwargs["http_credentials"] = {
@@ -499,6 +514,25 @@ def run_playwright_testcase(
             tracing_started = pw.enable_trace and _start_tracing(context, tc, log_lines)
 
             page = context.new_page()
+
+            # docs/checklists/checklist-common.md C8: console.error / pageerror を
+            # 自動収集する。検出件数が >0 の testcase は無条件 FAIL とする (後段で集計)。
+            def _on_console(msg) -> None:
+                try:
+                    if msg.type == "error":
+                        console_errors.append(f"{msg.location.get('url', '?')}: {msg.text[:500]}")
+                except Exception:
+                    pass
+
+            def _on_pageerror(exc) -> None:
+                try:
+                    page_errors.append(str(exc)[:1000])
+                except Exception:
+                    pass
+
+            page.on("console", _on_console)
+            page.on("pageerror", _on_pageerror)
+
             video_handle = page.video
 
             try:
@@ -557,7 +591,7 @@ def run_playwright_testcase(
                     except Exception as exc:
                         log_lines.append(f"[trace] stop 失敗: {exc}")
 
-                # 動画は context.close() で初めてファイルに書き出される
+                # 動画 / HAR は context.close() で初めてファイルに書き出される
                 try:
                     page.close()
                 except Exception:
@@ -570,6 +604,19 @@ def run_playwright_testcase(
                 final_video_rel = _save_video(
                     video_handle, case_dir, tc.id, pw.video_format, log_lines,
                 )
+
+                if har_path.exists():
+                    har_relpath = har_path.name
+                    log_lines.append(f"[har] saved: {har_path.name}")
+
+                if console_errors:
+                    log_lines.append(f"[console.error] {len(console_errors)} 件:")
+                    for line in console_errors[:10]:
+                        log_lines.append(f"    {line}")
+                if page_errors:
+                    log_lines.append(f"[pageerror] {len(page_errors)} 件:")
+                    for line in page_errors[:10]:
+                        log_lines.append(f"    {line}")
 
                 try:
                     browser.close()
@@ -589,8 +636,26 @@ def run_playwright_testcase(
 
     (case_dir / "log.txt").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
 
-    overall_ok = (not error_msg) and all(s.ok for s in steps_records)
+    # docs/checklists/checklist-common.md C8.1/C8.2: pageerror または console.error が
+    # 1 件でも検出されたら無条件 FAIL。
+    has_runtime_errors = bool(console_errors or page_errors)
+    overall_ok = (
+        (not error_msg)
+        and all(s.ok for s in steps_records)
+        and not has_runtime_errors
+    )
+    final_error = error_msg
+    if has_runtime_errors and not final_error:
+        parts = []
+        if page_errors:
+            parts.append(f"pageerror {len(page_errors)} 件")
+        if console_errors:
+            parts.append(f"console.error {len(console_errors)} 件")
+        final_error = "Runtime errors detected: " + ", ".join(parts)
+
     return _result(
-        tc, case_dir, started, ok=overall_ok, error=error_msg,
+        tc, case_dir, started, ok=overall_ok, error=final_error,
         video_relpath=final_video_rel, steps=steps_records, nav_vars=nav_vars,
+        har_relpath=har_relpath,
+        console_errors=console_errors, page_errors=page_errors,
     )

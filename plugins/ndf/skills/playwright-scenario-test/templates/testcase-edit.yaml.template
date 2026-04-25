@@ -25,28 +25,31 @@ post_login:
 
 steps:
   # === ED1: プリフィル ===
+  # 前提: 一覧で先に extract:item_id を取得してから本 testcase を実行する設計、
+  # または手動で {item_id} を実 ID に置換する。scenario_test runner は
+  # path 中の {var} を nav_vars (前 step の extract 結果) で str.format 展開する。
   - name: "[ED1] 編集画面プリフィル"
-    path: /items/${ITEM_ID}/edit
+    path: /items/{item_id}/edit
 
   # === ED2: BVA — 各フィールドの境界値 ===
   # 「title 長さ 1〜100 仕様」を例に min-1/min/max/max+1 を試す
   # NOTE: scenario_test ランナーは現状フィールド入力をサポートしないため、
   #       実際の入力テストは pytest-playwright (将来) または手動補完で実施
   - name: "[ED2] title 長さ 0 (min-1)"
-    path: /items/${ITEM_ID}/edit?prefill_title=
+    path: /items/{item_id}/edit?prefill_title=
 
   - name: "[ED2] title 長さ 1 (min)"
-    path: /items/${ITEM_ID}/edit?prefill_title=A
+    path: /items/{item_id}/edit?prefill_title=A
 
   - name: "[ED2] title 長さ 100 (max)"
-    path: /items/${ITEM_ID}/edit?prefill_title=AAAAAAAAAA  # 実際は 100 文字
+    path: /items/{item_id}/edit?prefill_title=AAAAAAAAAA  # 実際は 100 文字
 
   - name: "[ED2] title 長さ 101 (max+1)"
-    path: /items/${ITEM_ID}/edit?prefill_title=BBBBBBBBBB  # 実際は 101 文字
+    path: /items/{item_id}/edit?prefill_title=BBBBBBBBBB  # 実際は 101 文字
 
   # === ED8: CSRF token 削除攻撃 ===
   - name: "[ED8] CSRF token なしで POST"
-    path: /items/${ITEM_ID}/update
+    path: /items/{item_id}/update
     method: POST
     data:
       title: "csrf-bypass-test"

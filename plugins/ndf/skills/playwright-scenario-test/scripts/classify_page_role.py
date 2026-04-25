@@ -1,7 +1,11 @@
-"""URL の page role を a11y tree から判定する。
+"""URL の page role を DOM の (implicit + explicit) role 集計から判定する。
 
-経験ではなく Playwright の `page.accessibility.snapshot()` で得られる role の集計を
-ヒューリスティックに当てて分類する。docs/02-page-roles.md の識別ルールを実装。
+実装はブラウザ DOM クエリで `<button>` / `<a href>` / `<input>` 等を集計し、
+`page.evaluate` で取得した role 出現回数 + URL pattern スコアリングで分類する
+(完全な a11y tree ではなく軽量な近似)。docs/02-page-roles.md の識別ヒューリスティック
+を機械化したもの。
+
+`page.accessibility.snapshot()` ベースのより厳密な分類は将来検討 (Skill v0.3.0+)。
 
 Usage:
     python classify_page_role.py --url https://example.com/items

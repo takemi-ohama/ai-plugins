@@ -1,6 +1,10 @@
 """Core Web Vitals (LCP / CLS / TTFB) を Playwright で計測する。
 
-field metric である INP は Lab 計測の代替指標 (TBT / 最初の click 応答) を使う。
+field metric である INP は本スクリプトでは計測**しない**。代わりに「最大 Long Task
+持続時間」(`longest_task_ms`) を取得する。これは INP の近似ではなく、UI 応答性の
+**ラフな指標**としてのみ使う (50ms 超は応答性低下の兆候)。
+正式な INP は web-vitals.js の attribution build を使うか、フィールド計測を実施。
+
 docs/checklists/checklist-common.md の C2 (perf) を機械的に検証する。
 
 Usage:
@@ -22,10 +26,12 @@ from playwright.sync_api import sync_playwright
 
 # web.dev 公式閾値 (75 percentile 基準)
 THRESHOLDS = {
-    "lcp": {"good": 2500, "poor": 4000},     # ms
-    "cls": {"good": 0.1, "poor": 0.25},
-    "ttfb": {"good": 800, "poor": 1800},     # ms
-    "inp_proxy": {"good": 200, "poor": 500}, # ms
+    "lcp": {"good": 2500, "poor": 4000},      # ms (web.dev 公式)
+    "cls": {"good": 0.1, "poor": 0.25},       # web.dev 公式
+    "ttfb": {"good": 800, "poor": 1800},      # ms (web.dev 公式)
+    # longest_task は INP ではない。50ms 超は応答性低下の兆候 (browser main thread block)。
+    # 正式 INP の代替指標ではないことに注意。
+    "longest_task": {"good": 50, "poor": 200},
 }
 
 
@@ -139,7 +145,7 @@ def measure(
                 "lcp": _judge("lcp", metrics.get("lcp")),
                 "cls": _judge("cls", metrics.get("cls")),
                 "ttfb": _judge("ttfb", metrics.get("ttfb")),
-                "longest_task": _judge("inp_proxy", metrics.get("longest_task")),
+                "longest_task": _judge("longest_task", metrics.get("longest_task")),
             },
             "thresholds": THRESHOLDS,
         }

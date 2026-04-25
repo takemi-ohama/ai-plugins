@@ -94,6 +94,8 @@ def _render_testcase(r: TestCaseResult, out: list[str]) -> None:
     out.append(f"#### `{tc_id}` — {r.title} [{_mark(r.ok)}]")
     out.append("")
     out.append(f"- ロール  : {r.role or '-'} / 優先度: {r.priority}")
+    if r.page_role:
+        out.append(f"- page_role: {', '.join(r.page_role)}")
     out.append(f"- 種別    : {r.type}")
     out.append(f"- 開始    : {r.started_at:%H:%M:%S} / 所要 {r.duration_sec:.1f}s")
     if r.tags:
@@ -109,11 +111,30 @@ def _render_testcase(r: TestCaseResult, out: list[str]) -> None:
             f"- Trace   : [`{tc_id}/{trace_name}`](./{tc_id}/{trace_name}) "
             "— `uv run playwright show-trace …` で閲覧可"
         )
+    if r.har_relpath:
+        out.append(
+            f"- HAR     : [`{tc_id}/{r.har_relpath}`](./{tc_id}/{r.har_relpath}) "
+            "— ブラウザ開発者ツールの Network 系で読み込み可"
+        )
     out.append(f"- 個別ログ: [`{tc_id}/log.txt`](./{tc_id}/log.txt)")
     if r.nav_vars:
         out.append(f"- 抽出変数: `{r.nav_vars}`")
+    if r.page_errors:
+        out.append(f"- ⚠️ pageerror: {len(r.page_errors)} 件 (auto-FAIL 要因)")
+    if r.console_errors:
+        out.append(f"- ⚠️ console.error: {len(r.console_errors)} 件 (auto-FAIL 要因)")
     if r.error:
         out.extend(["", "**FATAL エラー**:", "", "```", r.error.strip(), "```"])
+    if r.page_errors:
+        out.extend(["", "**pageerror 詳細** (先頭 5 件):", "", "```"])
+        for line in r.page_errors[:5]:
+            out.append(line)
+        out.append("```")
+    if r.console_errors:
+        out.extend(["", "**console.error 詳細** (先頭 5 件):", "", "```"])
+        for line in r.console_errors[:5]:
+            out.append(line)
+        out.append("```")
     out.append("")
     if r.steps:
         out.append("| # | ステップ | 結果 | 詳細 | スクショ |")

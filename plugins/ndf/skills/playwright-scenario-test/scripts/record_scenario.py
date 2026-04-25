@@ -79,10 +79,19 @@ def main() -> int:
         return 2
 
     if args.output and args.output.exists():
-        print(f"\nOK: 録画コード → {args.output}", file=sys.stderr)
+        lang_label = {
+            "python": "Python (sync)",
+            "python-async": "Python (async)",
+            "python-pytest": "pytest-playwright",
+            "javascript": "JavaScript",
+            "java": "Java",
+            "csharp": "C#",
+        }.get(args.target, args.target)
+        print(f"\nOK: 録画コード ({lang_label}) → {args.output}", file=sys.stderr)
         print("\n次のステップ:", file=sys.stderr)
-        print("  1. 出力された Python コードを開いて get_by_role/get_by_label が使われているか確認",
+        print(f"  1. 出力された {lang_label} コードを開いて get_by_role/get_by_label が",
               file=sys.stderr)
+        print("     使われているか確認", file=sys.stderr)
         print("  2. CSS セレクタ (page.locator('#foo')) は a11y 名へ書き換える", file=sys.stderr)
         print("  3. scripts/generate_test_plan.py で testcase YAML 雛形と組合せる",
               file=sys.stderr)

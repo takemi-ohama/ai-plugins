@@ -55,9 +55,10 @@ steps:
     skip_if_missing: [first_id]
 
   # === LST15: IDOR ===
-  # 別 role の id を踏む。前提: BOB_ITEM_ID 環境変数 or 別 fixture
+  # 別 role の id を踏む。99999 は実環境で他者所有 id に置換すること
+  # (例: 実値 789)。runner には env 展開がないので、固定 id を埋め込む。
   - name: "[LST15-IDOR] 他者所有 id へアクセス"
-    path: /items/${BOB_ITEM_ID:-99999}
+    path: /items/99999
     expect_url_contains: /  # 401/403/404 ページにリダイレクトされていること
 
 # ============================================================

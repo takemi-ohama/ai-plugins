@@ -172,7 +172,7 @@ def test_a11y(page):
     assert results.violations_count == 0, results.generate_report()
 ```
 
-公式 Locator の `to_match_aria_snapshot('''- heading "todos" - textbox ...''')` で a11y 構造のリグレッション検出も可能 (`scripts/check_aria.py` を活用).
+公式 Locator の `to_match_aria_snapshot('''- heading "todos" - textbox ...''')` で a11y 構造のリグレッション検出も可能 (testcase 内で `expect(page).to_match_aria_snapshot(...)` を使う方針。ヘルパスクリプトは v0.3.0 以降で検討).
 
 ### Core Web Vitals
 

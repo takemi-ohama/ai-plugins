@@ -3,9 +3,13 @@
 bug report に zip 単体ではなく URL を載せると、開発者が即座に trace を開けるようになる。
 docs/05-bug-report.md の「evidence」項目で必須。
 
+⚠️ trace.zip には DOM snapshot / 入力痕跡 / 内部 URL が含まれる。
+既定では非公開 (Drive デフォルト共有のみ) でアップロードし、`--public` を明示した
+場合のみ anyone/read リンクを付与する。安易な公開を避ける。
+
 Usage:
     python trace_link.py /path/to/trace.zip --parent-folder-id <DRIVE_FOLDER_ID>
-    python trace_link.py reports/20260425/TC-50/trace.zip
+    python trace_link.py reports/20260425/TC-50/trace.zip --public  # 公開を明示
 """
 
 from __future__ import annotations
@@ -39,7 +43,7 @@ def upload_and_link(
     trace_zip: Path,
     *,
     parent_folder_id: str | None = None,
-    public: bool = True,
+    public: bool = False,
 ) -> dict:
     """trace.zip をアップロードして playwright.dev URL を返す。"""
     _ensure_google_auth_on_path()
@@ -82,8 +86,8 @@ def main() -> int:
     parser.add_argument("trace_zip", type=Path, help="trace.zip のパス")
     parser.add_argument("--parent-folder-id", default=None,
                         help="Drive の親フォルダ ID (省略時はマイドライブ直下)")
-    parser.add_argument("--no-public", action="store_true",
-                        help="パブリック共有を付与しない (社内利用)")
+    parser.add_argument("--public", action="store_true",
+                        help="anyone/read 公開リンクを付与する (既定は非公開、明示 opt-in)")
     args = parser.parse_args()
 
     if not args.trace_zip.exists():
@@ -93,8 +97,16 @@ def main() -> int:
     result = upload_and_link(
         args.trace_zip,
         parent_folder_id=args.parent_folder_id,
-        public=not args.no_public,
+        public=args.public,
     )
+
+    if not args.public:
+        print("[NOTE] 非公開でアップロード済 (既定)。チーム共有が必要なら --public を付け直すか、",
+              file=sys.stderr)
+        print("       Drive 上で個別に共有設定してください。trace には DOM snapshot や",
+              file=sys.stderr)
+        print("       入力痕跡が含まれるため、安易な anyone/read は避けてください。",
+              file=sys.stderr)
 
     print(f"file_id: {result['file_id']}")
     print(f"Drive: {result['drive_view']}")

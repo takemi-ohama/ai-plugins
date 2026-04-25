@@ -33,6 +33,7 @@ def _empty_result(tc: TestCase, case_dir: Path, error: str) -> TestCaseResult:
         started_at=now, finished_at=now,
         case_dir=case_dir, ok=False, error=error,
         video_relpath=None, steps=[],
+        page_role=list(tc.page_role),
     )
 
 

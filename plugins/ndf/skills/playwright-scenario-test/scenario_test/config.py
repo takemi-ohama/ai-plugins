@@ -103,15 +103,17 @@ class PlaywrightConfig:
 
     @classmethod
     def from_raw(cls, raw: dict[str, Any]) -> "PlaywrightConfig":
+        # 既定値は 1280x720 (HD 720p, 16:9) で統一。dataclass の default、
+        # config.example.yaml、本メソッドの default すべて同じ値にする。
         viewport = raw.get("viewport") or {}
         video_size = raw.get("video_size") or {}
         return cls(
             headless=bool(raw.get("headless", True)),
             viewport_width=int(viewport.get("width", 1280)),
-            viewport_height=int(viewport.get("height", 800)),
+            viewport_height=int(viewport.get("height", 720)),
             slow_mo_ms=int(raw.get("slow_mo_ms", 0)),
             video_width=int(video_size.get("width", 1280)),
-            video_height=int(video_size.get("height", 800)),
+            video_height=int(video_size.get("height", 720)),
             navigation_timeout_ms=int(raw.get("navigation_timeout_ms", 30000)),
             step_delay_ms=int(raw.get("step_delay_ms", 1500)),
             enable_overlay=bool(raw.get("enable_overlay", True)),
@@ -119,6 +121,11 @@ class PlaywrightConfig:
             enable_scroll_demo=bool(raw.get("enable_scroll_demo", True)),
             video_format=str(raw.get("video_format", "mp4")).lower(),
         )
+
+    @classmethod
+    def defaults(cls) -> "PlaywrightConfig":
+        """設定が完全に省略された場合の defaults。viewport=video_size=1280x720 で揃える。"""
+        return cls()
 
 
 @dataclass
@@ -175,9 +182,13 @@ class Config:
     @classmethod
     def _from_dict(cls, raw: dict[str, Any], *, config_path: Path) -> "Config":
         target = raw["target"]
+        # basic_auth は省略可能 (サイトに Basic 認証が掛かっていない場合)。
+        # 省略時は空 BasicAuth を使い、role 側で `requires_basic_auth: true` を
+        # 指定したテストケースだけが basic_auth ヘッダを要求する設計。
+        ba_raw = target.get("basic_auth") or {}
         basic_auth = BasicAuth(
-            user=target["basic_auth"]["user"],
-            password=target["basic_auth"]["password"],
+            user=str(ba_raw.get("user", "")),
+            password=str(ba_raw.get("password", "")),
         )
         roles = {rid: _role_from_raw(rid, r) for rid, r in (raw.get("roles") or {}).items()}
 

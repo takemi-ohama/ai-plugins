@@ -112,6 +112,7 @@ def _make_result(
         started_at=started, finished_at=_dt.datetime.now(),
         case_dir=case_dir, ok=ok, error=error,
         video_relpath=None, steps=steps or [],
+        page_role=list(tc.page_role),
     )
 
 

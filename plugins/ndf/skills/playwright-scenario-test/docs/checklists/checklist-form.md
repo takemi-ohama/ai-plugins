@@ -7,8 +7,9 @@
 代表 URL: `/contact`, `/signup`, `/apply`, `/subscribe`.
 
 > ⚠️ **重要**: form の入力分岐はコードを読んで Decision Table を作る対象。
-> 経験で書かない。`scripts/generate_test_plan.py --read-source <ファイル>` でフォーム定義を解析するか、
-> 手動でフォーム JS / バリデーション関数を読む。
+> 経験で書かない。フォーム実装コード (HTML / JS / サーバ側 validator) を読んで分岐表を
+> 自前で作り、その後 `scripts/generate_test_plan.py --role form --factors "..."` で
+> Pairwise を自動生成する流れを推奨。
 
 ## 必須テスト観点
 

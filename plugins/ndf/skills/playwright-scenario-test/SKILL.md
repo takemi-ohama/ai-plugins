@@ -1,7 +1,7 @@
 ---
 name: playwright-scenario-test
 description: "Playwright + curl による Web シナリオ E2E テストの理論ベース実施フレームワーク。HTSM / ISTQB / FEW HICCUPPS に基づき page role 別の checklist + 必須技法マッピングを内蔵し、字幕・カーソル付き動画レポート + a11y / Core Web Vitals 計測 + Playwright trace を自動収集する。"
-when_to_use: "E2E テスト計画立案 / 不具合エビデンス収集 / 動画レポート / Google Drive 共有が必要なとき。検証環境の動作確認、第三者向けエビデンス収集、定期回帰テスト、リリース前確認に使う。Triggers: 'E2E テスト', 'シナリオテスト', '動画エビデンス', 'Playwright', 'リリース前確認', '回帰テスト', 'a11y テスト', 'Core Web Vitals'"
+when_to_use: "E2E テスト計画立案 / 不具合エビデンス収集 / 動画レポート / Google Drive 共有が必要なとき。LP / 一覧 / 詳細 / 編集 / 申込フォーム / 検索 / ダッシュボード / 認証 / カート / チェックアウト / モーダル / ウィザード / 設定 / エラーページ など page role 別の理論ベースチェックを行う。Triggers: 'E2E テスト', 'シナリオテスト', '動画エビデンス', 'Playwright', 'リリース前確認', '回帰テスト', 'a11y テスト', 'Core Web Vitals', 'LP テスト', '一覧ページ', '詳細ページ', '編集フォーム', '申込フォーム', '検索ページ', 'ダッシュボード', 'login テスト', 'カート / 決済', 'モーダル', 'ウィザード', 'page role'"
 allowed-tools:
   - Read
   - Bash(uv *)

@@ -27,6 +27,29 @@ ROLE_ITEM_COUNTS: dict[str, int] = {
     "lp": 12, "list": 15, "item": 13, "edit": 14, "form": 15,
     "search": 13, "dashboard": 15, "auth": 15, "cart": 17, "checkout": 17,
     "modal": 10, "wizard": 10,
+    # cart と checkout は同一 checklist (cart-checkout.md) を共有。
+    # error / settings は専用 checklist がなく checklist-common.md + 関連 role で代用。
+    "error": 0, "settings": 0,
+}
+
+# 各 role の checklist ファイル名 (docs/checklists/ 内の実ファイルにマップ)。
+# 一部 role は共通ファイルを共有する。
+ROLE_CHECKLIST_FILES: dict[str, str] = {
+    "lp": "checklist-lp.md",
+    "list": "checklist-list.md",
+    "item": "checklist-item.md",
+    "edit": "checklist-edit.md",
+    "form": "checklist-form.md",
+    "search": "checklist-search.md",
+    "dashboard": "checklist-dashboard.md",
+    "auth": "checklist-auth.md",
+    "cart": "checklist-cart-checkout.md",      # cart と checkout で共有
+    "checkout": "checklist-cart-checkout.md",
+    "modal": "checklist-modal-wizard.md",      # modal と wizard で共有
+    "wizard": "checklist-modal-wizard.md",
+    # error / settings には専用 checklist がない。共通 + 近接 role を参照する。
+    "error": "checklist-common.md",
+    "settings": "checklist-edit.md",
 }
 
 # 役割 × 必須技法 (docs/03-test-techniques.md § 11 のマッピング)
@@ -43,6 +66,8 @@ ROLE_TECHNIQUES: dict[str, list[str]] = {
     "checkout": ["Decision Table", "BVA (CVV/amount)", "State Transition (cart→paid)", "Risk (PCI)"],
     "modal": ["State Transition (open/focus/close)", "ARIA APG conformance"],
     "wizard": ["State Transition", "Decision Table (動的 step)"],
+    "error": ["Claims (status code)", "Risk (情報露出)", "User (復帰導線)"],
+    "settings": ["BVA", "Decision Table (再認証要否)", "State Transition (退会フロー)"],
 }
 
 
@@ -148,16 +173,29 @@ def _yaml_dump(data: dict | list, indent: int = 0) -> str:
     return f"{pad}{_yaml_repr(data)}"
 
 
+_YAML_RESERVED_RE = re.compile(
+    r"^(true|false|null|yes|no|on|off|~)$|^[+-]?\d+(\.\d+)?$|^0x[0-9a-fA-F]+$|^0o[0-7]+$",
+    re.IGNORECASE,
+)
+
+
 def _yaml_repr(v) -> str:
     if v is None:
         return "null"
     if isinstance(v, bool):
         return "true" if v else "false"
+    if isinstance(v, int) or isinstance(v, float):
+        # 数値はそのまま (期待は数値型)
+        return str(v)
     if isinstance(v, str):
-        # YAML 特殊文字 / 改行 / タブ / 空文字 / 先頭末尾の空白 → JSON quote
+        # 文字列は **常に JSON quote** で出力する。
+        # 型保持のため: '01', 'true', 'null', '12345' (郵便番号) などが
+        # safe_load 後に別型になるのを防ぐ。
         if (not v
             or re.search(r"[:#\[\]{},&*!|>'\"%@`\n\r\t]", v)
-            or v.strip() != v):
+            or v.strip() != v
+            or _YAML_RESERVED_RE.match(v)
+            or (v[0].isdigit() and any(c not in "0123456789." for c in v[1:]) is False)):
             return json.dumps(v, ensure_ascii=False)
         return v
     return str(v)
@@ -175,17 +213,24 @@ def generate_yaml(
     """testcase YAML を生成する。"""
     item_count = ROLE_ITEM_COUNTS.get(role, 0)
     techniques = ROLE_TECHNIQUES.get(role, [])
+    checklist_file = ROLE_CHECKLIST_FILES.get(role, "checklist-common.md")
 
     pairs = _all_pairs(factors) if factors else []
 
     title = title or f"{role.upper()} シナリオ ({url})"
+
+    item_count_text = (
+        f"全 {item_count} 項目を走査"
+        if item_count > 0
+        else "横断項目のみ (専用 checklist なし)"
+    )
 
     header_comments = dedent(f"""\
         # ============================================================
         # 自動生成テスト計画 — page_role: {role}
         # ============================================================
         # 必須参照ドキュメント:
-        #   - docs/checklists/checklist-{role}.md (全 {item_count} 項目を走査)
+        #   - docs/checklists/{checklist_file} ({item_count_text})
         #   - docs/checklists/checklist-common.md (a11y/perf/sec/i18n 横断)
         #   - docs/03-test-techniques.md (適用技法)
         #   - docs/05-bug-report.md (失敗時の報告)
@@ -209,7 +254,7 @@ def generate_yaml(
         "tags": [role, "scenario"],
         "description": (
             f"page_role={role} の必須 {item_count} 項目チェック。\n"
-            f"docs/checklists/checklist-{role}.md の全項目を覆うこと。"
+            f"docs/checklists/{checklist_file} の全項目を覆うこと。"
         ),
         "post_login": {"url_must_not_contain": []},
     }
@@ -249,16 +294,18 @@ def generate_checklist_summary(role: str) -> str:
     """role 別 checklist の要約を Markdown で生成 (テスト計画書補助)。"""
     item_count = ROLE_ITEM_COUNTS.get(role, 0)
     techniques = ROLE_TECHNIQUES.get(role, [])
+    checklist_file = ROLE_CHECKLIST_FILES.get(role, "checklist-common.md")
+    item_count_text = f"{item_count} 項目" if item_count > 0 else "横断項目のみ"
     return dedent(f"""\
         # テスト計画サマリ: {role.upper()}
 
-        - 必須 checklist: docs/checklists/checklist-{role}.md ({item_count} 項目)
+        - 必須 checklist: docs/checklists/{checklist_file} ({item_count_text})
         - 共通 checklist: docs/checklists/checklist-common.md
         - 適用技法: {", ".join(techniques)}
 
         ## 参照すべき docs (順次)
         1. docs/02-page-roles.md  — {role} の識別と兼ね role
-        2. docs/checklists/checklist-{role}.md — 必須テスト観点
+        2. docs/checklists/{checklist_file} — 必須テスト観点
         3. docs/checklists/checklist-common.md — a11y / perf / sec / i18n
         4. docs/03-test-techniques.md — 各観点に適用する技法
         5. docs/04-playwright-mapping.md — locator / assertion 戦略
