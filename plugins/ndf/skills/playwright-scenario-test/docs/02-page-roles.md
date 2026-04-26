@@ -191,9 +191,10 @@
 
 1 ページが複数 role を兼ねる場合 (例: 検索結果 = list + search):
 
-```yaml
-# testcase YAML
-page_role: [search, list]
+```python
+@pytest.mark.page_role("search", "list")
+def test_search_result(page, ndf_role_user):
+    ...
 ```
 
 このとき各 role の checklist 全項目を走査する。重複項目は片方で OK。

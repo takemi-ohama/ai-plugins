@@ -107,17 +107,13 @@ E2E から検証可能な範囲。攻撃ではなく**挙動確認**まで。
 
 ## 10. 追加すべきプロジェクト固有チェック
 
-testcase YAML の最後に `kind: expect_no_text` step を並べる (web-first):
+pytest テスト関数の最後に `expect(...).not_to_contain_text(...)` を並べる (web-first):
 
-```yaml
-- kind: expect_no_text                # フレームワーク fatal
-  name: "Fatal error が出ていないこと"
-  locator: { css: body }
-  text: "Fatal error"
-- kind: expect_no_text                # ローカライズされた 404 表示
-  name: "Page not found が出ていないこと"
-  locator: { css: body }
-  text: "Page not found"
+```python
+# フレームワーク fatal
+expect(page.locator("body")).not_to_contain_text("Fatal error")
+# ローカライズされた 404 表示
+expect(page.locator("body")).not_to_contain_text("Page not found")
 ```
 
 ページ全体に対する正規表現マッチではなく、locator + 部分一致で判定する。

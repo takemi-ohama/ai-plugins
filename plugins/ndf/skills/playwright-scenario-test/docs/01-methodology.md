@@ -113,11 +113,13 @@ James Bach の **Heuristic Test Strategy Model** (v6.3) は、テスト戦略を
 [4] 各項目に適用するテスト技法を選ぶ → docs/03-test-techniques.md
        │ 例: 編集フィールドなら BVA で min-1/min/min+1/max-1/max/max+1
        ▼
-[5] testcase YAML 生成 → templates/testcase-{role}.yaml.template
-       │ scripts/generate_test_plan.py が雛形と oracle 引用を埋める
+[5] pytest テストを書く → templates/test_{role}.py.template
+       │ playwright codegen で操作録画 → そのまま test 関数に貼ってもよい
+       │ @pytest.mark.page_role(...) を付けると a11y / CWV が autouse で走る
        ▼
-[6] 実行 → scenario-test --config ./config.yaml --workers 4
-       │ trace.zip / video / screenshot / HAR / console を自動収集
+[6] 実行 → uv run pytest --ndf-config=./scenario.config.yaml -n 4
+       │ trace.zip / video / screenshot / HAR / console / a11y / CWV を自動収集
+       │ reports/<run-id>/report.md が pytest_terminal_summary で生成
        ▼
 [7] FAIL → docs/05-bug-report.md の構造で報告 (FEW HICCUPPS 軸付与)
 ```
@@ -130,7 +132,7 @@ James Bach の **Heuristic Test Strategy Model** (v6.3) は、テスト戦略を
 |---|---|---|
 | 業界標準 (ISO / WCAG / OWASP / ISTQB) | docs/ 配下 (このディレクトリ) | 出典がある。揺らぎが小さい |
 | ヒューリスティクス (HTSM / FEW HICCUPPS / Hendrickson) | docs/ 配下 | 「思考の道具」として再利用 |
-| 個別プロジェクトの慣習 (PHP / Rails / 等) | testcase YAML に `kind: expect_no_text` step (`text: "Fatal error"` 等) | 個別カスタマイズ |
+| 個別プロジェクトの慣習 (PHP / Rails / 等) | scenario.config.yaml の `tolerated_console_errors` / `tolerated_page_errors` 正規表現 | 個別カスタマイズ |
 | 動画/HUD の細かい数値 (字幕高さ・カーソル色) | scenario_test/hud.py のコード内定数 | 表示 UX の調整。理論の対象外 |
 
 「経験」を docs に書くのではなく、**理論を docs に書き、慣習は config に逃がす** のが本 Skill の規律。

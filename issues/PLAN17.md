@@ -1,5 +1,86 @@
 # PLAN17: playwright-scenario-test v0.3.0 — pure pytest-playwright 完全移行
 
+> ## 🚨 引継ぎメモ (2026-04-26 セッション切替時点)
+>
+> ### 現在の状態
+>
+> - **PR #56 (v0.2.5 transition) はマージ済み** (mergeCommit `d288f92`、2026-04-26T04:04:26Z)
+> - 削除済 feature ブランチ: `feature/scenario-test-v0.3.0-oss-quality`
+> - 現在のブランチ: **`main`** (`origin/main` と同期済み)
+> - 関連 PR の経緯はすべて `plugins/ndf/CLAUDE.md` の v4.1.1 セクションに記録済み
+> - 本 PLAN17 は **これから実装する** (まだコード変更ゼロ)
+>
+> ### 未着手のタスク (本 PLAN17 の Task 1〜8)
+>
+> 何も着手していない。下記「タスク分解」節を上から順に実行してください。
+>
+> ### 着手前にやること
+>
+> 1. `git -C /work/ai-plugins checkout -b feature/scenario-test-v0.3.0-pytest-native` で新ブランチ作成
+> 2. `cd /work/ai-plugins/plugins/ndf/skills/playwright-scenario-test`
+> 3. `uv sync` で依存解決確認 (現状 v0.2.5 = locator-first DSL 中間版)
+> 4. `uv run pytest` で **126 件 全 pass** することを確認 (出発点)
+>
+> ### v0.2.5 から v0.3.0 への影響範囲 (削除予定の DSL 層)
+>
+> 以下を削除/全面書き換えすることを忘れない:
+>
+> - `scenario_test/testcase.py` の `Step` / `LocatorSpec` / `KNOWN_STEP_KINDS` / `discover_testcases` / `filter_testcases` / `parse_filter` (testcase.py 自体は残しても良いが、`Step` 系は削除)
+> - `scenario_test/locator_steps.py` (全削除)
+> - `scenario_test/runner.py` (全削除)
+> - `scenario_test/cli.py` (全削除 or `pytest` invoker 薄ラッパに縮退)
+> - `scenario_test/playwright_executor.py` (login 部分のみ fixture へ移植して全廃)
+> - `scenario_test/report.py` (pytest plugin の `pytest_terminal_summary` hook で再実装)
+> - `scripts/record_to_yaml.py` (codegen Python をそのまま test ファイルに使うため不要)
+> - `scripts/generate_test_plan.py` (pytest 雛形生成版に置換)
+> - `templates/testcase-*.yaml.template` 6 ファイル (pytest テスト雛形に置換)
+> - `templates/config.example.yaml` (`scenario.config.yaml` ベースに変更)
+> - `tests/test_step_schema.py` / `test_locator_steps.py` / `test_record_to_yaml.py` / `test_filter_and_slug.py` / `test_templates.py` (削除して新フィクスチャ向けに書き直し)
+>
+> ### 残す物 (carry forward, v0.2.5 から)
+>
+> - `scenario_test/a11y.py` (`scan_page` / `is_available` / `should_auto_scan`)
+> - `scenario_test/cwv.py` (`measure_page` / `judge` / `passed`)
+> - `scenario_test/evidence.py` の listener / tolerated patterns ロジック (fixture 内に再構成)
+> - `scenario_test/hud.py` (HUD overlay JS 一式)
+> - `scenario_test/video.py` (webm → mp4 変換)
+> - `scripts/upload_evidence.py` (Drive 連携 CLI)
+> - `scripts/run_a11y_scan.py` / `check_cwv.py` / `record_scenario.py` (CLI 単発)
+> - `scripts/build_gdoc_with_drive_links.py`, `gdrive_upload_dir.py`, `_drive_auth.py`, `upload_md_as_gdoc.py`
+> - `docs/` 配下 (方法論ドキュメント、checklists)
+>
+> ### バージョン bump 予定
+>
+> - `pyproject.toml`: `0.2.5` → **`0.3.0`**
+> - `plugins/ndf/.claude-plugin/plugin.json`: `4.1.1` → **`4.2.0`**
+> - `plugins/ndf/CLAUDE.md` に v4.2.0 セクションを追加
+>
+> ### 着手順序の推奨 (本 PLAN17 の段階的実装より具体化)
+>
+> Phase 1 (Task 1-2): pytest plugin 骨組み + auth fixture を作って、最小 1 テスト (`def test_login(page, ndf_role_admin): page.goto("/")`) が pytest 経由で通ることを確認
+> → ここで一旦 commit (旧 DSL は残したまま新 fixture と両立)
+>
+> Phase 2 (Task 3-4): evidence + a11y/CWV autouse hook 追加
+> → axe-core 違反を含むダミー HTML で fixture が機能することを確認
+>
+> Phase 3 (Task 5-6): HUD overlay + report.md + Drive 連携 を fixture/hook で実装
+> → ここで end-to-end のスモークが完成
+>
+> Phase 4 (Task 7): templates / docs / SKILL.md / pyproject.toml / plugin.json を一気に書き直し
+>
+> Phase 5 (Task 8): **旧 DSL を一括削除**。最後にまとめて削除すると PR の見通しが効く
+>
+> ### 検証
+>
+> 各 Phase 完了ごとに `uv run pytest` を実行し、リグレッションがないことを確認。Phase 5 まで完了したら最終的に `100+ 件 (smoke + unit) 全 pass` を目指す。
+>
+> ### 関連リンク
+>
+> - 親 PR (v0.2.5 transition): https://github.com/takemi-ohama/ai-plugins/pull/56
+> - mergeCommit: `d288f92`
+>
+> ---
+
 ## 関連リンク
 
 - 親 PR (v0.2.5 transition): [#56 feat(ndf): playwright-scenario-test ...](https://github.com/takemi-ohama/pull/56)

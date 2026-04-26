@@ -6,11 +6,47 @@
 
 from __future__ import annotations
 
+import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+
+# ---------------------------------------------------------------------------
+# 環境変数展開 (Codex Major 4)
+# ---------------------------------------------------------------------------
+
+_ENV_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
+
+
+def _expand_env_in_str(s: str) -> str:
+    """文字列中の ${VAR} / ${VAR:-default} を環境変数で展開する。"""
+    def repl(m: re.Match) -> str:
+        name, default = m.group(1), m.group(2)
+        val = os.environ.get(name)
+        if val is None:
+            if default is None:
+                raise ValueError(
+                    f"環境変数 ${{{name}}} が未定義です "
+                    "(default 指定 ${VAR:-default} または env を設定してください)"
+                )
+            return default
+        return val
+    return _ENV_RE.sub(repl, s)
+
+
+def _expand_env(value: Any) -> Any:
+    """dict / list / str を再帰的に走査して ${VAR} を展開する。"""
+    if isinstance(value, str):
+        return _expand_env_in_str(value)
+    if isinstance(value, list):
+        return [_expand_env(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _expand_env(v) for k, v in value.items()}
+    return value
 
 
 # --- 接続/認証 -------------------------------------------------------
@@ -28,9 +64,8 @@ class Login:
     fields: dict[str, str]
     fail_if_url_contains: str
     # ログイン送信ボタンを特定するためのプロジェクト固有セレクタ (CSS / role / text)。
-    # `playwright_executor._submit_login_form` が「これ → role/type=submit
-    # フォールバック → Password で Enter」の順で試す。空のままでも汎用
-    # フォールバックで通常はログインできる。
+    # auth fixture の _submit_login_form が「これ → role/type=submit フォールバック
+    # → Password で Enter」の順で試す。空のままでも汎用フォールバックで通常はログインできる。
     submit_selectors: list[str] = field(default_factory=list)
 
 
@@ -75,22 +110,24 @@ class PlaywrightConfig:
 
     @classmethod
     def from_raw(cls, raw: dict[str, Any]) -> "PlaywrightConfig":
-        # 既定値は 1280x720 (HD 720p, 16:9) で統一。dataclass の default、
-        # config.example.yaml、本メソッドの default すべて同じ値にする。
+        # dataclass の default を真実の源 (single source of truth) とする。
+        # fallback 値を base = cls() から参照することで、dataclass default と
+        # from_raw() の fallback が乖離するバグを防ぐ (Codex Minor 6)。
+        base = cls()
         viewport = raw.get("viewport") or {}
         video_size = raw.get("video_size") or {}
         return cls(
-            headless=bool(raw.get("headless", True)),
-            viewport_width=int(viewport.get("width", 1280)),
-            viewport_height=int(viewport.get("height", 720)),
-            slow_mo_ms=int(raw.get("slow_mo_ms", 0)),
-            video_width=int(video_size.get("width", 1280)),
-            video_height=int(video_size.get("height", 720)),
-            navigation_timeout_ms=int(raw.get("navigation_timeout_ms", 30000)),
-            step_delay_ms=int(raw.get("step_delay_ms", 1500)),
-            enable_overlay=bool(raw.get("enable_overlay", True)),
-            enable_trace=bool(raw.get("enable_trace", True)),
-            video_format=str(raw.get("video_format", "mp4")).lower(),
+            headless=bool(raw.get("headless", base.headless)),
+            viewport_width=int(viewport.get("width", base.viewport_width)),
+            viewport_height=int(viewport.get("height", base.viewport_height)),
+            slow_mo_ms=int(raw.get("slow_mo_ms", base.slow_mo_ms)),
+            video_width=int(video_size.get("width", base.video_width)),
+            video_height=int(video_size.get("height", base.video_height)),
+            navigation_timeout_ms=int(raw.get("navigation_timeout_ms", base.navigation_timeout_ms)),
+            step_delay_ms=int(raw.get("step_delay_ms", base.step_delay_ms)),
+            enable_overlay=bool(raw.get("enable_overlay", base.enable_overlay)),
+            enable_trace=bool(raw.get("enable_trace", base.enable_trace)),
+            video_format=str(raw.get("video_format", base.video_format)).lower(),
         )
 
     @classmethod
@@ -179,10 +216,16 @@ class Config:
         if not path.exists():
             raise FileNotFoundError(
                 f"設定ファイルが見つかりません: {path}\n"
-                "config.example.yaml をコピーして作成してください。"
+                "templates/scenario.config.yaml をコピーして作成してください。"
             )
         with path.open("r", encoding="utf-8") as fp:
-            raw: dict[str, Any] = yaml.safe_load(fp)
+            raw = yaml.safe_load(fp)
+        if not isinstance(raw, dict):
+            raise ValueError(
+                f"scenario.config.yaml の中身が空または辞書ではありません: {path}\n"
+                "templates/scenario.config.yaml をコピーして必要項目を埋めてください。"
+            )
+        raw = _expand_env(raw)
         return cls._from_dict(raw, config_path=path.resolve())
 
     @classmethod

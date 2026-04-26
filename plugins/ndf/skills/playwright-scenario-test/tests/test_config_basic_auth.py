@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from scenario_test.config import Config
+from scenario_test.config import Config, _expand_env
 
 
 _BASE_RAW = {
@@ -85,6 +85,41 @@ def test_tolerated_patterns_default_empty():
     cfg = _from_dict(_BASE_RAW)
     assert cfg.tolerated_console_errors == []
     assert cfg.tolerated_page_errors == []
+
+
+def test_empty_yaml_raises_value_error(tmp_path):
+    """空 YAML ファイルを Config.load() すると ValueError が出ること (Codex Minor 7)。"""
+    p = tmp_path / "empty.yaml"
+    p.write_text("", encoding="utf-8")
+    with pytest.raises(ValueError, match="空または辞書ではありません"):
+        Config.load(p)
+
+
+# --- _expand_env 純関数テスト (Codex Major 4) ------------------------------
+
+
+def test_expand_env_simple(monkeypatch):
+    monkeypatch.setenv("MY_VAR", "hello")
+    assert _expand_env("${MY_VAR}") == "hello"
+
+
+def test_expand_env_default_when_unset(monkeypatch):
+    monkeypatch.delenv("UNSET_VAR", raising=False)
+    assert _expand_env("${UNSET_VAR:-fallback}") == "fallback"
+
+
+def test_expand_env_undefined_no_default_raises(monkeypatch):
+    monkeypatch.delenv("UNDEFINED_VAR", raising=False)
+    with pytest.raises(ValueError, match="UNDEFINED_VAR"):
+        _expand_env("${UNDEFINED_VAR}")
+
+
+def test_expand_env_recursive(monkeypatch):
+    monkeypatch.setenv("DB_HOST", "localhost")
+    monkeypatch.setenv("DB_PASS", "secret")
+    raw = {"host": "${DB_HOST}", "nested": [{"pass": "${DB_PASS}"}]}
+    result = _expand_env(raw)
+    assert result == {"host": "localhost", "nested": [{"pass": "secret"}]}
 
 
 def test_tolerated_patterns_loaded():

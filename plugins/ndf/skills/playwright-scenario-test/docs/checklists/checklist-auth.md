@@ -143,6 +143,6 @@ assert session_before != session_after, "session fixation 対策不備"
 - OWASP ASVS v5.0 V2 (Authentication), V3 (Session Management)
 - OWASP Authentication Cheat Sheet
 - OWASP Session Management Cheat Sheet
-- OWASP CSRF Prevention Cheat Sheet
+- OWASP CSRF Prevention Cheat Sheet/
 - NIST SP 800-63B "Digital Identity Guidelines"
 - RFC 6265 "HTTP State Management Mechanism" (cookies)
