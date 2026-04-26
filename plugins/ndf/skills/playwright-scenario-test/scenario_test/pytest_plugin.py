@@ -257,8 +257,10 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
     # Step 2: teardown report の ndf_har / ndf_trace を call entry に merge する。
     # teardown 時点で context.close() 後の確定値が積まれているため、
     # call phase で None だった artifact path をここで埋める。
-    for outcome_key in ("passed", "failed", "skipped", "error", "xfailed", "xpassed"):
-        for rep in terminalreporter.stats.get(outcome_key, []):
+    # pytest は setup/teardown の rep を stats[""] (空文字キー) に格納するため、
+    # "" キーも含めて全キーを走査する。
+    for outcome_key in terminalreporter.stats:
+        for rep in terminalreporter.stats[outcome_key]:
             if getattr(rep, "when", None) != "teardown":
                 continue
             nodeid = getattr(rep, "nodeid", "?")
