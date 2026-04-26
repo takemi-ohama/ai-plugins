@@ -1,63 +1,62 @@
-id: TC-FRM-{role}-{slug}
-title: 申込フォーム ({role}) — Decision Table + State Transition + 二重送信防止
-phase: 40
+# form page_role 用 testcase テンプレート
+# docs/checklists/checklist-form.md (15 項目) を満たすこと
+
+id: TC-FORM-{role}-{slug}
+title: フォーム ({role}) — Decision Table + Classification Tree + State Transition
+phase: 10
 type: playwright
 role: {role}
 priority: high
 page_role: form
-tags: [form, multi-step, decision-table, scenario]
+tags: [form, scenario]
 description: |
-  docs/checklists/checklist-form.md (15 項目) を必ず参照。
-  必須技法: Decision Table 必須 + Classification Tree + Pairwise + State Transition.
-  Triggers: 'form', 'フォーム', 'wizard', '申込', 'multi-step'
+  docs/checklists/checklist-form.md 全 15 項目を必ず参照。
+  必須技法: Decision Table 必須, Classification Tree + Pairwise, State Transition.
 
-  ⚠️ 入力分岐は経験で書かない。コードを読んで Decision Table を作成すること:
-    scripts/generate_test_plan.py --role form --url ... --factors "country=JP,US"
-  または手動で各分岐を別 testcase に分割。
-
-  項目別の検査計画:
-    - FM1 直接 URL アクセス:   step 1〜3
-    - FM3 入力分岐:            別 testcase に分割 (Decision Table 各行)
-    - FM5 二重送信:            step 4
-    - FM6 完了画面リロード:     step 5
-    - FM9 step skip 攻撃:       step 6
+  バリデーション分岐は `--factors` で Pairwise 拡張可能 (generate_test_plan.py 参照).
 
 post_login:
   url_must_not_contain: []
 
 steps:
-  # === FM1: 各 step の直接 URL アクセス ===
-  - name: "[FM1] step1 直接アクセス"
-    path: /form/step1
-
-  - name: "[FM1] step2 直接 (step1 未完) → step1 にリダイレクト"
-    path: /form/step2
-    expect_url_contains: /form/
-
-  - name: "[FM1] /form/complete 直接 → step1 にリダイレクト"
-    path: /form/complete
-    expect_url_contains: /form/
-
-  # === FM5: 二重送信防止 (E2E 単体では限定的) ===
-  - name: "[FM5] 送信ページ表示 (実際の二重 click は手動 or pytest-playwright で)"
-    path: /form/submit
-
-  # === FM6: 完了画面 ===
-  - name: "[FM6] 完了画面アクセス"
-    path: /form/complete?ok=1
-
-  # === FM9: step skip ===
-  - name: "[FM9] step1 完了せず /form/complete アクセス → 拒否"
-    path: /form/complete
-    expect_url_contains: /form/
-
-# ============================================================
-# Decision Table 全行カバーは別 testcase で。例:
-#   testcases/TC-FRM-individual-jp.yaml  (個人 × JP)
-#   testcases/TC-FRM-corporate-jp.yaml   (法人 × JP)
-#   testcases/TC-FRM-individual-us.yaml  (個人 × US)
-#   ...
-# scripts/generate_test_plan.py --role form --factors "type=ind,corp" \
-#                               --factors "country=JP,US,EU" --output ...
-# で All-Pairs を自動生成できる。
-# ============================================================
+  - kind: goto
+    name: フォーム表示
+    path: /contact
+    expect_status: 200
+  - kind: expect_visible
+    name: 入力フォーム表示
+    locator: { role: heading, name: お問い合わせ }
+  - kind: fill
+    name: お名前を入力
+    locator: { label: お名前 }
+    value: テスト 太郎
+  - kind: fill
+    name: メールアドレスを入力
+    locator: { label: メールアドレス }
+    value: test@example.com
+  - kind: select
+    name: お問い合わせ種別を選択
+    locator: { label: お問い合わせ種別 }
+    value: bug
+  - kind: fill
+    name: "本文を入力 (BVA: 最低文字数を満たす)"
+    locator: { label: お問い合わせ内容 }
+    value: |
+      不具合報告です。
+      再現手順は以下の通りです。
+  - kind: check
+    name: 利用規約に同意
+    locator: { label: 利用規約に同意します }
+  - kind: click
+    name: 送信ボタン押下
+    locator: { role: button, name: 送信 }
+  - kind: expect_url
+    name: 送信完了 URL へ遷移
+    contains: /contact/thanks
+  - kind: expect_visible
+    name: 受付完了の見出し表示
+    locator: { role: heading, name: お問い合わせを受け付けました }
+  - kind: expect_no_text
+    name: バリデーションエラーが残っていないこと
+    locator: { css: body }
+    text: "errors-summary"

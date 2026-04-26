@@ -1,64 +1,61 @@
-id: TC-EDT-{role}-{slug}
-title: 編集ページ ({role}) — BVA + validation + CSRF + dirty 検知
-phase: 30
+# edit page_role 用 testcase テンプレート
+# docs/checklists/checklist-edit.md (14 項目) を満たすこと
+
+id: TC-EDIT-{role}-{slug}
+title: 編集フロー ({role}) — BVA + EP + Decision Table + State Transition
+phase: 10
 type: playwright
 role: {role}
 priority: high
 page_role: edit
-tags: [edit, validation, scenario]
+tags: [edit, scenario]
 description: |
-  docs/checklists/checklist-edit.md (14 項目) を必ず参照。
-  必須技法: BVA, EP, Decision Table, State Transition (clean/dirty/saving).
-  Triggers: '編集', 'edit', 'validation', 'バリデーション', 'CSRF', 'dirty'
+  docs/checklists/checklist-edit.md 全 14 項目を必ず参照。
+  必須技法: BVA, EP, Decision Table, State Transition (dirty/saving).
 
   項目別の検査計画:
-    - ED1 プリフィル:           step 1
-    - ED2 境界値 (BVA):         step 2〜5 (parametrize で展開)
-    - ED4 必須未入力:           step 6
-    - ED5 client/server 一致:    step 7
-    - ED8 CSRF token 削除:      step 8
-    - ED9 dirty 検知:           step 9 (別ページへ navigate)
-    - ED13 no-op 保存:          step 10
+    - EDIT1〜3   フォーム表示 / 既存値ロード: step 1〜4
+    - EDIT5〜7   保存正常系:                step 5〜8
+    - EDIT9〜10  バリデーション (空 / 上限): 別 testcase に分割
+    - EDIT13     楽観ロック:                別 testcase
 
 post_login:
   url_must_not_contain: []
 
 steps:
-  # === ED1: プリフィル ===
-  # 前提: 一覧で先に extract:item_id を取得してから本 testcase を実行する設計、
-  # または手動で {item_id} を実 ID に置換する。scenario_test runner は
-  # path 中の {var} を nav_vars (前 step の extract 結果) で str.format 展開する。
-  - name: "[ED1] 編集画面プリフィル"
-    path: /items/{item_id}/edit
-
-  # === ED2: BVA — 各フィールドの境界値 ===
-  # 「title 長さ 1〜100 仕様」を例に min-1/min/max/max+1 を試す
-  # NOTE: scenario_test ランナーは現状フィールド入力をサポートしないため、
-  #       実際の入力テストは pytest-playwright (将来) または手動補完で実施
-  - name: "[ED2] title 長さ 0 (min-1)"
-    path: /items/{item_id}/edit?prefill_title=
-
-  - name: "[ED2] title 長さ 1 (min)"
-    path: /items/{item_id}/edit?prefill_title=A
-
-  - name: "[ED2] title 長さ 100 (max)"
-    path: /items/{item_id}/edit?prefill_title=AAAAAAAAAA  # 実際は 100 文字
-
-  - name: "[ED2] title 長さ 101 (max+1)"
-    path: /items/{item_id}/edit?prefill_title=BBBBBBBBBB  # 実際は 101 文字
-
-  # === ED8: CSRF token 削除攻撃 ===
-  - name: "[ED8] CSRF token なしで POST"
-    path: /items/{item_id}/update
-    method: POST
-    data:
-      title: "csrf-bypass-test"
-    expect_status: 403  # token なしで 403 期待
-
-  # === ED9: dirty 検知 (E2E 単体では困難 — 手動 or 拡張 runner) ===
-  # 実装メモ: scenario_test ランナーには beforeunload 検知機構がない。
-  # 別途 pytest-playwright で page.on("dialog", ...) を使うこと
-
-# ============================================================
-# 関連: docs/03-test-techniques.md § 1〜3 (EP / BVA / Decision Table)
-# ============================================================
+  - kind: goto
+    name: 一覧から既存項目を開く準備
+    path: /items
+    expect_status: 200
+  - kind: click
+    name: 1 件目の編集リンクをクリック
+    locator: { role: link, name: 編集 }
+  - kind: expect_url
+    name: 編集画面 URL に遷移
+    contains: /items/edit
+  - kind: extract
+    name: 既存タイトルを変数に保存 (saved_title)
+    locator: { label: タイトル }
+    var: saved_title
+  - kind: fill
+    name: タイトルを変更
+    locator: { label: タイトル }
+    value: 更新後タイトル
+  - kind: fill
+    name: "本文を変更 (BVA: 1 文字でも変更検出されること)"
+    locator: { label: 本文 }
+    value: 更新後の本文。
+  - kind: click
+    name: 保存ボタン押下
+    locator: { role: button, name: 保存 }
+  - kind: expect_url
+    name: 詳細画面へ遷移
+    contains: /items/
+  - kind: expect_text
+    name: 詳細画面に更新後タイトル表示
+    locator: { role: heading }
+    text: 更新後タイトル
+  - kind: expect_no_text
+    name: 保存に失敗していないこと
+    locator: { css: body }
+    text: "保存できませんでした"

@@ -130,7 +130,7 @@ James Bach の **Heuristic Test Strategy Model** (v6.3) は、テスト戦略を
 |---|---|---|
 | 業界標準 (ISO / WCAG / OWASP / ISTQB) | docs/ 配下 (このディレクトリ) | 出典がある。揺らぎが小さい |
 | ヒューリスティクス (HTSM / FEW HICCUPPS / Hendrickson) | docs/ 配下 | 「思考の道具」として再利用 |
-| 個別プロジェクトの慣習 (PHP / Rails / 等) | config.yaml の `body_check.*_patterns` | 個別カスタマイズ |
+| 個別プロジェクトの慣習 (PHP / Rails / 等) | testcase YAML に `kind: expect_no_text` step (`text: "Fatal error"` 等) | 個別カスタマイズ |
 | 動画/HUD の細かい数値 (字幕高さ・カーソル色) | scenario_test/hud.py のコード内定数 | 表示 UX の調整。理論の対象外 |
 
 「経験」を docs に書くのではなく、**理論を docs に書き、慣習は config に逃がす** のが本 Skill の規律。

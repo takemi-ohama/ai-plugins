@@ -1,7 +1,7 @@
-"""axe-core で a11y 違反を検出する。
+"""axe-core で a11y 違反を検出する CLI (`scenario_test.a11y` モジュールの薄いラッパ)。
 
-docs/checklists/checklist-common.md の C1 (a11y) を機械的に走査する。
-WCAG 2.0 / 2.1 / 2.2 タグを指定。
+docs/checklists/checklist-common.md C1 (a11y) の自動走査用。runner はテストケース
+内蔵で同 module を呼ぶため、本 CLI は外部 URL の単発スキャン専用。
 
 Usage:
     python run_a11y_scan.py --url https://example.com
@@ -19,8 +19,12 @@ from typing import Any
 
 from playwright.sync_api import sync_playwright
 
+# scenario_test 配下を import 可能にする (skill 直下から呼ばれる前提)
+_SKILL_ROOT = Path(__file__).resolve().parent.parent
+if str(_SKILL_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SKILL_ROOT))
 
-DEFAULT_TAGS = ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]
+from scenario_test.a11y import DEFAULT_TAGS, scan_page  # noqa: E402
 
 
 def scan(
@@ -31,17 +35,6 @@ def scan(
     timeout_ms: int = 30_000,
     headless: bool = True,
 ) -> dict[str, Any]:
-    """1 URL をスキャンして axe の結果 dict を返す。"""
-    try:
-        from axe_playwright_python.sync_playwright import Axe
-    except ImportError as exc:
-        raise SystemExit(
-            "axe-playwright-python が未インストール。\n"
-            "  uv sync --extra a11y\n"
-            "または\n"
-            "  uv add axe-playwright-python"
-        ) from exc
-
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
         ctx_kwargs: dict = {"ignore_https_errors": True}
@@ -53,48 +46,17 @@ def scan(
             page.goto(url, timeout=timeout_ms, wait_until="domcontentloaded")
             page.wait_for_load_state("networkidle", timeout=timeout_ms)
         except Exception as exc:
+            browser.close()
             return {"url": url, "error": str(exc)}
 
-        axe = Axe()
-        # axe-playwright-python 0.1.x は run(page) のみ。タグ絞り込みは
-        # 内部 axe-core の options で実施するため context options を渡す。
-        try:
-            results = axe.run(
-                page,
-                options={"runOnly": {"type": "tag", "values": tags or DEFAULT_TAGS}},
-            )
-        except TypeError:
-            # 古いバージョンは options 非対応
-            results = axe.run(page)
-
-        violations: list[dict[str, Any]] = []
-        for v in results.response.get("violations", []):
-            violations.append({
-                "id": v.get("id"),
-                "impact": v.get("impact"),
-                "tags": v.get("tags", []),
-                "help": v.get("help"),
-                "helpUrl": v.get("helpUrl"),
-                "nodes": [
-                    {
-                        "html": n.get("html", "")[:200],
-                        "target": n.get("target", []),
-                        "failureSummary": n.get("failureSummary", "")[:300],
-                    }
-                    for n in v.get("nodes", [])
-                ],
-            })
-
-        out = {
+        violations = scan_page(page, tags=tuple(tags or DEFAULT_TAGS))
+        browser.close()
+        return {
             "url": url,
             "violations_count": len(violations),
             "violations": violations,
-            "passes_count": len(results.response.get("passes", [])),
-            "incomplete_count": len(results.response.get("incomplete", [])),
-            "tags": tags or DEFAULT_TAGS,
+            "tags": tags or list(DEFAULT_TAGS),
         }
-        browser.close()
-        return out
 
 
 def main() -> int:
@@ -102,8 +64,8 @@ def main() -> int:
     parser.add_argument("--url", help="検査対象 URL")
     parser.add_argument("--url-list", type=Path, help="URL を 1 行 1 件で書いたファイル")
     parser.add_argument("--storage-state", default=None, help="ログイン済 storage_state.json")
-    parser.add_argument("--tags", nargs="+", default=DEFAULT_TAGS,
-                        help=f"axe-core タグ (default: {DEFAULT_TAGS})")
+    parser.add_argument("--tags", nargs="+", default=list(DEFAULT_TAGS),
+                        help=f"axe-core タグ (default: {list(DEFAULT_TAGS)})")
     parser.add_argument("--output", type=Path, default=None,
                         help="JSON 出力先 (省略時 stdout)")
     parser.add_argument("--fail-on-violations", action="store_true",

@@ -123,6 +123,12 @@ def _render_testcase(r: TestCaseResult, out: list[str]) -> None:
         out.append(f"- ⚠️ pageerror: {len(r.page_errors)} 件 (auto-FAIL 要因)")
     if r.console_errors:
         out.append(f"- ⚠️ console.error: {len(r.console_errors)} 件 (auto-FAIL 要因)")
+    if r.axe_violations:
+        out.append(f"- ⚠️ axe-core 違反: {len(r.axe_violations)} 件")
+    if r.cwv_metrics:
+        cwv_str = ", ".join(f"{k}={v:.0f}" for k, v in r.cwv_metrics.items())
+        mark = "PASS" if r.cwv_passed else "FAIL"
+        out.append(f"- 🚀 Core Web Vitals ({mark}): {cwv_str}")
     if r.error:
         out.extend(["", "**FATAL エラー**:", "", "```", r.error.strip(), "```"])
     if r.page_errors:
@@ -135,6 +141,15 @@ def _render_testcase(r: TestCaseResult, out: list[str]) -> None:
         for line in r.console_errors[:5]:
             out.append(line)
         out.append("```")
+    if r.axe_violations:
+        out.extend(["", "**axe-core 違反 詳細** (先頭 5 件):", ""])
+        out.append("| ID | impact | help |")
+        out.append("|---|---|---|")
+        for v in r.axe_violations[:5]:
+            help_url = v.get("helpUrl") or ""
+            help_text = v.get("help", "")
+            help_md = f"[{help_text}]({help_url})" if help_url else help_text
+            out.append(f"| `{v.get('id')}` | {v.get('impact', '?')} | {help_md} |")
     out.append("")
     if r.steps:
         out.append("| # | ステップ | 結果 | 詳細 | スクショ |")

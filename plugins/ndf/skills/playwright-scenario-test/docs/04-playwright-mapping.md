@@ -137,7 +137,7 @@ playwright show-trace test-results/<test>/trace.zip
 https://trace.playwright.dev/?trace=<URL>
 ```
 
-bug report に **trace.zip の playwright.dev リンク** を必ず付与する (`scripts/trace_link.py`)。
+bug report に **trace.zip の playwright.dev リンク** を必ず付与する (`scripts/upload_evidence.py --kind trace --public`)。
 
 ### page.pause()
 
@@ -172,7 +172,7 @@ def test_a11y(page):
     assert results.violations_count == 0, results.generate_report()
 ```
 
-公式 Locator の `to_match_aria_snapshot('''- heading "todos" - textbox ...''')` で a11y 構造のリグレッション検出も可能 (testcase 内で `expect(page).to_match_aria_snapshot(...)` を使う方針。ヘルパスクリプトは v0.3.0 以降で検討).
+公式 Locator の `to_match_aria_snapshot('''- heading "todos" - textbox ...''')` で a11y 構造のリグレッション検出も可能。testcase YAML では `kind: expect_aria_snapshot` step を使う (`text:` フィールドに snapshot YAML を渡す)。
 
 ### Core Web Vitals
 

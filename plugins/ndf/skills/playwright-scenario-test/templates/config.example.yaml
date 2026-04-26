@@ -32,9 +32,8 @@ roles:
       fields:
         LoginID: admin@example.com
         Password: replace-me
-      # 任意: 独自フォーム名がある場合の優先セレクタ。省略時は汎用フォールバック
-      # ('form input[type="image"]' / 'form button[type="submit"]' / 'form input[type="submit"]')
-      # で nav_helpers.submit_login が試行する。
+      # 任意: 独自フォーム名がある場合の優先セレクタ。省略時は role/type=submit
+      # の汎用フォールバックを runner が試行する。
       # submit_selectors:
       #   - 'form[name="MyAdminLoginForm"] button[type="submit"]'
       # ログイン成功判定: URL がこの文字列を含めば「失敗」とみなす
@@ -73,10 +72,6 @@ playwright:
   # Playwright Trace (trace.zip) を出力する。 `playwright show-trace trace.zip`
   # でクリック箇所のハイライト・DOM スナップショット・コンソールを対話確認可能。
   enable_trace: true
-  # ページが viewport より長い場合、ナビゲーション直前に「下までスクロール →
-  # クリック対象 (なければ最上部) に戻る」アニメーションを差し込む。
-  # 動画でページ全体像を見せたい場合に有効。所要時間は +2〜3秒/ステップ。
-  enable_scroll_demo: true
   # 録画動画のフォーマット: "mp4" 推奨 (Google Drive プレビュアで再生互換性が高い)。
   # "webm" にすると変換せず Playwright 既定の webm のまま。
   video_format: mp4
@@ -85,24 +80,6 @@ playwright:
 runner:
   workers: 4
   testcases_dir: ./testcases
-
-# --- ページ本文エラー検出 (省略可) -----------------------------------
-# 各ナビゲーション後に body_text を見て自動 FAIL 判定する。
-# 各リストが空のままなら無効化される。プロジェクトの言語/フレームワークに合わせて
-# 検出パターンを書き加える。
-body_check:
-  # 本文中にあれば致命的エラーとみなす文字列
-  fatal_patterns: []
-  # 本文先頭 300 文字に出ていれば「ページが壊れた」とみなす警告文字列
-  warning_patterns: []
-  # 本文中にあれば File not found 系とみなす文字列
-  not_found_strings: []
-
-# 例: PHP プロジェクトの場合 (Fatal/Warning/Notice/Deprecated を捕捉)
-# body_check:
-#   fatal_patterns: ["Fatal error", "Uncaught", "Parse error"]
-#   warning_patterns: ["STRICT:", "Warning:", "Notice:", "Deprecated:"]
-#   not_found_strings: ["File not found"]
 
 # --- 許容する console.error / pageerror パターン (省略可) -------------
 # docs/checklists/checklist-common.md C8 では console.error / pageerror が
@@ -113,18 +90,28 @@ tolerated_console_errors: []
 tolerated_page_errors: []
 # 例:
 # tolerated_console_errors:
-#   - "Failed to load resource: the server responded with a status of 404"  # 既知の missing favicon
-#   - "ResizeObserver loop limit exceeded"                                    # Chrome の良性 warning
+#   - "Failed to load resource: the server responded with a status of 404"
+#   - "ResizeObserver loop limit exceeded"
 # tolerated_page_errors:
-#   - "ChunkLoadError"   # CDN 起因で再現しないケースを除外する場合のみ
+#   - "ChunkLoadError"
 
-# --- スクショファイル名のスラッグ生成ルール (省略可) ------------------
-# path から作るスラッグの正規化ルール。空のままなら拡張子もクエリも残る。
-slug:
-  # 削除する拡張子の配列。例: PHP プロジェクトなら [".php"]
-  strip_extensions: []
-  # クエリ部分から拾うサフィックス (例: r"Cmd=(\w+)" で /foo.php?Cmd=Edit → foo-Edit)
-  query_capture_re: null
+# --- a11y (axe-core) 自動スキャン (v0.3.0) ----------------------------
+# page_role が auto_roles にマッチする testcase で 1 回 axe-core を実行する。
+# 違反があれば fail_on_violations=true なら FAIL、false なら情報のみ。
+a11y:
+  enabled: true
+  auto_roles: [lp, list, form, dashboard, cart, checkout, settings, auth]
+  tags: [wcag2a, wcag2aa, wcag21aa, wcag22aa]
+  fail_on_violations: true
+
+# --- Core Web Vitals 自動計測 (v0.3.0) --------------------------------
+# page_role が auto_roles にマッチする testcase で 1 回 LCP/CLS/TTFB/longest_task
+# を 5 秒観察する。poor 判定が 1 件でもあれば fail_on_poor=true なら FAIL。
+cwv:
+  enabled: true
+  auto_roles: [lp, list, dashboard, search]
+  observe_ms: 5000
+  fail_on_poor: true
 
 # --- レポート設定 (省略可) -------------------------------------------
 # render_report が見出し・計画書リンク・Phase ラベルに使う。

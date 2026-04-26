@@ -1,51 +1,47 @@
-id: TC-00
-title: 疎通検査 (curl)
+# curl タイプ testcase テンプレート (疎通検査専用、Playwright 不使用)
+# 大量 URL の HTTP ステータス + body 文字列を高速にチェックする用途。
+# 認証要否は basic_auth: skip / required / optional で指定。
+
+id: TC-CURL-{role}-{slug}
+title: 疎通検査 ({role}) — エンドポイント別 HTTP ステータス確認
 phase: 0
 type: curl
-priority: high
+role: {role}                           # 任意 (フィルタ用)
+priority: medium
+page_role: lp                          # 任意 (フィルタ用)
+tags: [curl, smoke]
 description: |
-  HTTPS 到達性、Basic 認証ゲート、ログインフォーム HTML の存在を curl で検査する。
-  Playwright 起動の前段で実行する軽量チェック。
+  対象環境の主要エンドポイントが想定 HTTP コードで返ることのみ確認する。
+  Playwright を起動しないため数十 URL を並列に叩いても軽量。
 
-# 各 check が ID 付き sub-test 扱いとなり、レポートでは個別 PASS/FAIL を出す
 checks:
-  - id: TC-00-01
-    name: ルート URL HTTPS 応答 (認証なし)
+  - id: TC-CURL-{role}-001
+    name: トップページ
     path: /
     basic_auth: optional
-    expect_status_in: [200, 301, 302, 401]
-
-  - id: TC-00-02
-    name: 管理者画面 Basic 認証ゲート (無認証→401)
-    path: /admin/login
-    basic_auth: skip
-    expect_status_in: [401]
-
-  - id: TC-00-03
-    name: 管理者画面 Basic 認証通過後 (→200, ログインフォームあり)
-    path: /admin/login
-    basic_auth: required
     expect_status_in: [200]
-    body_must_contain:
-      - 'name="LoginID"'
-      - 'name="Password"'
-
-  - id: TC-00-04
-    name: 一般ユーザログイン公開アクセス (無認証→200, フォームあり)
-    path: /user/login
+    body_must_contain: ["<html"]
+  - id: TC-CURL-{role}-002
+    name: ヘルスチェック
+    path: /health
+    basic_auth: skip
+    expect_status_in: [200, 204]
+    body_must_contain: []
+  - id: TC-CURL-{role}-003
+    name: ログイン画面 (匿名)
+    path: /login
     basic_auth: skip
     expect_status_in: [200]
-    body_must_contain:
-      - 'name="LoginID"'
-      - 'name="Password"'
-
-# ===========================================================================
-# 各 check フィールド説明
-# ===========================================================================
-# id              : サブ test ID (レポート上で個別 PASS/FAIL 表示)
-# name            : 表示名
-# path            : 訪問パス
-# basic_auth      : "skip" (認証ヘッダ無) | "required" (config の basic_auth を使う) |
-#                   "optional" (リダイレクト・401 何でも OK 用)
-# expect_status_in: 期待 HTTP ステータスのリスト (1 つでもマッチすれば OK)
-# body_must_contain: レスポンス本文に必ず含まれる文字列のリスト
+    body_must_contain: ["ログイン"]
+  - id: TC-CURL-{role}-004
+    name: 静的ファイル (CSS)
+    path: /static/css/main.css
+    basic_auth: skip
+    expect_status_in: [200]
+    body_must_contain: []
+  - id: TC-CURL-{role}-005
+    name: 404 ページが意図通り返るか
+    path: /this-path-does-not-exist
+    basic_auth: skip
+    expect_status_in: [404]
+    body_must_contain: ["Not Found"]
