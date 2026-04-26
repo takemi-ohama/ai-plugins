@@ -70,7 +70,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--ndf-drive-folder",
         action="store",
         default=None,
-        help="Drive アップロード先フォルダ ID (terminal_summary 後に upload 実行)",
+        help=(
+            "Drive アップロード先フォルダ ID (terminal_summary 後に upload 実行)。"
+            "trace.zip / *.har / 動画には機微情報 (URL / Cookie / localStorage / 操作履歴) "
+            "が含まれる可能性があります。private folder + 信頼できる共有相手のみに限定してください。"
+            " (Codex Minor 8)"
+        ),
     )
 
 
@@ -294,19 +299,14 @@ def pytest_sessionfinish(session, exitstatus):
         return
 
     try:
-        # scripts/ を import path に追加して upload_evidence をロード
-        import sys
-
-        scripts_dir = (
-            Path(__file__).resolve().parent.parent / "scripts"
-        )
-        if str(scripts_dir) not in sys.path:
-            sys.path.insert(0, str(scripts_dir))
-        import upload_evidence  # type: ignore  # noqa: I001
+        # Amazon Q Critical-5: sys.path への動的 inject を廃止し、
+        # scenario_test.uploaders パッケージ経由で安全に import する。
+        # scripts/upload_evidence.py は CLI スタンドアロン用途として残す。
+        from scenario_test.uploaders import upload, detect_kind
 
         # report.md は kind=any でアップ
         if report_path.exists():
-            upload_evidence.upload(
+            upload(
                 report_path, kind="any", parent_folder_id=folder_id, public=False
             )
 
@@ -316,8 +316,8 @@ def pytest_sessionfinish(session, exitstatus):
                 continue
             for f in sub.iterdir():
                 if f.suffix in (".zip", ".har", ".mp4", ".webm"):
-                    kind = upload_evidence.detect_kind(f)
-                    upload_evidence.upload(
+                    kind = detect_kind(f)
+                    upload(
                         f, kind=kind, parent_folder_id=folder_id, public=False
                     )
     except Exception as exc:  # pragma: no cover - depends on Drive auth
