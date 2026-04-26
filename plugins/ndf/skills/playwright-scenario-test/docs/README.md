@@ -38,7 +38,7 @@ AI/人間どちらが計画書を書く場合も、まず該当 page role のチ
    → docs/checklists/checklist-{role}.md を全項目走査
    → 各項目には適用すべきテスト技法 (EP/BVA/...) と oracle が併記されている
 
-3. pytest テストを書く (v0.3.0+)
+3. pytest テストを書く
    → templates/test_<role>.py.template を起点に test 関数を追加
    → `playwright codegen` で操作録画 → そのまま test に貼ってもよい
    → `@pytest.mark.page_role(...)` を付ければ a11y / CWV が autouse で走る

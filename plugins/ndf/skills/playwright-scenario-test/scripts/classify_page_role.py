@@ -5,7 +5,7 @@
 (完全な a11y tree ではなく軽量な近似)。docs/02-page-roles.md の識別ヒューリスティック
 を機械化したもの。
 
-`page.accessibility.snapshot()` ベースのより厳密な分類は将来検討 (Skill v0.3.0+)。
+`page.accessibility.snapshot()` ベースのより厳密な分類は将来検討。
 
 Usage:
     python classify_page_role.py --url https://example.com/items

@@ -1,4 +1,4 @@
-"""認証 (auth) 系テストの雛形 (v0.3.0+)。
+"""認証 (auth) 系テストの雛形。
 
 ログインフロー単体の検証。NDF が提供する ``ndf_role_<id>`` fixture で
 ``page`` に storage_state を inject 済みなので、test 関数は遷移先の URL や

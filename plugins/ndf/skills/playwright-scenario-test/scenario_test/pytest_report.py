@@ -1,10 +1,6 @@
-"""pytest hook で集めた test result から Markdown レポートを生成する (v0.3.0+)。
+"""pytest hook で集めた test result から Markdown レポートを生成する。
 
-旧 ``scenario_test.report`` は ``TestCaseResult`` (自前 DSL) ベースだったため、
-pytest の TestReport / 集計に合わせた薄い renderer に置き換える。
-
-PLAN17 Task 6: ``pytest_terminal_summary`` から呼ばれ、
-``reports/<run-id>/report.md`` を生成する。
+``pytest_terminal_summary`` から呼ばれ、``reports/<run-id>/report.md`` を生成する。
 ``--ndf-drive-folder`` 指定時は Drive アップロードと URL 差し込みも担当。
 """
 

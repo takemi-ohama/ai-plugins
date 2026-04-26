@@ -121,8 +121,8 @@ playwright codegen --save-storage=auth.json example.com
 playwright codegen --load-storage=auth.json example.com
 ```
 
-本 Skill では `scripts/record_scenario.py` がラッパーを提供し、出力を testcase YAML に整形する。
-**「経験で書く」を「録画→生成→YAML 化」に置換** する。
+本 Skill では `scripts/record_scenario.py` がラッパーを提供し、codegen の Python 出力をそのまま pytest テスト関数として利用する。
+**「経験で書く」を「録画→生成→pytest テスト」に置換** する。
 
 ### Trace Viewer
 
@@ -233,9 +233,9 @@ page.on("pageerror", lambda exc: errors.append(str(exc)))
 | retry | `pytest --reruns N` | `retries: 2` | Python |
 | 並列 | `pytest -n auto` | builtin worker | Python |
 | trace | `--tracing retain-on-failure` | 同等 | Python |
-| merge-reports | 自前実装 | builtin | 自前 (既存 report.py 活用) |
+| merge-reports | `pytest_terminal_summary` で集計 | builtin | Python (`scenario_test/pytest_report.py`) |
 
-**結論**: Python sync API を維持。理由は (1) 動画/字幕焼き込み実装が完成、(2) AI が config/testcase YAML だけ書く設計と pytest fixture が相性良、(3) 機能差は merge-reports のみで自前実装で吸収可能.
+**結論**: Python `pytest-playwright` を採用。理由は (1) HUD overlay / 字幕焼き込み / a11y / CWV / Drive 連携を pytest plugin として一体化済み、(2) `def test_xxx(page, ndf_role_admin): ...` を直接書く設計のため pytest fixture / marker と相性が良い、(3) merge-reports は `pytest_terminal_summary` hook で同等機能を提供.
 
 ## 参考文献
 

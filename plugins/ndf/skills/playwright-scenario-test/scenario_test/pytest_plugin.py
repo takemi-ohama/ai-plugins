@@ -1,21 +1,17 @@
-"""playwright-scenario-test の pytest plugin (v0.3.0+)。
+"""playwright-scenario-test の pytest plugin。
 
-PLAN17 Task 1: 骨組みのみ (addoption / configure / markers / config fixture)。
-
+CLI options:
 - ``--ndf-config <path>``: scenario.config.yaml を指定
 - ``--ndf-out-dir <path>``: 成果物 (HAR / trace / 動画 / report) の出力先
-- ``--ndf-no-evidence``: evidence 収集を OFF (Phase 2 で本格利用)
-- ``--ndf-hud``: HUD overlay を ON (Phase 3 で本格利用)
-- ``--ndf-drive-folder <id>``: Drive 連携 (Phase 3 で本格利用)
+- ``--ndf-no-evidence``: evidence 収集を OFF
+- ``--ndf-hud``: HUD overlay を ON
+- ``--ndf-drive-folder <id>``: Drive 連携
 
 markers:
-- ``page_role(*roles)``: a11y / CWV autouse の判定材料 (Phase 2)
+- ``page_role(*roles)``: a11y / CWV autouse の判定材料
 - ``role(role_id)``: login する role を明示 (`ndf_role_<id>` fixture と並用可)
-- ``phase(num)``: report.md のフェーズ集計用 (Phase 3)
-- ``priority(level)``: report.md のソート用 (Phase 3)
-
-Phase 1 では fixture を提供するのみ。a11y / CWV / report 連携は Phase 2-3
-で順次追加する。
+- ``phase(num)``: report.md のフェーズ集計用
+- ``priority(level)``: report.md のソート用
 """
 
 from __future__ import annotations
@@ -130,9 +126,9 @@ def pytest_configure(config: pytest.Config) -> None:
 def pytest_runtest_makereport(item, call):
     """test の各 phase 終了時に ``ndf_evidence`` の状態をレポートに紐付ける。
 
-    Phase 2: FAIL 時に evidence の trace/HAR path を log に追記する。
-    Phase 3: rep.user_properties に成果物 path / marker を保存し、
-             ``pytest_terminal_summary`` で report.md に集約する。
+    FAIL 時には evidence の trace/HAR path を log に追記し、
+    成果物 path / marker を rep.user_properties に保存して
+    ``pytest_terminal_summary`` で report.md に集約する。
     """
     outcome = yield
     rep = outcome.get_result()
@@ -180,7 +176,7 @@ def pytest_runtest_makereport(item, call):
 
 
 # ---------------------------------------------------------------------------
-# Terminal summary / session finish (PLAN17 Task 6)
+# Terminal summary / session finish
 # ---------------------------------------------------------------------------
 
 
@@ -266,8 +262,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 def pytest_sessionfinish(session, exitstatus):
     """``--ndf-drive-folder`` 指定時、生成済 report.md と evidence を Drive アップ。
 
-    PLAN17 Task 6: ``upload_evidence.upload`` を直接呼ぶ。失敗時は警告のみ
-    (test 結果には影響しない)。
+    ``upload_evidence.upload`` を直接呼ぶ。失敗時は警告のみで test 結果には影響しない。
     """
     folder_id: str | None = session.config.getoption(
         "ndf_drive_folder", default=None

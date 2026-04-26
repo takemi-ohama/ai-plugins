@@ -1,7 +1,7 @@
 """a11y fixture: ``page_role`` marker に応じた axe-core 自動スキャン。
 
-PLAN17 Task 4: ``@pytest.mark.page_role("form")`` 等が付与された test 関数の
-終了直前に axe-core を自動実行する。
+``@pytest.mark.page_role("form")`` 等が付与された test 関数の終了直前に
+axe-core を自動実行する。
 
 利用方法:
 - ``@pytest.mark.page_role("form")`` を test に付与すれば autouse 経由で

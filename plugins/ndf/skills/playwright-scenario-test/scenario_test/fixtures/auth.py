@@ -3,7 +3,7 @@
 pytest-playwright が提供する ``page`` / ``context`` / ``browser_context_args``
 fixture と協調して動作する。
 
-設計方針 (PLAN17 Task 2):
+設計方針:
 - ``ndf_config`` は session scope。``--ndf-config`` で指定された YAML を
   1 度だけ読み込む。利用者プロジェクトの ``conftest.py`` から override 可能。
 - 各 role に対し ``ndf_role_<id>`` fixture を *動的* に生成する。
@@ -14,7 +14,6 @@ fixture と協調して動作する。
 - function scope で ``page.context.storage_state(...)`` を inject し、
   ``page`` は既に該当 role でログイン済みの状態で test 関数に渡される。
 
-旧 ``playwright_executor._do_login`` のロジックを fixture 内へ移植。
 fail_if_url_contains による失敗判定もここで行い、test 開始前に明示的に
 ``pytest.fail`` する。
 """
@@ -54,7 +53,10 @@ class _StorageStateCache:
 
 
 def _submit_login_form(page, login: Login) -> None:
-    """``playwright_executor._submit_login_form`` を fixture 用に再実装。"""
+    """ログインフォームの submit を行う。
+
+    優先順位は ``login.submit_selectors`` → role/type=submit → password Enter。
+    """
     for sel in login.submit_selectors:
         try:
             page.locator(sel).first.click(timeout=2000)

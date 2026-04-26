@@ -28,9 +28,8 @@ class Login:
     fields: dict[str, str]
     fail_if_url_contains: str
     # ログイン送信ボタンを特定するためのプロジェクト固有セレクタ (CSS / role / text)。
-    # `playwright_executor._submit_login_form` が「これ → role/type=submit
-    # フォールバック → Password で Enter」の順で試す。空のままでも汎用
-    # フォールバックで通常はログインできる。
+    # auth fixture の _submit_login_form が「これ → role/type=submit フォールバック
+    # → Password で Enter」の順で試す。空のままでも汎用フォールバックで通常はログインできる。
     submit_selectors: list[str] = field(default_factory=list)
 
 
@@ -76,7 +75,7 @@ class PlaywrightConfig:
     @classmethod
     def from_raw(cls, raw: dict[str, Any]) -> "PlaywrightConfig":
         # 既定値は 1280x720 (HD 720p, 16:9) で統一。dataclass の default、
-        # config.example.yaml、本メソッドの default すべて同じ値にする。
+        # templates/scenario.config.yaml、本メソッドの default すべて同じ値にする。
         viewport = raw.get("viewport") or {}
         video_size = raw.get("video_size") or {}
         return cls(
@@ -179,7 +178,7 @@ class Config:
         if not path.exists():
             raise FileNotFoundError(
                 f"設定ファイルが見つかりません: {path}\n"
-                "config.example.yaml をコピーして作成してください。"
+                "templates/scenario.config.yaml をコピーして作成してください。"
             )
         with path.open("r", encoding="utf-8") as fp:
             raw: dict[str, Any] = yaml.safe_load(fp)

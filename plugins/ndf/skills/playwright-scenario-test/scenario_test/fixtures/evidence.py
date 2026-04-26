@@ -1,7 +1,7 @@
 """evidence fixture: HAR / trace / console / pageerror の収集。
 
-PLAN17 Task 3: pytest-playwright が提供する ``browser_context_args`` /
-``context`` / ``page`` fixture と組み合わせて、test 関数ごとに以下を自動収集:
+pytest-playwright が提供する ``browser_context_args`` / ``context`` / ``page``
+fixture と組み合わせて、test 関数ごとに以下を自動収集する:
 
 - HAR: ``browser_context_args`` に ``record_har_path`` を inject
 - trace: ``context.tracing.start`` / ``stop`` (``--ndf-no-evidence`` で無効化)
@@ -62,7 +62,7 @@ def _safe_slug(name: str, fallback: str = "test") -> str:
 
 @dataclass
 class NdfEvidence:
-    """1 test 関数分の証跡コレクタ (旧 ``EvidenceCollectors`` の fixture 版)。"""
+    """1 test 関数分の証跡コレクタ。"""
 
     case_dir: Path
     config: Config | None
@@ -231,7 +231,7 @@ def ndf_evidence(
     - ``page`` fixture から console / pageerror listener を attach
     - ``context.tracing.start/stop`` を裏で実行 (有効時)
     - ``--ndf-hud`` 指定時は ``hud.HUD_INIT_SCRIPT`` を ``context.add_init_script``
-      で全 page に inject する (PLAN17 Task 5)
+      で全 page に inject する
     - ``pytest_runtest_makereport`` から FAIL 時に ``ndf_evidence`` の状態を確認可能
     """
     enabled = not bool(pytestconfig.getoption("ndf_no_evidence", default=False))
@@ -249,7 +249,7 @@ def ndf_evidence(
     ev.attach_listeners(page)
     ev.start_tracing(context)
 
-    # PLAN17 Task 5: HUD overlay (赤丸カーソル + 字幕) を init_script で inject。
+    # HUD overlay (赤丸カーソル + 字幕) を init_script で inject。
     if hud_enabled:
         try:
             from scenario_test.hud import HUD_INIT_SCRIPT

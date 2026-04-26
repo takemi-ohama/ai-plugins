@@ -10,11 +10,11 @@ allowed-tools:
   - Bash(python *)
 ---
 
-# Playwright シナリオテスト Skill (v0.3.0+)
+# Playwright シナリオテスト Skill
 
 Web アプリの E2E シナリオを **理論ベース** で計画し、**pytest-playwright** 上で実行、**動画 + Markdown レポート + a11y/CWV** を自動収集する一式の Skill。
 
-v0.3.0 で **自前 YAML DSL を全廃**し、利用者は **通常の pytest テスト** を書く形に移行した。NDF が提供するのは pytest plugin / fixture / marker / テンプレート / Drive 連携スクリプト。
+利用者は **通常の pytest テスト** を書く。NDF が提供するのは pytest plugin / fixture / marker / テンプレート / Drive 連携スクリプト。
 
 ## 提供物
 
@@ -191,7 +191,6 @@ uv run pytest --html=reports/index.html --self-contained-html
 
 ## 制約 / 注意
 
-- **互換性**: v0.2.5 以前の YAML DSL は廃止 (PLAN17)。利用者は pytest テストへの書き直しが必要
 - **依存**: `pytest>=8.0`, `pytest-playwright>=0.5`, `pytest-xdist>=3.0`, `playwright>=1.50`
 - **トレース / HAR / 動画は機微情報を含む**: `upload_evidence.py --public` を付けない限り Drive にも非公開でアップ
 - **CI**: GitHub Actions では `uv run pytest -n auto` でそのまま回せる
@@ -200,4 +199,3 @@ uv run pytest --html=reports/index.html --self-contained-html
 
 - `docs/README.md` — 知識マップ
 - `templates/scenario.config.yaml` — 設定例
-- `plugins/ndf/CLAUDE.md` v4.2.0 セクション — 本リリースの詳細

@@ -1,7 +1,7 @@
 """CWV fixture: ``page_role`` marker に応じた Core Web Vitals 自動計測。
 
-PLAN17 Task 4: ``@pytest.mark.page_role("dashboard")`` 等が付与された test の
-終了直前に LCP / CLS / TTFB / longest_task を計測。
+``@pytest.mark.page_role("dashboard")`` 等が付与された test の終了直前に
+LCP / CLS / TTFB / longest_task を計測する。
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""ダッシュボード (dashboard) 系テストの雛形 (v0.3.0+)。
+"""ダッシュボード (dashboard) 系テストの雛形。
 
 KPI / グラフ / リンクの存在と遷移を検証。``page_role("dashboard")`` で
 a11y / CWV autouse される。

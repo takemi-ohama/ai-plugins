@@ -2,8 +2,7 @@
 
 scenario_test はパッケージなので import 可能。scripts/ 配下の単発スクリプト
 (upload_evidence.py 等) はパッケージ化されていないため sys.path 追加が必要。
-
-v0.3.0+: pytest plugin の自己テスト用に ``pytester`` を有効化する。
+pytest plugin の自己テスト用に ``pytester`` を有効化する。
 """
 
 from __future__ import annotations

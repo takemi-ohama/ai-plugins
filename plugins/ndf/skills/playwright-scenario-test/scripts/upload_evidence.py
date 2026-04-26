@@ -1,7 +1,6 @@
 """trace.zip / HAR / video / 任意ファイルを Google Drive にアップロードする統合 uploader。
 
-bug report の証跡を Drive リンクで貼るためのスクリプト。`trace_link.py` (旧名) は
-廃止し、本スクリプトに統合した。
+bug report の証跡を Drive リンクで貼るためのスクリプト。
 
 ⚠️ trace.zip / HAR / video は DOM snapshot や入力痕跡、HTTP request body を含む。
 既定では非公開アップロード。`--public` 明示時のみ anyone/read を付与する。

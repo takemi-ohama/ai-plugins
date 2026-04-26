@@ -1,4 +1,4 @@
-"""利用者プロジェクトの ``tests/conftest.py`` 雛形 (v0.3.0+)。
+"""利用者プロジェクトの ``tests/conftest.py`` 雛形。
 
 NDF playwright-scenario-test を pytest-playwright 上で使うための共通設定。
 plugin (``scenario_test.pytest_plugin``) は entry-point 経由で auto-load される
