@@ -33,17 +33,39 @@ from scenario_test.config import Config
 
 
 def _resolve_out_dir(pytestconfig) -> Path:
-    """``--ndf-out-dir`` が指定されればそれを、なければ ``reports/<run-id>/``。"""
+    """``--ndf-out-dir`` が指定されればそれを、なければ ``reports/<run-id>/``。
+
+    run_id は session 開始時に 1 度だけ決定し、``pytestconfig._ndf_out_dir`` に
+    キャッシュする。これにより ``ndf_out_dir`` fixture と
+    ``pytest_terminal_summary`` が別々に ``datetime.now()`` を呼んで
+    秒またぎでディレクトリがズレる問題を防ぐ (新規 Major 対応)。
+
+    ``--ndf-out-dir`` が明示指定されている場合はキャッシュ不要のため
+    常にその値を返す（複数回呼ばれても同じ値）。
+    """
     raw: str | None = pytestconfig.getoption("ndf_out_dir", default=None)
     if raw:
         return Path(raw).resolve()
+
+    # --ndf-out-dir 未指定時のみキャッシュで run_id の秒またぎを防ぐ。
+    # hasattr で厳密にチェックし、MagicMock 等が偽の属性を返さないようにする。
+    if "_ndf_out_dir" in vars(pytestconfig):
+        return pytestconfig._ndf_out_dir  # type: ignore[attr-defined]
+
     run_id = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    return (Path.cwd() / "reports" / run_id).resolve()
+    out = (Path.cwd() / "reports" / run_id).resolve()
+    # session-scoped キャッシュとして保存
+    pytestconfig._ndf_out_dir = out  # type: ignore[attr-defined]
+    return out
 
 
 @pytest.fixture(scope="session")
 def ndf_out_dir(pytestconfig) -> Path:
-    """session 全体で共有する成果物ルート。session 開始時に作成する。"""
+    """session 全体で共有する成果物ルート。session 開始時に作成する。
+
+    ``_resolve_out_dir`` を通じて ``pytestconfig._ndf_out_dir`` にキャッシュし、
+    ``pytest_terminal_summary`` と同じ out_dir を参照する。
+    """
     out = _resolve_out_dir(pytestconfig)
     out.mkdir(parents=True, exist_ok=True)
     return out

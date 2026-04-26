@@ -228,12 +228,17 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
     """``reports/<run-id>/report.md`` を生成する。
 
-    ``--ndf-out-dir`` 指定があればそこに、なければ session 開始時の
-    ``ndf_out_dir`` fixture と同じ規則で path を解決する。
+    ``--ndf-out-dir`` 指定があればそこに、なければ ``ndf_out_dir`` fixture と
+    同一の ``pytestconfig._ndf_out_dir`` キャッシュを参照する。
+    キャッシュが無い場合 (ndf_out_dir fixture が一度も呼ばれていない) は
+    ``_resolve_out_dir`` 経由でセットする。これにより evidence と report.md の
+    出力先が秒またぎでズレる問題を防ぐ (新規 Major 対応)。
     """
-    # session 中で 1 件も test を回していない (collect-only など) ならスキップ
-    stats = terminalreporter.stats
-    if not any(stats.get(k) for k in ("passed", "failed", "skipped", "error")):
+    # session 中で 1 件も test を回していない (collect-only など) は先に entries で判断。
+    # xfailed / xpassed のみの session でも report を生成するため、
+    # early return は _collect_entries() の結果で判断する (新規 Minor 対応)。
+    entries = _collect_entries(terminalreporter)
+    if not entries:
         return
 
     cached_cfg = getattr(config, "_ndf_config", None)
@@ -244,16 +249,12 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         else "シナリオ E2E テスト 実施報告書"
     )
 
-    raw_out: str | None = config.getoption("ndf_out_dir", default=None)
-    if raw_out:
-        out_dir = Path(raw_out).resolve()
-    else:
-        run_id = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-        out_dir = (Path.cwd() / "reports" / run_id).resolve()
+    # evidence.py の _resolve_out_dir と同一キャッシュ (_ndf_out_dir) を参照する。
+    # これにより両者が独立に datetime.now() を呼んで別ディレクトリを作る問題を解消。
+    from scenario_test.fixtures.evidence import _resolve_out_dir
 
-    entries = _collect_entries(terminalreporter)
-    if not entries:
-        return
+    out_dir = _resolve_out_dir(config)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     # Amazon Q Critical-4: xdist 並列実行時の session 開始時刻計算が不正確な問題を修正。
     # terminalreporter._sessionstarttime (pytest 内部 float) を優先利用し、
