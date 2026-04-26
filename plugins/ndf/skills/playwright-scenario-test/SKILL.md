@@ -35,7 +35,7 @@ playwright-scenario-test/
 │   └── config.py               ← scenario.config.yaml ローダ
 ├── docs/                       ← テスト方法論 (HTSM / ISTQB / FEW HICCUPPS)
 │   ├── 01-methodology.md  / 02-page-roles.md / 03-test-techniques.md
-│   ├── 04-playwright-mapping.md  / 05-bug-report.md
+│   ├── 04-playwright-mapping.md  / 05-bug-report.md  / 06-pytest-playwright.md
 │   └── checklists/             — 役割別 11 ファイル
 ├── scripts/                    ← CLI 単発ツール
 │   ├── classify_page_role.py   — URL から page role 自動判定
@@ -176,6 +176,7 @@ uv run pytest --html=reports/index.html --self-contained-html
 | `docs/03-test-techniques.md` | テスト技法 (EP / BVA / Decision Table / Pairwise) と role 必須マッピング |
 | `docs/04-playwright-mapping.md` | Playwright API → role / 観点 マッピング |
 | `docs/05-bug-report.md` | bug report 仕様 (ISO 29119-3 + FEW HICCUPPS) |
+| `docs/06-pytest-playwright.md` | pytest-playwright fixture / CLI option / NDF 拡張との対応関係 |
 | `docs/checklists/checklist-<role>.md` | role 別チェックリスト (lp/list/item/edit/form/search/dashboard/auth/cart-checkout/modal-wizard/common) |
 
 ## テスト雛形 (templates/)

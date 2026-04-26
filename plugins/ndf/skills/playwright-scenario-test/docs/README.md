@@ -15,6 +15,7 @@ AI/人間どちらが計画書を書く場合も、まず該当 page role のチ
 | `03-test-techniques.md` | テスト技法ライブラリ (EP / BVA / Decision Table / State Transition / Pairwise) | テストケース設計者 |
 | `04-playwright-mapping.md` | Playwright API → page role / 観点 マッピング | 自動化実装者 |
 | `05-bug-report.md` | bug report 仕様 (ISO/IEC/IEEE 29119-3 ベース) + エビデンス自動収集 | テスト実行者 / 報告者 |
+| `06-pytest-playwright.md` | pytest-playwright fixture / CLI option / NDF 拡張との対応関係 | 自動化実装者 / 利用者 |
 | `checklists/checklist-common.md` | 全 role 共通: a11y / Core Web Vitals / セキュリティ / i18n | 全テスト |
 | `checklists/checklist-lp.md` | Landing Page (外部到達ページ) | LP 担当 |
 | `checklists/checklist-list.md` | 一覧ページ | 一覧担当 |
