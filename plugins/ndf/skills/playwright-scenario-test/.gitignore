@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# uv lock は共有可
+!uv.lock

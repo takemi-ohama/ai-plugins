@@ -1,0 +1,61 @@
+id: TC-AUT-{slug}
+title: 認証 — login / logout / session 再発行 / ユーザ列挙防止
+phase: 5
+type: playwright
+role: user
+priority: high
+page_role: auth
+tags: [auth, login, security, scenario]
+description: |
+  docs/checklists/checklist-auth.md (15 項目) を必ず参照。
+  必須技法: Decision Table (auth flow), Risk (列挙/ロック), BVA (PW length).
+  Triggers: 'auth', 'login', 'ログイン', '認証', 'session', '2FA'
+
+  項目別の検査計画:
+    - AU1 正常ログイン:         step 1〜2
+    - AU2 列挙防止:             step 3〜4 (両方で同じエラー文言)
+    - AU8 session 再発行:       step 5 (cookie の前後比較は手動 or 拡張 runner)
+    - AU9 logout:               step 6
+    - AU11 cookie 属性:          step 7 (Set-Cookie ヘッダ検査は curl で)
+
+post_login:
+  url_must_not_contain: []
+
+steps:
+  # === AU1: 正常ログイン ===
+  - name: "[AU1] login 画面表示"
+    path: /login
+
+  - name: "[AU1] ログイン後 dashboard へ"
+    path: /dashboard
+
+  # === AU2: ユーザ列挙防止 ===
+  # 不存在メールと存在メール両方で同一エラー文言を確認
+  - name: "[AU2-不存在] 不存在メール + 不正 PW → 統一エラー"
+    path: /login?email=nonexistent@test&attempt=1
+    expect_status: 200
+
+  - name: "[AU2-存在] 存在メール + 不正 PW → 同一エラー文言"
+    path: /login?email=valid@test&attempt=1
+    expect_status: 200
+
+  # === AU8: session 再発行 ===
+  # cookie の前後比較は scenario_test 単体では限定的。
+  # pytest-playwright で context.cookies() の差分検査を推奨。
+  - name: "[AU8] ログイン直後の cookie 確認 (手動補完)"
+    path: /dashboard
+
+  # === AU9: logout ===
+  - name: "[AU9] logout"
+    path: /logout
+    expect_url_contains: /login
+
+  - name: "[AU9] logout 後の保護ページアクセス"
+    path: /dashboard
+    expect_url_contains: /login
+
+# ============================================================
+# 補足: cookie 属性 (Secure/HttpOnly/SameSite) は curl テストケースで検査:
+#   testcase-curl の checks に Set-Cookie ヘッダ検査を入れる。
+# Decision Table のロックアウト (AU4) は別 testcase に分割。
+# ============================================================

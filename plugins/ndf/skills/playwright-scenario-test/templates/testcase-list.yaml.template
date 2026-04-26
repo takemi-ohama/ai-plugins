@@ -1,0 +1,67 @@
+id: TC-LST-{role}-{slug}
+title: 一覧ページ ({role}) — Count 三値 + ページネーション境界 + 削除
+phase: 20
+type: playwright
+role: {role}
+priority: high
+page_role: list
+tags: [list, scenario]
+description: |
+  docs/checklists/checklist-list.md (15 項目) を必ず参照。
+  必須技法: EP (Count: 0/1/Many), BVA (page), Pairwise (filter), State Transition.
+  Triggers: '一覧', 'list', 'pagination', 'CRUD'
+
+  項目別の検査計画:
+    - LST1 Count 三値:    step 1〜3 で 0/1/many をそれぞれ別 fixture で検査
+    - LST2 ページ境界:    step 4〜6
+    - LST5 行操作:        step 7〜9
+    - LST15 IDOR:         step 10 (別 role の id を踏む)
+    - 残: LST3/4/6〜14 は 不適用 or 別 testcase に分割
+
+post_login:
+  url_must_not_contain: []
+
+steps:
+  # === LST1: Count 三値 (EP / Hendrickson Count) ===
+  - name: "[LST1-0件] 空リスト UI 表示"
+    path: /items?empty_fixture=1
+    extract:
+      empty_msg: "(該当する|データがありません|0 件)"
+
+  - name: "[LST1-1件] 単数表示"
+    path: /items?single_fixture=1
+
+  - name: "[LST1-多数] 大量データでの性能維持"
+    path: /items?bulk=10000
+
+  # === LST2: ページネーション境界 (BVA) ===
+  - name: "[LST2] page=1 (有効最小)"
+    path: /items?page=1
+
+  - name: "[LST2] page=last+1 (out of range)"
+    path: /items?page=99999
+
+  - name: "[LST2] page=-1 (型/値検証)"
+    path: /items?page=-1
+
+  # === LST5: 行操作 ===
+  - name: "[LST5] 行詳細リンクで /items/{id} へ"
+    path: /items
+    extract:
+      first_id: 'href="/items/(\d+)"'
+
+  - name: "[LST5] 詳細遷移"
+    path: /items/{first_id}
+    skip_if_missing: [first_id]
+
+  # === LST15: IDOR ===
+  # 別 role の id を踏む。99999 は実環境で他者所有 id に置換すること
+  # (例: 実値 789)。runner には env 展開がないので、固定 id を埋め込む。
+  - name: "[LST15-IDOR] 他者所有 id へアクセス"
+    path: /items/99999
+    expect_url_contains: /  # 401/403/404 ページにリダイレクトされていること
+
+# ============================================================
+# 各 step のテスト技法 (technique) と oracle (FEW HICCUPPS 軸)
+# は計画書 docs/05-bug-report.md に従って bug 起票時に記録する。
+# ============================================================

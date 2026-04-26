@@ -4,7 +4,7 @@
 
 NDF プラグインは、Claude Code / Kiro CLI 向けのオールインワン開発支援プラグイン。エージェント、Skills、フックを統合して提供する。
 
-**現行バージョン**: **v4.0.0** — `/ndf:codex` skill + `corder` エージェント経由の Codex CLI 直接実行に一本化。Serena MCP は別プラグイン `mcp-serena` に分離済み。
+**現行バージョン**: **v4.1.0** — `/ndf:codex` skill + `corder` エージェント経由の Codex CLI 直接実行に一本化。Serena MCP は別プラグイン `mcp-serena` に分離済み。Playwright シナリオ E2E、Google Drive / Chat 連携 skill を追加し、`google-auth` を v0.2.0 (永続トークン + ライブラリ用法) に拡張。
 
 ## ディレクトリ構造
 
@@ -18,7 +18,7 @@ plugins/ndf/
 │   ├── ensure-retention.sh  # cleanupPeriodDays >= 90 を保つ
 │   └── slack-notify.js      # Slack通知スクリプト
 ├── agents/                  # 専門エージェント（8個）
-├── skills/                  # Skills（33個）
+├── skills/                  # Skills（36個）
 ├── CLAUDE.md                # プラグイン開発者向けガイド
 └── README.md                # 利用者向けドキュメント
 ```
@@ -174,3 +174,4 @@ claude -p --settings '{"disableAllHooks": true, "disableAllPlugins": true}' --ou
 | v3.6.0 | 汎用 skill 13 個追加 (原則系・PR ワークフロー系・codex) |
 | v3.7.0 | transcript 保持期間自動管理 hook、`/ndf:skill-stats` skill |
 | **v4.0.0 (BREAKING)** | **Codex MCP 廃止 → CLI 直接実行一本化**、レガシー CLAUDE.ndf.md 救済機構削除、skill-stats にプロジェクト別/日付範囲フィルタ追加 |
+| **v4.1.0** | `playwright-scenario-test` / `google-drive` / `google-chat` skill 追加、`google-auth` v0.2.0 (永続トークン `~/.config/gcloud/google_token.json` + `get_credentials()` API + 手動 copy-paste フロー) |

@@ -7,7 +7,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 4.0.0
+- **現在バージョン**: 4.1.0
 - **種類**: 統合プラグイン（Skills + Agents + Hooks / v4.0.0 で Codex MCP 廃止）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -39,7 +39,7 @@ plugins/ndf/
 │   ├── debugger.md              # sonnet: 根本原因分析
 │   ├── devops-engineer.md       # sonnet: Docker/CI/K8s
 │   └── code-reviewer.md         # sonnet: diff/PRレビュー
-├── skills/                      # スキル（33個）
+├── skills/                      # スキル（36個）
 │   # PRワークフロー系
 │   ├── pr/                      # commit+push+PR作成/更新
 │   ├── pr-tests/                # Test Plan自動実行
@@ -74,6 +74,9 @@ plugins/ndf/
 │   ├── google-auth/
 │   ├── browser-test/            # ブラウザ動作確認(Playwright/Chrome DevTools)
 │   ├── codex/                   # Codex CLI直接実行（MCP版との使い分け）
+│   ├── playwright-scenario-test/ # Playwright+curl Web シナリオE2E並列ランナー
+│   ├── google-drive/            # Google Drive エクスポート/DL/UP（google-auth依存）
+│   ├── google-chat/             # Google Chat メッセージ取得（google-auth依存）
 │   # Anthropic公式連携
 │   ├── mcp-builder/             # Anthropic公式（Apache-2.0）
 │   └── official-skills-autoloader/  # 公式Skill自動ロード
@@ -121,6 +124,45 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v4.1.0
+- **`playwright-scenario-test` v0.2.0** (理論ベース化):
+  - `docs/` 配下に方法論を 6 ファイル (総論 / page role / 技法 / Playwright API / bug report) + checklists 11 ファイル (lp/list/item/edit/form/search/dashboard/auth/cart-checkout/modal-wizard/common) として整備
+  - 出典: HTSM v6.3 (James Bach), ISTQB CTFL 4.2, ISO/IEC/IEEE 29119-3:2021, WCAG 2.2, OWASP Top 10:2025, FEW HICCUPPS, Hendrickson Cheat Sheet
+  - 新規スクリプト: `classify_page_role.py` (a11y tree から自動 role 判定), `generate_test_plan.py` (Pairwise 込み YAML 自動生成), `run_a11y_scan.py` (axe-core), `check_cwv.py` (LCP/CLS/TTFB), `record_scenario.py` (Playwright codegen ラッパー), `trace_link.py` (trace.zip → playwright.dev URL)
+  - 役割別 testcase YAML テンプレート 4 件 (list/edit/form/auth) を追加
+  - SKILL.md は実行手順とナビゲーションに集中 (332 → 245 行)
+  - pyproject.toml に optional-dependencies `a11y` (axe-playwright-python) を追加
+- **公式 Agent Skill 仕様準拠**: 14 skill の frontmatter を Pattern A (description 単体に Triggers 埋め込み) から Pattern B (description + 公式 `when_to_use` フィールド分離) へ移行。対象 skill: codex / data-analyst-export / data-analyst-sql-optimization / deepwiki-transfer / docker-container-access / git-gh-operations / google-auth / google-chat / google-drive / markdown-writing / official-skills-autoloader / playwright-scenario-test / python-execution / qa-security-scan / skill-stats。`description` は概要に集中、`when_to_use` に Trigger phrase を分離して auto-invoke 精度向上 (公式 1,536 字上限内)。`mcp-builder` は Anthropic 公式 (Apache-2.0) のため改変せず。
+- **コード品質改善**:
+  - `google-chat/scripts/gchat_read.py`: `DEFAULT_SPACE_ID` のハードコード (`AAQA6AWG1iE`) を撤去。env `GCHAT_DEFAULT_SPACE` で指定するか `--space` を required にする運用に変更
+  - `google-auth/SKILL.md`: `allowed-tools` から不要な `Bash(pip *)` を削除 (uv で完結)
+  - `google-drive/scripts/gdrive_fetch.py`: `upload_file` 内の dead な再 `import os` を削除
+  - `playwright-scenario-test/SKILL.md`: 不足していた `allowed-tools` (Read / Bash(uv *) / Bash(python *)) を追加
+- **新規 Skill `playwright-scenario-test`** (self-contained uv project):
+  - Playwright + curl で Web シナリオ E2E テストを並列実行
+  - HUD オーバーレイ (カーソル + 字幕) 焼き込み済み動画 + Markdown レポート生成
+  - Drive アップロード自動化までサポート
+  - 外部プロジェクトは `config.yaml` + `testcases/*.yaml` のみで利用可能
+- **新規 Skill `google-drive`**:
+  - Google Drive / Docs のファイルエクスポート / ダウンロード / アップロード (公開共有リンク付与)
+  - 認証は `ndf:google-auth` の `get_credentials()` に委譲
+- **新規 Skill `google-chat`**:
+  - Google Chat スペースのメッセージ・スペース一覧取得 (Chat API)
+  - 認証は `ndf:google-auth` の `get_credentials()` に委譲
+  - 旧 uttarov 版のハードコードパス (`/work/uttarov2-doc/...`) を撤廃し、
+    sibling-skill discovery (`GOOGLE_AUTH_SCRIPTS` env / `~/.claude/skills/google-auth/scripts` /
+    隣接スキル) でフォールバック
+- **`google-auth` v0.2.0 (互換性破壊)**:
+  - Python ライブラリ用法 (`from google_auth import get_credentials`) を追加
+  - `--manual` 手動 copy-paste フロー (ローカルサーバ不要、コンテナ環境対応)
+  - トークン自動リフレッシュ + スコープ不足検出 / 自動マージ
+  - `--show` / `--clear` サブコマンド
+  - **トークン保存先を `/tmp/google_token.json` → `~/.config/gcloud/google_token.json` に変更**
+    (env `GOOGLE_TOKEN_FILE` で上書き可)
+  - `client_secret` パスは `--client-secret` → env `GOOGLE_CLIENT_SECRET` →
+    `${CLAUDE_SKILL_DIR}/client_secret.json` → CWD の順
+- Skills: 33個 → **36個**
 
 ### v4.0.0 (BREAKING: Codex MCP廃止 + レガシー救済機構削除)
 - **Codex MCP サーバを削除** (`.mcp.json` から `codex` エントリを削除)
