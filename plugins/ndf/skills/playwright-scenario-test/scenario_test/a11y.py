@@ -4,8 +4,8 @@
 runner からは `scan_page(page, ...)` を直接呼び出して `EvidenceCollectors`
 の `axe_violations` に格納する。
 
-page_role が `lp / list / form / dashboard / cart / checkout / settings` のとき
-runner が自動実行する (config.a11y.auto_roles で上書き可能)。
+page_role が `lp / list / form / dashboard / cart / checkout / settings / auth`
+のとき runner が自動実行する (config.a11y.auto_roles で上書き可能)。
 """
 
 from __future__ import annotations
@@ -19,10 +19,19 @@ from playwright.sync_api import Page
 # WCAG 2.0 AAA は適合義務がない (一般的に過剰) ため除外。
 DEFAULT_TAGS: tuple[str, ...] = ("wcag2a", "wcag2aa", "wcag21aa", "wcag22aa")
 
-# page_role × a11y 自動実行のデフォルト対象。フォーム / 商取引系は a11y 影響が大きい。
+# page_role × a11y 自動実行のデフォルト対象。フォーム / 商取引 / 認証系は a11y 影響大。
 DEFAULT_AUTO_ROLES: frozenset[str] = frozenset({
     "lp", "list", "form", "dashboard", "cart", "checkout", "settings", "auth",
 })
+
+
+def is_available() -> bool:
+    """axe-playwright-python がインストール済かを確認する (Maj-9: silent fail 対策)。"""
+    try:
+        import axe_playwright_python.sync_playwright  # noqa: F401
+    except ImportError:
+        return False
+    return True
 
 
 def scan_page(
@@ -32,7 +41,8 @@ def scan_page(
 ) -> list[dict[str, Any]]:
     """既にロード済みの Page に対し axe-core を実行し violations の list を返す。
 
-    axe-playwright-python が未インストールなら空 list を返し warning は呼出側で出す。
+    axe-playwright-python が未インストールなら空 list を返す。呼出側は事前に
+    `is_available()` で判定し、未インストールならスキップを明示すること。
     """
     try:
         from axe_playwright_python.sync_playwright import Axe

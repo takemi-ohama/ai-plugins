@@ -5,6 +5,12 @@ from __future__ import annotations
 from scenario_test import a11y, cwv
 
 
+class TestA11yIsAvailable:
+    def test_returns_bool(self):
+        # Maj-9: 環境に依存するが、bool が返ることを最低保証
+        assert isinstance(a11y.is_available(), bool)
+
+
 class TestA11yAutoScan:
     def test_lp_triggers(self):
         assert a11y.should_auto_scan(["lp"]) is True

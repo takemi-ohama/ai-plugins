@@ -60,6 +60,8 @@ _MIME_BY_KIND: dict[str, str] = {
     "any": "application/octet-stream",
 }
 
+ALLOWED_KINDS: frozenset[str] = frozenset(_MIME_BY_KIND)
+
 
 def detect_kind(path: Path) -> str:
     """拡張子から evidence kind を自動判定する。"""
@@ -85,6 +87,12 @@ def upload(
           "kind": str,
         }
     """
+    # Min-7: Python API として呼ばれた場合の防御的検査 (CLI argparse は別途 choices)
+    if kind not in ALLOWED_KINDS:
+        raise ValueError(
+            f"未対応の kind: {kind!r} (allowed: {sorted(ALLOWED_KINDS)})"
+        )
+
     _ensure_google_auth_on_path()
     from google_auth import get_credentials  # type: ignore  # noqa: E402
     from googleapiclient.discovery import build  # noqa: E402

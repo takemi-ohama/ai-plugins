@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from upload_evidence import detect_kind
+import pytest
+
+from upload_evidence import ALLOWED_KINDS, detect_kind, upload
 
 
 class TestDetectKind:
@@ -22,3 +24,17 @@ class TestDetectKind:
     def test_unknown_extension_falls_back_to_any(self):
         assert detect_kind(Path("unknown.bin")) == "any"
         assert detect_kind(Path("README.md")) == "any"
+
+
+class TestUploadKindValidation:
+    """Min-7: Python API として呼ばれた場合の kind 値検査。"""
+
+    def test_invalid_kind_raises_before_drive_call(self, tmp_path):
+        # Drive API には触らずに上流で ValueError が出ることを確認
+        f = tmp_path / "x.bin"
+        f.write_bytes(b"")
+        with pytest.raises(ValueError, match="未対応の kind"):
+            upload(f, kind="bogus")
+
+    def test_allowed_kinds_set(self):
+        assert ALLOWED_KINDS == frozenset({"trace", "har", "video", "any"})

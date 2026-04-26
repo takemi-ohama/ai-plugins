@@ -34,8 +34,11 @@ THRESHOLDS: dict[str, dict[str, float]] = {
 DEFAULT_AUTO_ROLES: frozenset[str] = frozenset({"lp", "list", "dashboard", "search"})
 
 
+# Crit-1 (amazon-q-developer 指摘): JS 内の "5000" を `str.replace` する旧実装は
+# JS 中に同じ数値が他出現すると壊れる fragile な置換だった。`page.evaluate` の
+# arg 経由で `observeMs` を渡し、JS 関数引数として明示的に bind する。
 _PERF_JS = r"""
-() => new Promise((resolve) => {
+(observeMs) => new Promise((resolve) => {
     const result = {lcp: null, cls: 0, longest_task: 0, ttfb: null};
 
     try {
@@ -74,20 +77,19 @@ _PERF_JS = r"""
         if (nav) result.ttfb = nav.responseStart - nav.requestStart;
     } catch (e) {}
 
-    setTimeout(() => resolve(result), 5000);
+    setTimeout(() => resolve(result), observeMs);
 });
 """
 
 
 def measure_page(page: Page, *, observe_ms: int = 5000) -> dict[str, float]:
-    """既にロード済みの Page で CWV を 5 秒観察し、metrics dict を返す。
+    """既にロード済みの Page で CWV を `observe_ms` ミリ秒観察し、metrics dict を返す。
 
     Returns: `{"lcp_ms": float, "cls": float, "ttfb_ms": float, "longest_task_ms": float}`
             計測失敗した metric は dict から除外される。
     """
-    js = _PERF_JS.replace("5000", str(int(observe_ms)))
     try:
-        raw: dict[str, Any] = page.evaluate(js)
+        raw: dict[str, Any] = page.evaluate(_PERF_JS, int(observe_ms))
     except Exception:
         return {}
 

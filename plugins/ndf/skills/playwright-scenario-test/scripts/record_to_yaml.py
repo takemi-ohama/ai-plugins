@@ -4,6 +4,10 @@
 通すと `goto / click / fill / press / select` 系の操作行を抽出して
 locator-first の YAML steps として出力する。
 
+Maj-10 対応: 旧版は手書き string parser (`_parse_args_kv`) で codegen 出力をパース
+していたが、引数内の `)` や escape の扱いが脆弱だった。codegen 出力は valid Python
+なので `ast.parse(...)` で AST を作り `Call` ノードを抽出する方が遥かに堅牢。
+
 Usage:
     python record_scenario.py --target python --output recorded.py https://example.com
     python record_to_yaml.py recorded.py --id TC-AUTH-login --role user --page-role auth
@@ -12,160 +16,168 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import re
+import ast
 import sys
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
+from urllib.parse import urlparse
 
 import yaml
 
 
-# `page.get_by_role("button", name="保存")` 等を捉える共通パターン
-_LOCATOR_GETBY_RE = re.compile(
-    r"page\.get_by_(?P<kind>role|label|placeholder|text|alt_text|title|test_id)\("
-    r"(?P<args>.+?)\)"
-)
-# locator dispatcher 側のキー名 (alt_text → alt, test_id → testid に合わせる)
-_KIND_REMAP = {"alt_text": "alt", "test_id": "testid"}
+# `page.get_by_role` 等の locator factory → 新スキーマでの key
+_LOCATOR_KIND_REMAP: dict[str, str] = {
+    "get_by_role": "role",
+    "get_by_label": "label",
+    "get_by_placeholder": "placeholder",
+    "get_by_text": "text",
+    "get_by_alt_text": "alt",
+    "get_by_title": "title",
+    "get_by_test_id": "testid",
+}
 
-# `.action(...)` 系
-_ACTION_RE = re.compile(
-    r"^\s*page(?:\.get_by_(?P<lkind>\w+)\((?P<largs>[^)]+)\))?\.(?P<action>"
-    r"goto|click|fill|press|check|uncheck|select_option|hover|set_input_files"
-    r")\((?P<aargs>[^)]*)\)\s*$"
-)
-
-# シンプルな `page.goto(...)`
-_GOTO_RE = re.compile(r"^\s*page\.goto\(\s*['\"](?P<url>[^'\"]+)['\"]")
-
-
-def _parse_args_kv(args: str) -> tuple[str | None, dict[str, str]]:
-    """`"button", name="保存"` → ("button", {"name": "保存"})"""
-    parts: list[str] = []
-    depth = 0
-    current = ""
-    in_str: str | None = None
-    for ch in args:
-        if in_str:
-            current += ch
-            if ch == in_str and not current.endswith("\\" + in_str):
-                in_str = None
-            continue
-        if ch in ("'", '"'):
-            in_str = ch
-            current += ch
-            continue
-        if ch in "([{":
-            depth += 1
-            current += ch
-            continue
-        if ch in ")]}":
-            depth -= 1
-            current += ch
-            continue
-        if ch == "," and depth == 0:
-            parts.append(current.strip())
-            current = ""
-            continue
-        current += ch
-    if current.strip():
-        parts.append(current.strip())
-
-    positional: str | None = None
-    kwargs: dict[str, str] = {}
-    for p in parts:
-        m = re.match(r"^([a-zA-Z_]\w*)\s*=\s*(.+)$", p)
-        if m:
-            kwargs[m.group(1)] = _strip_quotes(m.group(2))
-        else:
-            if positional is None:
-                positional = _strip_quotes(p)
-    return positional, kwargs
+# 取り扱う action method
+_SUPPORTED_ACTIONS: frozenset[str] = frozenset({
+    "goto", "click", "fill", "press", "check", "uncheck",
+    "hover", "select_option", "set_input_files",
+})
 
 
-def _strip_quotes(s: str) -> str:
-    s = s.strip()
-    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
-        return s[1:-1]
-    return s
+def _literal(node: ast.AST) -> Any:
+    """`ast.Constant` 等を Python 値に評価する (literal のみ)。"""
+    try:
+        return ast.literal_eval(node)
+    except (ValueError, SyntaxError):
+        return None
 
 
-def _build_locator(lkind: str, largs: str) -> dict[str, Any]:
-    """`get_by_role("button", name="X")` → {role: button, name: X}"""
-    selector, kw = _parse_args_kv(largs)
-    kind = _KIND_REMAP.get(lkind, lkind)
-    out: dict[str, Any] = {kind: selector}
-    if "name" in kw:
-        out["name"] = kw["name"]
+def _kw_dict(call: ast.Call) -> dict[str, Any]:
+    """`Call.keywords` から literal 評価できるものだけ dict 化する。"""
+    return {kw.arg: _literal(kw.value) for kw in call.keywords if kw.arg}
+
+
+def _build_locator_from_call(call: ast.Call) -> dict[str, Any] | None:
+    """`page.get_by_role("button", name="保存")` の Call → locator dict。"""
+    if not isinstance(call.func, ast.Attribute):
+        return None
+    method = call.func.attr
+    if method not in _LOCATOR_KIND_REMAP:
+        return None
+    kind = _LOCATOR_KIND_REMAP[method]
+    selector = _literal(call.args[0]) if call.args else None
+    if selector is None:
+        return None
+    out: dict[str, Any] = {kind: str(selector)}
+    kw = _kw_dict(call)
+    if "name" in kw and kw["name"] is not None:
+        out["name"] = str(kw["name"])
     if "exact" in kw:
-        out["exact"] = kw["exact"].lower() == "true"
+        out["exact"] = bool(kw["exact"])
     return out
 
 
-def parse_codegen(text: str) -> list[dict[str, Any]]:
-    """Playwright codegen Python 出力を `Step` 候補 dict のリストに変換する。
+def _extract_action_call(call: ast.Call) -> tuple[str, dict[str, Any] | None, list[Any], dict[str, Any]] | None:
+    """`page.X(args)` または `page.locator_factory(...).X(args)` を解析する。
 
-    認識できなかった行 (with statement / 変数代入など) は黙ってスキップする。
+    Returns: (action_method, locator_dict | None, positional_args, kwargs)
+             dispatch 対象でない場合は None。
     """
+    if not isinstance(call.func, ast.Attribute):
+        return None
+    action = call.func.attr
+    if action not in _SUPPORTED_ACTIONS:
+        return None
+
+    receiver = call.func.value  # page or page.get_by_role(...)
+    locator: dict[str, Any] | None = None
+
+    if isinstance(receiver, ast.Call):
+        locator = _build_locator_from_call(receiver)
+        if locator is None:
+            # locator_factory 以外の chain は処理対象外
+            return None
+    elif isinstance(receiver, ast.Name) and receiver.id == "page":
+        # `page.goto(...)` のように直接呼ぶ form
+        if action != "goto":
+            return None  # locator なしの click/fill 等は無効
+    else:
+        return None
+
+    pos = [_literal(a) for a in call.args]
+    kw = _kw_dict(call)
+    return action, locator, pos, kw
+
+
+def _convert(action: str, locator: dict[str, Any] | None,
+             pos: list[Any], kw: dict[str, Any]) -> dict[str, Any] | None:
+    """1 件の action call → 新スキーマの step dict に変換する。"""
+    if action == "goto":
+        url = pos[0] if pos else None
+        if not isinstance(url, str):
+            return None
+        path = urlparse(url).path or "/"
+        return {"kind": "goto", "name": f"goto {path}", "path": path}
+
+    if locator is None:
+        return None
+
+    name_summary = ", ".join(f"{k}={v!r}" for k, v in locator.items())
+
+    if action == "click":
+        return {"kind": "click", "name": f"click {name_summary}", "locator": locator}
+    if action == "hover":
+        return {"kind": "hover", "name": f"hover {name_summary}", "locator": locator}
+    if action == "check":
+        return {"kind": "check", "name": f"check {name_summary}", "locator": locator}
+    if action == "uncheck":
+        return {"kind": "uncheck", "name": f"uncheck {name_summary}", "locator": locator}
+    if action == "fill":
+        value = pos[0] if pos else ""
+        return {
+            "kind": "fill", "name": f"fill {name_summary}",
+            "locator": locator, "value": str(value),
+        }
+    if action == "press":
+        key = pos[0] if pos else "Enter"
+        return {
+            "kind": "press", "name": f"press {key} on {name_summary}",
+            "locator": locator, "value": str(key),
+        }
+    if action == "select_option":
+        # Playwright codegen は select_option(label="…") など多形式を出力するが、
+        # 新スキーマは単純な value 指定を想定。代表的な kw を順に拾う。
+        value = pos[0] if pos else (
+            kw.get("value") or kw.get("label") or kw.get("index") or ""
+        )
+        return {
+            "kind": "select", "name": f"select {value!r} on {name_summary}",
+            "locator": locator, "value": str(value),
+        }
+    return None  # set_input_files 等は当面非対応
+
+
+def parse_codegen(text: str) -> list[dict[str, Any]]:
+    """Playwright codegen Python 出力を新スキーマ step 候補のリストに変換する (Maj-10)。
+
+    AST ベースで `page.X(...)` / `page.locator_factory(...).X(...)` を抽出する。
+    invalid Python (構文エラー) の場合は空 list を返す。
+    """
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return []
+
     steps: list[dict[str, Any]] = []
-    for line in text.splitlines():
-        m = _GOTO_RE.match(line)
-        if m and "page.get_by_" not in line:
-            url = m.group("url")
-            from urllib.parse import urlparse
-            path = urlparse(url).path or "/"
-            steps.append({"kind": "goto", "name": f"goto {path}", "path": path})
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
             continue
-
-        m = _ACTION_RE.match(line)
-        if not m:
+        parsed = _extract_action_call(node)
+        if parsed is None:
             continue
-
-        action = m.group("action")
-        aargs = m.group("aargs") or ""
-        loc: dict[str, Any] | None = None
-        if m.group("lkind"):
-            loc = _build_locator(m.group("lkind"), m.group("largs") or "")
-
-        if action == "goto":
-            url, _ = _parse_args_kv(aargs)
-            from urllib.parse import urlparse
-            path = urlparse(url or "/").path or "/"
-            steps.append({"kind": "goto", "name": f"goto {path}", "path": path})
-            continue
-
-        if loc is None:
-            continue
-
-        name_summary = ", ".join(f"{k}={v!r}" for k, v in loc.items())
-
-        if action == "click":
-            steps.append({"kind": "click", "name": f"click {name_summary}", "locator": loc})
-        elif action == "hover":
-            steps.append({"kind": "hover", "name": f"hover {name_summary}", "locator": loc})
-        elif action == "check":
-            steps.append({"kind": "check", "name": f"check {name_summary}", "locator": loc})
-        elif action == "uncheck":
-            steps.append({"kind": "uncheck", "name": f"uncheck {name_summary}", "locator": loc})
-        elif action == "fill":
-            value, _ = _parse_args_kv(aargs)
-            steps.append({
-                "kind": "fill", "name": f"fill {name_summary}", "locator": loc,
-                "value": value or "",
-            })
-        elif action == "press":
-            key, _ = _parse_args_kv(aargs)
-            steps.append({
-                "kind": "press", "name": f"press {key} on {name_summary}",
-                "locator": loc, "value": key or "Enter",
-            })
-        elif action == "select_option":
-            value, _ = _parse_args_kv(aargs)
-            steps.append({
-                "kind": "select", "name": f"select {value!r} on {name_summary}",
-                "locator": loc, "value": value or "",
-            })
+        step = _convert(*parsed)
+        if step is not None:
+            steps.append(step)
     return steps
 
 

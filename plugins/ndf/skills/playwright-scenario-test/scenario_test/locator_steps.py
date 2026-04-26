@@ -10,9 +10,10 @@
 
 from __future__ import annotations
 
-import re as _re
+import re
 from dataclasses import dataclass
 from typing import Callable
+from urllib.parse import urlparse
 
 from playwright.sync_api import Locator, Page, expect
 
@@ -49,20 +50,31 @@ def build_locator(page: Page, spec: LocatorSpec) -> Locator:
     return loc
 
 
+def _loc(step: Step) -> LocatorSpec:
+    """Step.locator が None でないことを保証して返す narrowing helper。
+
+    Step.from_raw が必須 kind に対して locator を要求するため実行時には到達しないが、
+    型チェッカと読み手のために 1 箇所に集約する (Maj-1: `# type: ignore[union-attr]`
+    の散在を解消)。
+    """
+    assert step.locator is not None, f"step kind={step.kind!r} に locator が必要"
+    return step.locator
+
+
 # --- 変数展開 -------------------------------------------------------
 
-_VAR_RE = _re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
+_VAR_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
 
-def expand_vars(value: str | None, vars_: dict[str, str]) -> str | None:
-    """`{var_name}` 形式の placeholder を `vars_` 辞書で置換する。
+def expand_vars(value: str | None, variables: dict[str, str]) -> str | None:
+    """`{var_name}` 形式の placeholder を `variables` 辞書で置換する。
 
     extract step で保存された値を後続 step の path / value / text に注入する。
     マッチしない placeholder はそのまま残す (typo 早期検出のため)。
     """
     if value is None:
         return None
-    return _VAR_RE.sub(lambda m: vars_.get(m.group(1), m.group(0)), value)
+    return _VAR_RE.sub(lambda m: variables.get(m.group(1), m.group(0)), value)
 
 
 # --- 結果の表現 -----------------------------------------------------
@@ -78,9 +90,14 @@ class StepContext:
 
 # --- 各 step kind handler -------------------------------------------
 
+def _is_absolute_http_url(s: str) -> bool:
+    """`http(s)://` で始まる絶対 URL かを urlparse で確認する (Maj-3)。"""
+    return urlparse(s).scheme in ("http", "https")
+
+
 def _handle_goto(step: Step, ctx: StepContext) -> str:
     path = expand_vars(step.path, ctx.nav_vars) or "/"
-    url = path if path.startswith("http") else f"{ctx.base_url}{path}"
+    url = path if _is_absolute_http_url(path) else f"{ctx.base_url}{path}"
     response = ctx.page.goto(url, timeout=step.timeout_ms or ctx.default_timeout_ms)
     code = response.status if response else 0
     if step.expect_status is not None and code != step.expect_status:
@@ -89,62 +106,72 @@ def _handle_goto(step: Step, ctx: StepContext) -> str:
 
 
 def _handle_click(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
-    loc.click(timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"click {step.locator.describe()}"  # type: ignore[union-attr]
+    spec = _loc(step)
+    build_locator(ctx.page, spec).click(timeout=step.timeout_ms or ctx.default_timeout_ms)
+    return f"click {spec.describe()}"
 
 
 def _handle_fill(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
+    spec = _loc(step)
     value = expand_vars(step.value, ctx.nav_vars) or ""
-    loc.fill(value, timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"fill {step.locator.describe()} = {value!r}"  # type: ignore[union-attr]
+    build_locator(ctx.page, spec).fill(value, timeout=step.timeout_ms or ctx.default_timeout_ms)
+    return f"fill {spec.describe()} = {value!r}"
 
 
 def _handle_select(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
+    spec = _loc(step)
     value = expand_vars(step.value, ctx.nav_vars) or ""
-    loc.select_option(value=value, timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"select {step.locator.describe()} = {value!r}"  # type: ignore[union-attr]
+    build_locator(ctx.page, spec).select_option(
+        value=value, timeout=step.timeout_ms or ctx.default_timeout_ms,
+    )
+    return f"select {spec.describe()} = {value!r}"
 
 
 def _handle_check(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
-    loc.check(timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"check {step.locator.describe()}"  # type: ignore[union-attr]
+    spec = _loc(step)
+    build_locator(ctx.page, spec).check(timeout=step.timeout_ms or ctx.default_timeout_ms)
+    return f"check {spec.describe()}"
 
 
 def _handle_uncheck(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
-    loc.uncheck(timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"uncheck {step.locator.describe()}"  # type: ignore[union-attr]
+    spec = _loc(step)
+    build_locator(ctx.page, spec).uncheck(timeout=step.timeout_ms or ctx.default_timeout_ms)
+    return f"uncheck {spec.describe()}"
 
 
 def _handle_press(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
-    key = step.value or ""
-    loc.press(key, timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"press {step.locator.describe()} key={key!r}"  # type: ignore[union-attr]
+    # Maj-2: Step.from_raw が press の value 必須を validation 済み。fallback 不要。
+    spec = _loc(step)
+    assert step.value is not None, "press に value が必要 (validation バグ?)"
+    build_locator(ctx.page, spec).press(
+        step.value, timeout=step.timeout_ms or ctx.default_timeout_ms,
+    )
+    return f"press {spec.describe()} key={step.value!r}"
 
 
 def _handle_hover(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
-    loc.hover(timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"hover {step.locator.describe()}"  # type: ignore[union-attr]
+    spec = _loc(step)
+    build_locator(ctx.page, spec).hover(timeout=step.timeout_ms or ctx.default_timeout_ms)
+    return f"hover {spec.describe()}"
 
 
 def _handle_extract(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
-    text = loc.first.text_content(timeout=step.timeout_ms or ctx.default_timeout_ms) or ""
+    # Maj-5: LocatorSpec.nth は build_locator で適用済み。loc.first を強制すると
+    # nth 指定が無視されるため、locator 自体に対して text_content を呼ぶ。
+    spec = _loc(step)
+    assert step.var is not None, "extract に var が必要 (validation バグ?)"
+    text = build_locator(ctx.page, spec).text_content(
+        timeout=step.timeout_ms or ctx.default_timeout_ms,
+    ) or ""
     text = text.strip()
-    ctx.nav_vars[step.var] = text  # type: ignore[index]
-    return f"extract {step.var}={text!r} from {step.locator.describe()}"  # type: ignore[union-attr]
+    ctx.nav_vars[step.var] = text
+    return f"extract {step.var}={text!r} from {spec.describe()}"
 
 
 def _handle_wait_for(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
-    loc.wait_for(timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"wait_for {step.locator.describe()}"  # type: ignore[union-attr]
+    spec = _loc(step)
+    build_locator(ctx.page, spec).wait_for(timeout=step.timeout_ms or ctx.default_timeout_ms)
+    return f"wait_for {spec.describe()}"
 
 
 def _handle_wait_ms(step: Step, ctx: StepContext) -> str:
@@ -154,50 +181,68 @@ def _handle_wait_ms(step: Step, ctx: StepContext) -> str:
 
 
 def _handle_expect_visible(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
-    expect(loc).to_be_visible(timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"expect_visible {step.locator.describe()}"  # type: ignore[union-attr]
+    spec = _loc(step)
+    expect(build_locator(ctx.page, spec)).to_be_visible(
+        timeout=step.timeout_ms or ctx.default_timeout_ms,
+    )
+    return f"expect_visible {spec.describe()}"
 
 
 def _handle_expect_hidden(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
-    expect(loc).to_be_hidden(timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"expect_hidden {step.locator.describe()}"  # type: ignore[union-attr]
+    spec = _loc(step)
+    expect(build_locator(ctx.page, spec)).to_be_hidden(
+        timeout=step.timeout_ms or ctx.default_timeout_ms,
+    )
+    return f"expect_hidden {spec.describe()}"
 
 
 def _handle_expect_text(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
+    spec = _loc(step)
     text = expand_vars(step.text, ctx.nav_vars) or ""
-    expect(loc).to_contain_text(text, timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"expect_text {step.locator.describe()} contains {text!r}"  # type: ignore[union-attr]
+    expect(build_locator(ctx.page, spec)).to_contain_text(
+        text, timeout=step.timeout_ms or ctx.default_timeout_ms,
+    )
+    return f"expect_text {spec.describe()} contains {text!r}"
 
 
 def _handle_expect_no_text(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
+    spec = _loc(step)
     text = expand_vars(step.text, ctx.nav_vars) or ""
-    expect(loc).not_to_contain_text(text, timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"expect_no_text {step.locator.describe()} ∌ {text!r}"  # type: ignore[union-attr]
+    expect(build_locator(ctx.page, spec)).not_to_contain_text(
+        text, timeout=step.timeout_ms or ctx.default_timeout_ms,
+    )
+    return f"expect_no_text {spec.describe()} ∌ {text!r}"
 
 
 def _handle_expect_url(step: Step, ctx: StepContext) -> str:
+    # Maj-4: re.compile(re.escape(...)) は冗長。Playwright `to_have_url` は
+    # str を渡すと完全一致なので、`re.compile` で部分一致を表現する必要があるが、
+    # `re.escape` を介すれば純粋な substring match と等価。代わりに lambda 述語形式
+    # (一致判定を手書き) で部分一致を表現するのが docs の推奨。
     needle = expand_vars(step.contains, ctx.nav_vars) or expand_vars(step.path, ctx.nav_vars) or ""
-    expect(ctx.page).to_have_url(_re.compile(_re.escape(needle)),
-                                 timeout=step.timeout_ms or ctx.default_timeout_ms)
+    expect(ctx.page).to_have_url(
+        lambda url: needle in url,
+        timeout=step.timeout_ms or ctx.default_timeout_ms,
+    )
     return f"expect_url contains {needle!r}"
 
 
 def _handle_expect_count(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
-    expect(loc).to_have_count(step.count, timeout=step.timeout_ms or ctx.default_timeout_ms)  # type: ignore[arg-type]
-    return f"expect_count {step.locator.describe()} == {step.count}"  # type: ignore[union-attr]
+    spec = _loc(step)
+    assert step.count is not None, "expect_count に count が必要 (validation バグ?)"
+    expect(build_locator(ctx.page, spec)).to_have_count(
+        step.count, timeout=step.timeout_ms or ctx.default_timeout_ms,
+    )
+    return f"expect_count {spec.describe()} == {step.count}"
 
 
 def _handle_expect_aria_snapshot(step: Step, ctx: StepContext) -> str:
-    loc = build_locator(ctx.page, step.locator)  # type: ignore[arg-type]
+    spec = _loc(step)
     snapshot = expand_vars(step.text, ctx.nav_vars) or ""
-    expect(loc).to_match_aria_snapshot(snapshot,
-                                       timeout=step.timeout_ms or ctx.default_timeout_ms)
-    return f"expect_aria_snapshot {step.locator.describe()}"  # type: ignore[union-attr]
+    expect(build_locator(ctx.page, spec)).to_match_aria_snapshot(
+        snapshot, timeout=step.timeout_ms or ctx.default_timeout_ms,
+    )
+    return f"expect_aria_snapshot {spec.describe()}"
 
 
 _DISPATCH: dict[str, Callable[[Step, StepContext], str]] = {

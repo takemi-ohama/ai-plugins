@@ -114,8 +114,9 @@ class TestExecuteStepDispatch:
 
     def test_extract_saves_to_nav_vars(self):
         ctx = self._make_ctx()
+        # Maj-5 修正後: loc.text_content() を直接呼ぶ (loc.first を経由しない)
         loc = ctx.page.get_by_label.return_value
-        loc.first.text_content.return_value = "  TC-001  "
+        loc.text_content.return_value = "  TC-001  "
         step = Step.from_raw({
             "kind": "extract", "name": "id 取得",
             "locator": {"label": "ID"}, "var": "extracted_id",

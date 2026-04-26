@@ -25,7 +25,8 @@ from scenario_test.testcase import TestCase
 class EvidenceCollectors:
     """1 testcase 分の証跡コレクタ。
 
-    `attach()` でリスナーを登録、`finalize()` で artifact ファイルを確定する。
+    `attach_listeners()` で console/pageerror を購読、`start_tracing()` で trace を
+    開始、`finalize()` + `confirm_artifacts()` で artifact ファイルを確定する。
     runner 本体はこのオブジェクトを 1 つ持ち回せばよい。
     """
 
@@ -46,9 +47,23 @@ class EvidenceCollectors:
     cwv_metrics: dict[str, float] = field(default_factory=dict)
     cwv_passed: bool = True
 
-    _trace_started: bool = False
-    _tolerated_console_re: list[re.Pattern[str]] = field(default_factory=list)
-    _tolerated_page_re: list[re.Pattern[str]] = field(default_factory=list)
+    # Maj-6: 内部状態は `init=False, repr=False` で外部公開せず、`__post_init__` で
+    # 確定する。`for_testcase` で渡す必要もなくなり、ファクトリの API が縮む。
+    _trace_started: bool = field(default=False, init=False, repr=False)
+    _tolerated_console_re: list[re.Pattern[str]] = field(
+        default_factory=list, init=False, repr=False,
+    )
+    _tolerated_page_re: list[re.Pattern[str]] = field(
+        default_factory=list, init=False, repr=False,
+    )
+
+    def __post_init__(self) -> None:
+        self._tolerated_console_re = [
+            re.compile(p) for p in self.config.tolerated_console_errors
+        ]
+        self._tolerated_page_re = [
+            re.compile(p) for p in self.config.tolerated_page_errors
+        ]
 
     # --- 構築 ----------------------------------------------------------
 
@@ -63,8 +78,6 @@ class EvidenceCollectors:
             log_lines=log_lines,
             har_path=case_dir / f"{tc.id}.har",
             trace_path=case_dir / f"{tc.id}.trace.zip",
-            _tolerated_console_re=[re.compile(p) for p in config.tolerated_console_errors],
-            _tolerated_page_re=[re.compile(p) for p in config.tolerated_page_errors],
         )
 
     # --- HAR / trace / listener の attach ------------------------------
@@ -168,7 +181,11 @@ class EvidenceCollectors:
         if self.axe_violations:
             self.log_lines.append(f"[a11y] axe-core 違反 {len(self.axe_violations)} 件:")
             for v in self.axe_violations[:5]:
-                self.log_lines.append(f"  {v.get('id')}: {v.get('description', '')[:120]}")
+                # Min-4: scan_page は 'help' を格納する (description は格納しない)。
+                self.log_lines.append(
+                    f"  {v.get('id')} ({v.get('impact', '?')}): "
+                    f"{(v.get('help') or '')[:120]}",
+                )
         if self.cwv_metrics:
             self.log_lines.append(
                 "[cwv] " + ", ".join(f"{k}={v:.1f}" for k, v in self.cwv_metrics.items())

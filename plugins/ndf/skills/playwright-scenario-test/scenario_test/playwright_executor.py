@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import re as _re
+from collections import Counter
 from pathlib import Path
 
 from playwright.sync_api import (
@@ -201,33 +202,55 @@ def _save_video(
 
 
 def _run_a11y(
-    page: Page, tc: TestCase, config: Config,
-    ev: EvidenceCollectors, log_lines: list[str],
+    page: Page, tc: TestCase, config: Config, ev: EvidenceCollectors,
 ) -> StepRecord | None:
     if not config.a11y.enabled:
         return None
-    if not a11y_mod.should_auto_scan(tc.page_role, auto_roles=frozenset(config.a11y.auto_roles)):
+    if not a11y_mod.should_auto_scan(
+        tc.page_role, auto_roles=frozenset(config.a11y.auto_roles),
+    ):
         return None
+
+    # Maj-9: axe-playwright-python 未インストール時は SKIP step を明示する
+    # (旧実装は 0 violations と区別できず silent skip だった)。
+    if not a11y_mod.is_available():
+        ev.log_lines.append(
+            "[a11y] axe-playwright-python 未インストール — SKIP "
+            "(`uv sync --extra a11y` で有効化)",
+        )
+        return StepRecord(
+            name="[a11y] axe-core scan",
+            ok=True,
+            detail="SKIPPED (axe-playwright-python 未インストール)",
+        )
+
     violations = a11y_mod.scan_page(page, tags=tuple(config.a11y.tags))
     ev.axe_violations = violations
-    n = len(violations)
     if not violations:
         return StepRecord(name="[a11y] axe-core scan", ok=True, detail="0 violations")
-    detail = f"{n} violations: " + ", ".join(
-        f"{v.get('id')}({v.get('impact', '?')})" for v in violations[:5]
+
+    # Maj-8: 実 violation の impact を Counter で集計してログ + detail に出す。
+    impacts = Counter(v.get("impact") or "unknown" for v in violations)
+    impact_summary = ", ".join(f"{k}={n}" for k, n in impacts.most_common())
+    detail = (
+        f"{len(violations)} violations [{impact_summary}]: "
+        + ", ".join(f"{v.get('id')}({v.get('impact', '?')})" for v in violations[:5])
     )
-    log_lines.append(f"[a11y] {n} violations detected (impact: critical/serious/moderate/minor)")
-    ok = not config.a11y.fail_on_violations
-    return StepRecord(name="[a11y] axe-core scan", ok=ok, detail=detail)
+    ev.log_lines.append(f"[a11y] {len(violations)} violations: {impact_summary}")
+
+    # Maj-7: 二重否定を避けて failure → ok を 2 段で組み立てる。
+    failure = config.a11y.fail_on_violations
+    return StepRecord(name="[a11y] axe-core scan", ok=not failure, detail=detail)
 
 
 def _run_cwv(
-    page: Page, tc: TestCase, config: Config,
-    ev: EvidenceCollectors, log_lines: list[str],
+    page: Page, tc: TestCase, config: Config, ev: EvidenceCollectors,
 ) -> StepRecord | None:
     if not config.cwv.enabled:
         return None
-    if not cwv_mod.should_auto_measure(tc.page_role, auto_roles=frozenset(config.cwv.auto_roles)):
+    if not cwv_mod.should_auto_measure(
+        tc.page_role, auto_roles=frozenset(config.cwv.auto_roles),
+    ):
         return None
     metrics = cwv_mod.measure_page(page, observe_ms=config.cwv.observe_ms)
     ev.cwv_metrics = metrics
@@ -235,9 +258,11 @@ def _run_cwv(
     detail = ", ".join(
         f"{k}={v:.1f}({cwv_mod.judge(k, v)})" for k, v in metrics.items()
     ) or "no metrics collected"
-    log_lines.append(f"[cwv] {detail}")
-    ok = ev.cwv_passed or not config.cwv.fail_on_poor
-    return StepRecord(name="[cwv] Core Web Vitals", ok=ok, detail=detail)
+    ev.log_lines.append(f"[cwv] {detail}")
+
+    # Maj-7: failure を積極形で 1 行に集約。
+    failure = (not ev.cwv_passed) and config.cwv.fail_on_poor
+    return StepRecord(name="[cwv] Core Web Vitals", ok=not failure, detail=detail)
 
 
 def run_playwright_testcase(
@@ -355,10 +380,10 @@ def run_playwright_testcase(
 
                 # --- a11y / CWV 自動付加 ---
                 if login_ok:
-                    rec = _run_a11y(page, tc, config, ev, log_lines)
+                    rec = _run_a11y(page, tc, config, ev)
                     if rec is not None:
                         steps_records.append(rec)
-                    rec = _run_cwv(page, tc, config, ev, log_lines)
+                    rec = _run_cwv(page, tc, config, ev)
                     if rec is not None:
                         steps_records.append(rec)
             finally:

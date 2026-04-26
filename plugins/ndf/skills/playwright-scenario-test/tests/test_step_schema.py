@@ -88,6 +88,15 @@ class TestStep:
         # 既知 kind のリストが空でないことの sanity
         assert len(KNOWN_STEP_KINDS) >= 17
 
+    def test_known_kinds_match_dispatcher(self):
+        # Min-8: KNOWN_STEP_KINDS と locator_steps._DISPATCH のキー集合が完全一致
+        # することを保証する (片方の追加忘れを CI で検出)。
+        from scenario_test.locator_steps import supported_kinds
+        assert set(KNOWN_STEP_KINDS) == set(supported_kinds()), (
+            "KNOWN_STEP_KINDS と _DISPATCH のキー集合が不一致 — "
+            "片方への追加 / 削除を相手にも反映してください"
+        )
+
     def test_full_fill_step(self):
         s = Step.from_raw({
             "kind": "fill",
