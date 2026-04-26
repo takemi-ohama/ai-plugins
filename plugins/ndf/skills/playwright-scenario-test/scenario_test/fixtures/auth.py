@@ -98,66 +98,75 @@ def _login_and_get_storage_state(
     """role の login flow を実行し storage_state を返す。
 
     1 度だけ呼ばれることを想定。失敗時は ``pytest.fail`` を投げる。
+
+    AQ Critical-2 完遂: 関数全体を browser try/finally で囲み、
+    page.goto() / fill() / expect_navigation() / fail_if_url_contains で
+    pytest.fail() が発生した場合も含め、全ての failure path で
+    browser.close() が必ず呼ばれることを保証する。
+    pytest.fail() は内部的に例外を raise するため finally は確実に動く。
     """
     browser = playwright.chromium.launch(headless=True)
-    ctx_kwargs: dict[str, Any] = {
-        "ignore_https_errors": not verify_tls,
-    }
-    if role.login.requires_basic_auth:
-        ctx_kwargs["http_credentials"] = {
-            "username": basic_auth_user,
-            "password": basic_auth_password,
+    try:
+        ctx_kwargs: dict[str, Any] = {
+            "ignore_https_errors": not verify_tls,
         }
-    context = browser.new_context(**ctx_kwargs)
-    context.set_default_navigation_timeout(nav_timeout_ms)
-    context.set_default_timeout(nav_timeout_ms)
+        if role.login.requires_basic_auth:
+            ctx_kwargs["http_credentials"] = {
+                "username": basic_auth_user,
+                "password": basic_auth_password,
+            }
+        context = browser.new_context(**ctx_kwargs)
+        context.set_default_navigation_timeout(nav_timeout_ms)
+        context.set_default_timeout(nav_timeout_ms)
 
-    page = context.new_page()
-    url = f"{base_url}{role.login.path}"
-    try:
-        page.goto(url, wait_until="domcontentloaded", timeout=nav_timeout_ms)
-    except Exception as exc:  # pragma: no cover - depends on remote target
-        pytest.fail(
-            f"[ndf_role_{role.id}] login page open failed: {url} ({exc})"
-        )
-
-    for name, value in role.login.fields.items():
         try:
-            page.locator(f'input[name="{name}"]').fill(
-                value, timeout=nav_timeout_ms
-            )
-        except Exception as exc:  # pragma: no cover
-            pytest.fail(
-                f"[ndf_role_{role.id}] fill {name!r} failed: {exc}"
-            )
+            page = context.new_page()
+            url = f"{base_url}{role.login.path}"
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=nav_timeout_ms)
+            except Exception as exc:  # pragma: no cover - depends on remote target
+                pytest.fail(
+                    f"[ndf_role_{role.id}] login page open failed: {url} ({exc})"
+                )
 
-    try:
-        with page.expect_navigation(
-            wait_until="domcontentloaded", timeout=nav_timeout_ms
-        ):
-            _submit_login_form(page, role.login)
-    except Exception as exc:  # pragma: no cover
-        pytest.fail(
-            f"[ndf_role_{role.id}] navigation 失敗: "
-            f"{type(exc).__name__}: {exc}"
-        )
+            for name, value in role.login.fields.items():
+                try:
+                    page.locator(f'input[name="{name}"]').fill(
+                        value, timeout=nav_timeout_ms
+                    )
+                except Exception as exc:  # pragma: no cover
+                    pytest.fail(
+                        f"[ndf_role_{role.id}] fill {name!r} failed: {exc}"
+                    )
 
-    final_url = page.url
-    # Amazon Q Critical-1: fail_if_url_contains が空文字列の場合、空文字列は
-    # あらゆる文字列に含まれるため常に True になり全 login が失敗する。
-    # 空文字列 (= 未設定) の場合はチェックをスキップする。
-    if role.login.fail_if_url_contains and role.login.fail_if_url_contains in final_url:
-        pytest.fail(
-            f"[ndf_role_{role.id}] login 失敗: "
-            f"final_url={final_url} に '{role.login.fail_if_url_contains}' を含む"
-        )
+            try:
+                with page.expect_navigation(
+                    wait_until="domcontentloaded", timeout=nav_timeout_ms
+                ):
+                    _submit_login_form(page, role.login)
+            except Exception as exc:  # pragma: no cover
+                pytest.fail(
+                    f"[ndf_role_{role.id}] navigation 失敗: "
+                    f"{type(exc).__name__}: {exc}"
+                )
 
-    # Amazon Q Critical-2: context.close() が例外を投げると browser.close() が
-    # 実行されずリソースリークになる。try/finally を分割して確実に閉じる。
-    try:
-        state = context.storage_state()
-        context.close()
-        return state
+            final_url = page.url
+            # Amazon Q Critical-1: fail_if_url_contains が空文字列の場合、空文字列は
+            # あらゆる文字列に含まれるため常に True になり全 login が失敗する。
+            # 空文字列 (= 未設定) の場合はチェックをスキップする。
+            if role.login.fail_if_url_contains and role.login.fail_if_url_contains in final_url:
+                pytest.fail(
+                    f"[ndf_role_{role.id}] login 失敗: "
+                    f"final_url={final_url} に '{role.login.fail_if_url_contains}' を含む"
+                )
+
+            state = context.storage_state()
+            return state
+        finally:
+            try:
+                context.close()
+            except Exception:
+                pass
     finally:
         try:
             browser.close()

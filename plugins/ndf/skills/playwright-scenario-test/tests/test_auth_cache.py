@@ -136,7 +136,12 @@ def test_fail_if_url_contains_non_empty_triggers_on_match(monkeypatch):
 
 
 def test_browser_closed_even_when_context_close_raises(monkeypatch):
-    """context.close() が例外を投げても browser.close() が必ず呼ばれること (Amazon Q Critical-2)。"""
+    """context.close() が例外を投げても browser.close() が必ず呼ばれること (Amazon Q Critical-2)。
+
+    新実装では context.close() の例外は finally 内で握りつぶされるため、
+    呼び出し元には伝播しない。storage_state は正常に返ること、
+    かつ browser.close() が呼ばれることを検証する。
+    """
     role = _make_role(fail_if_url_contains="")
 
     fake_page = MagicMock()
@@ -153,9 +158,46 @@ def test_browser_closed_even_when_context_close_raises(monkeypatch):
     fake_playwright = MagicMock()
     fake_playwright.chromium.launch.return_value = fake_browser
 
-    # context.close() が例外を投げると storage_state は取得済みだが
-    # return state の前に例外が発生する → finally の browser.close() が呼ばれるか確認
-    with pytest.raises(RuntimeError, match="context close failed"):
+    # context.close() が例外を投げても、新実装では握りつぶされて
+    # storage_state が正常に返ること
+    result = _login_and_get_storage_state(
+        playwright=fake_playwright,
+        base_url="https://example.com",
+        role=role,
+        basic_auth_user="",
+        basic_auth_password="",
+        verify_tls=False,
+    )
+    assert result == {"cookies": [], "origins": []}
+
+    # browser.close() が呼ばれていること
+    fake_browser.close.assert_called_once()
+
+
+def test_browser_closed_when_goto_fails(monkeypatch):
+    """page.goto() が失敗して pytest.fail() が呼ばれても browser.close() されること (AQ Critical-2 完遂)。
+
+    goto / fill / expect_navigation / fail_if_url_contains の失敗は
+    いずれも pytest.fail() を raise し、旧実装では末尾 finally に到達しなかった。
+    新実装では関数全体を browser try/finally で囲んでいるため browser.close() が保証される。
+    """
+    role = _make_role(fail_if_url_contains="")
+
+    fake_page = MagicMock()
+    # goto() が例外を投げる
+    fake_page.goto.side_effect = Exception("network error")
+
+    fake_context = MagicMock()
+    fake_context.new_page.return_value = fake_page
+
+    fake_browser = MagicMock()
+    fake_browser.new_context.return_value = fake_context
+
+    fake_playwright = MagicMock()
+    fake_playwright.chromium.launch.return_value = fake_browser
+
+    # pytest.fail() が発生する (goto 失敗)
+    with pytest.raises(pytest.fail.Exception):
         _login_and_get_storage_state(
             playwright=fake_playwright,
             base_url="https://example.com",
@@ -166,4 +208,35 @@ def test_browser_closed_even_when_context_close_raises(monkeypatch):
         )
 
     # browser.close() が呼ばれていること
+    fake_browser.close.assert_called_once()
+
+
+def test_browser_closed_when_fail_if_url_contains_triggers(monkeypatch):
+    """fail_if_url_contains でログイン失敗判定しても browser.close() されること (AQ Critical-2 完遂)。"""
+    role = _make_role(fail_if_url_contains="/login")
+
+    fake_page = MagicMock()
+    fake_page.url = "https://example.com/login?error=1"  # login ページに残留
+
+    fake_context = MagicMock()
+    fake_context.new_page.return_value = fake_page
+    fake_context.storage_state.return_value = {"cookies": [], "origins": []}
+
+    fake_browser = MagicMock()
+    fake_browser.new_context.return_value = fake_context
+
+    fake_playwright = MagicMock()
+    fake_playwright.chromium.launch.return_value = fake_browser
+
+    with pytest.raises(pytest.fail.Exception):
+        _login_and_get_storage_state(
+            playwright=fake_playwright,
+            base_url="https://example.com",
+            role=role,
+            basic_auth_user="",
+            basic_auth_password="",
+            verify_tls=False,
+        )
+
+    # fail_if_url_contains でも browser.close() が呼ばれること
     fake_browser.close.assert_called_once()
