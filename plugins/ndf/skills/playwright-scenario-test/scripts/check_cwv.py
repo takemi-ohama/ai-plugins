@@ -1,16 +1,12 @@
-"""Core Web Vitals (LCP / CLS / TTFB) を Playwright で計測する。
+"""Core Web Vitals (LCP/CLS/TTFB/longest_task) を 1 URL に対して計測する CLI。
 
-field metric である INP は本スクリプトでは計測**しない**。代わりに「最大 Long Task
-持続時間」(`longest_task_ms`) を取得する。これは INP の近似ではなく、UI 応答性の
-**ラフな指標**としてのみ使う (50ms 超は応答性低下の兆候)。
-正式な INP は web-vitals.js の attribution build を使うか、フィールド計測を実施。
-
-docs/checklists/checklist-common.md の C2 (perf) を機械的に検証する。
+`scenario_test.cwv` モジュールの薄いラッパ。runner は testcase 内蔵で同 module
+を呼ぶため、本 CLI は外部 URL の単発計測専用。
 
 Usage:
     python check_cwv.py --url https://example.com
     python check_cwv.py --url-list urls.txt --output cwv.json
-    python check_cwv.py --url https://example.com --device "iPhone 13"
+    python check_cwv.py --url https://example.com --device "Pixel 5"
 """
 
 from __future__ import annotations
@@ -23,80 +19,11 @@ from typing import Any
 
 from playwright.sync_api import sync_playwright
 
+_SKILL_ROOT = Path(__file__).resolve().parent.parent
+if str(_SKILL_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SKILL_ROOT))
 
-# web.dev 公式閾値 (75 percentile 基準)
-THRESHOLDS = {
-    "lcp": {"good": 2500, "poor": 4000},      # ms (web.dev 公式)
-    "cls": {"good": 0.1, "poor": 0.25},       # web.dev 公式
-    "ttfb": {"good": 800, "poor": 1800},      # ms (web.dev 公式)
-    # longest_task は INP ではない。50ms 超は応答性低下の兆候 (browser main thread block)。
-    # 正式 INP の代替指標ではないことに注意。
-    "longest_task": {"good": 50, "poor": 200},
-}
-
-
-# LCP / CLS を PerformanceObserver で取得する JS。
-# 5 秒間観察してから値を返す (LCP はページ可視性が変わるまで更新され続けるため)。
-_PERF_JS = r"""
-() => new Promise((resolve) => {
-    const result = {lcp: null, cls: 0, longest_task: 0};
-
-    // LCP
-    try {
-        const lcpObs = new PerformanceObserver((list) => {
-            const entries = list.getEntries();
-            const last = entries.at(-1);
-            if (last) result.lcp = last.startTime;
-        });
-        lcpObs.observe({type: 'largest-contentful-paint', buffered: true});
-    } catch (e) {}
-
-    // CLS (累積; hadRecentInput===false のみ)
-    try {
-        const clsObs = new PerformanceObserver((list) => {
-            for (const entry of list.getEntries()) {
-                if (!entry.hadRecentInput) {
-                    result.cls += entry.value;
-                }
-            }
-        });
-        clsObs.observe({type: 'layout-shift', buffered: true});
-    } catch (e) {}
-
-    // 最大 long task (INP の代理指標)
-    try {
-        const ltObs = new PerformanceObserver((list) => {
-            for (const entry of list.getEntries()) {
-                if (entry.duration > result.longest_task) {
-                    result.longest_task = entry.duration;
-                }
-            }
-        });
-        ltObs.observe({type: 'longtask', buffered: true});
-    } catch (e) {}
-
-    // navigation timing から TTFB
-    try {
-        const nav = performance.getEntriesByType('navigation')[0];
-        if (nav) result.ttfb = nav.responseStart - nav.requestStart;
-    } catch (e) {}
-
-    setTimeout(() => resolve(result), 5000);
-});
-"""
-
-
-def _judge(metric: str, value: float | None) -> str:
-    if value is None:
-        return "unknown"
-    th = THRESHOLDS.get(metric)
-    if not th:
-        return "unknown"
-    if value <= th["good"]:
-        return "good"
-    if value <= th["poor"]:
-        return "needs-improvement"
-    return "poor"
+from scenario_test.cwv import THRESHOLDS, judge, measure_page  # noqa: E402
 
 
 def measure(
@@ -106,8 +33,8 @@ def measure(
     device_name: str | None = None,
     timeout_ms: int = 30_000,
     headless: bool = True,
+    observe_ms: int = 5000,
 ) -> dict[str, Any]:
-    """1 URL を計測し CWV 値を返す。"""
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
         ctx_kwargs: dict[str, Any] = {"ignore_https_errors": True}
@@ -119,6 +46,7 @@ def measure(
                 browser.close()
                 return {"url": url, "error": f"unknown device: {device_name}"}
             ctx_kwargs.update(device)
+
         context = browser.new_context(**ctx_kwargs)
         page = context.new_page()
         try:
@@ -127,42 +55,30 @@ def measure(
             browser.close()
             return {"url": url, "error": str(exc)}
 
-        try:
-            metrics = page.evaluate(_PERF_JS)
-        except Exception as exc:
-            metrics = {"error": str(exc)}
-
-        result = {
+        metrics = measure_page(page, observe_ms=observe_ms)
+        browser.close()
+        return {
             "url": url,
             "device": device_name or "desktop",
-            "metrics": {
-                "lcp_ms": metrics.get("lcp"),
-                "cls": metrics.get("cls"),
-                "ttfb_ms": metrics.get("ttfb"),
-                "longest_task_ms": metrics.get("longest_task"),
-            },
-            "judgement": {
-                "lcp": _judge("lcp", metrics.get("lcp")),
-                "cls": _judge("cls", metrics.get("cls")),
-                "ttfb": _judge("ttfb", metrics.get("ttfb")),
-                "longest_task": _judge("longest_task", metrics.get("longest_task")),
-            },
+            "metrics": metrics,
+            "judgement": {k: judge(k, v) for k, v in metrics.items()},
             "thresholds": THRESHOLDS,
         }
-        browser.close()
-        return result
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Core Web Vitals 計測")
-    parser.add_argument("--url", help="計測 URL")
+    parser = argparse.ArgumentParser(description="Core Web Vitals を計測")
+    parser.add_argument("--url", help="計測対象 URL")
     parser.add_argument("--url-list", type=Path, help="URL を 1 行 1 件で書いたファイル")
     parser.add_argument("--storage-state", default=None)
     parser.add_argument("--device", default=None,
-                        help="モバイル device 名 (例: 'iPhone 13'). 省略時は desktop")
+                        help="Playwright device 名 (例: 'Pixel 5')")
+    parser.add_argument("--observe-ms", type=int, default=5000,
+                        help="PerformanceObserver 観測時間 (ms)")
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--fail-on-poor", action="store_true",
-                        help="いずれかの指標が poor なら exit 1")
+                        help="poor 判定 1 件以上で exit 1")
+    parser.add_argument("--headed", action="store_true")
     args = parser.parse_args()
 
     if not args.url and not args.url_list:
@@ -173,19 +89,22 @@ def main() -> int:
         if args.url_list else [args.url]
     )
 
-    results = [measure(u, storage_state=args.storage_state,
-                       device_name=args.device) for u in urls]
+    results = [
+        measure(u, storage_state=args.storage_state, device_name=args.device,
+                headless=not args.headed, observe_ms=args.observe_ms)
+        for u in urls
+    ]
 
     text = json.dumps(results, indent=2, ensure_ascii=False)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(text, encoding="utf-8")
-        print(f"OK: CWV → {args.output}", file=sys.stderr)
+        print(f"OK: cwv → {args.output}", file=sys.stderr)
     else:
         sys.stdout.write(text + "\n")
 
     has_poor = any(
-        v == "poor" for r in results for v in (r.get("judgement") or {}).values()
+        any(v == "poor" for v in r.get("judgement", {}).values()) for r in results
     )
     return 1 if args.fail_on_poor and has_poor else 0
 

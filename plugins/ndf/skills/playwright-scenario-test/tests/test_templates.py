@@ -28,6 +28,9 @@ _PLACEHOLDERS: dict[str, str] = {
     "item_id": "stub-item-001",
     "image_id": "stub-image-001",
     "var": "stub_var",
+    "var_name": "stub_var_name",
+    "page_role": "list",
+    "saved_title": "Stub saved title",
 }
 
 _ASCII_PLACEHOLDER_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")

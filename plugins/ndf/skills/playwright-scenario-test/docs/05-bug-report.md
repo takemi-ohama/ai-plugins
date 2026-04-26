@@ -94,13 +94,16 @@ addopts = "--tracing retain-on-failure --video retain-on-failure --screenshot on
 
 ### trace.zip の閲覧 URL 化
 
-`scripts/trace_link.py` が trace.zip を Google Drive / S3 にアップロードし、
-`https://trace.playwright.dev/?trace=<URL>` 形式の閲覧 URL を生成。
+`scripts/upload_evidence.py --kind trace --public` が trace.zip を Google Drive に
+アップロードし、`https://trace.playwright.dev/?trace=<URL>` 形式の閲覧 URL を
+生成する (HAR / video の Drive アップロードも同スクリプトで可能、`--kind har/video`)。
 bug report に必ずこの URL を貼る (zip 単体だと開発者の手元で展開が必要)。
 
 ## 6. bug report テンプレート (Markdown)
 
-以下を bug 起票時の雛形として使用する (現状はコピペで運用、自動生成スクリプトは v0.3.0 以降で検討)。
+以下を bug 起票時の雛形として使用する (`reports/<run-id>/<TC-ID>/log.txt` と
+trace/HAR を `upload_evidence.py` でアップロードしたあと、生成された Drive リンクを
+本テンプレートに差し込む運用)。
 
 ```markdown
 # BUG-2026-04-25-001 — 詳細ページの編集ボタンが他者所有データで非表示にならない

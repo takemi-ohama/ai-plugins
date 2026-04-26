@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import itertools
 import json
 import re
@@ -144,8 +145,31 @@ def _parse_factor(spec: str) -> Factor:
 
 
 def _slugify(s: str) -> str:
+    """ASCII slug を作る (連続区切りを単一 - に圧縮、80 字までで truncate)。"""
     s = re.sub(r"[^\w\-]+", "-", s.lower()).strip("-")
-    return re.sub(r"-+", "-", s)[:60]
+    return re.sub(r"-+", "-", s)[:80]
+
+
+def _default_test_id(role: str, url: str) -> str:
+    """`--id` 未指定時の test_id 既定値を生成する (Min-2 衝突回避)。
+
+    旧実装は URL 末尾セグメントだけを slugify していたため、`/items/edit/1` と
+    `/users/edit/1` が同じ ID になっていた。新実装は:
+
+      1. URL の path 全体 (host を除く) を slugify したものを基本 slug とする
+      2. 末尾に URL 全体の sha1 短縮 (6 字) を suffix として付与し衝突を回避
+
+    例: `https://example.com/items/edit/1` → `TC-EDIT-items-edit-1-a3f9c2`
+    """
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    path = parsed.path.strip("/") or "root"
+    # クエリは衝突要因なので hash 計算には含めるが slug には含めない
+    base = _slugify(path)
+    suffix = hashlib.sha1(url.encode("utf-8")).hexdigest()[:6]
+    role_prefix = role.upper()[:6]
+    return f"TC-{role_prefix}-{base}-{suffix}"
 
 
 def _yaml_dump(data: dict | list, indent: int = 0) -> str:
@@ -276,20 +300,41 @@ def generate_yaml(
 
     steps: list[dict] = [
         {
+            "kind": "goto",
             "name": f"[{role}] 主要画面表示確認",
             "path": _path_from_url(url),
             "expect_status": 200,
         },
+        {
+            "kind": "expect_no_text",
+            "name": "[共通] フレームワーク fatal が出ていないこと",
+            "locator": {"css": "body"},
+            "text": "Fatal error",
+        },
     ]
 
     if pairs:
-        # Pairwise ケースを step として展開 (POST 入力分岐の例)
+        # Pairwise ケースは locator-first では fill/click ステップへの展開が必要だが、
+        # フィールドの入力先 (label / role) はプロジェクト固有のため自動生成では
+        # ダミー値のみ出す。実プロジェクトに合わせて locator を埋めること。
         for i, case in enumerate(pairs, 1):
             steps.append({
+                "kind": "goto",
                 "name": f"Pairwise #{i}: {', '.join(f'{k}={v}' for k,v in case.items())}",
                 "path": _path_from_url(url),
-                "method": "POST",
-                "data": case,
+                "expect_status": 200,
+            })
+            for field_name, field_value in case.items():
+                steps.append({
+                    "kind": "fill",
+                    "name": f"  fill {field_name}={field_value!r} (locator は要編集)",
+                    "locator": {"label": field_name},
+                    "value": field_value,
+                })
+            steps.append({
+                "kind": "click",
+                "name": "  送信 (button name は要編集)",
+                "locator": {"role": "button", "name": "送信"},
             })
 
     base_yaml["steps"] = steps
@@ -353,7 +398,7 @@ def main() -> int:
     args = parser.parse_args()
 
     factors = [_parse_factor(s) for s in args.factors]
-    test_id = args.id or f"TC-{args.role.upper()[:4]}-{_slugify(args.url.split('/')[-1] or 'root')}"
+    test_id = args.id or _default_test_id(args.role, args.url)
 
     yaml_text = generate_yaml(
         args.role, args.url,

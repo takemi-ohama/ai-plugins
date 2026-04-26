@@ -27,9 +27,10 @@ class Login:
     requires_basic_auth: bool
     fields: dict[str, str]
     fail_if_url_contains: str
-    # ログイン送信ボタンを特定するためのプロジェクト固有セレクタ。
-    # nav_helpers.submit_login() が「これ → 汎用フォールバック → Password で Enter」
-    # の順で試す。空のままでも汎用フォールバックで通常はログインできる。
+    # ログイン送信ボタンを特定するためのプロジェクト固有セレクタ (CSS / role / text)。
+    # `playwright_executor._submit_login_form` が「これ → role/type=submit
+    # フォールバック → Password で Enter」の順で試す。空のままでも汎用
+    # フォールバックで通常はログインできる。
     submit_selectors: list[str] = field(default_factory=list)
 
 
@@ -38,32 +39,6 @@ class Role:
     id: str
     label: str
     login: Login
-
-
-# --- ページ検査・スラッグ正規化 -------------------------------------
-
-@dataclass
-class BodyCheckConfig:
-    """ページ本文を見て「壊れている」と判定するためのパターン群。
-
-    すべて空のままなら検査せず、HTTP ステータスと URL アサーションだけが効く。
-    PHP プロジェクトなら Fatal/Warning パターンを足す、Rails なら別のパターンを
-    入れる、といった具合に config.yaml で差し込む。
-    """
-    fatal_patterns: list[str] = field(default_factory=list)
-    warning_patterns: list[str] = field(default_factory=list)
-    not_found_strings: list[str] = field(default_factory=list)
-
-
-@dataclass
-class SlugConfig:
-    """スクショファイル名生成用のスラッグ正規化ルール。
-
-    - strip_extensions: path から削除する拡張子 (例: [".php"])
-    - query_capture_re: クエリ文字列から拾うラベル (例: "Cmd=(\\w+)" → サフィックスに付与)
-    """
-    strip_extensions: list[str] = field(default_factory=list)
-    query_capture_re: str | None = None
 
 
 # --- レポート設定 ---------------------------------------------------
@@ -94,9 +69,6 @@ class PlaywrightConfig:
     # DOM スナップショット・コンソール・ネットワークなどを `playwright show-trace`
     # で対話的に確認できる。生成物が大きく (数MB〜) なるので必要時のみ。
     enable_trace: bool = True
-    # ページ内容が viewport より長い場合、ナビゲーション前に「下までスクロール →
-    # クリック対象の位置 (なければ最上部) に戻る」アニメーションを差し込む。
-    enable_scroll_demo: bool = True
     # 録画後の動画フォーマット: "webm" (Playwright 既定) | "mp4" (H.264 変換)
     # mp4 は Google Drive プレビュアで再生互換性が高い。
     video_format: str = "mp4"
@@ -118,7 +90,6 @@ class PlaywrightConfig:
             step_delay_ms=int(raw.get("step_delay_ms", 1500)),
             enable_overlay=bool(raw.get("enable_overlay", True)),
             enable_trace=bool(raw.get("enable_trace", True)),
-            enable_scroll_demo=bool(raw.get("enable_scroll_demo", True)),
             video_format=str(raw.get("video_format", "mp4")).lower(),
         )
 
@@ -141,6 +112,34 @@ class RunnerConfig:
         )
 
 
+# --- a11y / CWV (v0.3.0) ---------------------------------------------
+
+@dataclass
+class A11yConfig:
+    """axe-core 自動スキャンの設定 (page_role に応じて runner が自動実行)。"""
+    enabled: bool = True
+    auto_roles: list[str] = field(default_factory=lambda: [
+        "lp", "list", "form", "dashboard", "cart", "checkout", "settings", "auth",
+    ])
+    tags: list[str] = field(default_factory=lambda: [
+        "wcag2a", "wcag2aa", "wcag21aa", "wcag22aa",
+    ])
+    # 検出した violations を testcase の FAIL 要因として扱うか (false なら情報出力のみ)
+    fail_on_violations: bool = True
+
+
+@dataclass
+class CwvConfig:
+    """Core Web Vitals 自動計測の設定 (page_role に応じて runner が自動実行)。"""
+    enabled: bool = True
+    auto_roles: list[str] = field(default_factory=lambda: [
+        "lp", "list", "dashboard", "search",
+    ])
+    observe_ms: int = 5000
+    # poor 判定が 1 件でもあれば testcase を FAIL とするか
+    fail_on_poor: bool = True
+
+
 # --- ルート ---------------------------------------------------------
 
 @dataclass
@@ -151,8 +150,6 @@ class Config:
     roles: dict[str, Role]
     playwright: PlaywrightConfig
     runner: RunnerConfig
-    body_check: BodyCheckConfig
-    slug: SlugConfig
     report: ReportConfig
     config_path: Path  # 設定ファイルの絶対パス（testcases_dir の解決基点）
     # docs/checklists/checklist-common.md C8/C9 の境界曖昧さに対応する「除外」設定。
@@ -161,6 +158,9 @@ class Config:
     # 抜け穴。空 (デフォルト) なら従来どおり 1 件で FAIL。
     tolerated_console_errors: list[str] = field(default_factory=list)
     tolerated_page_errors: list[str] = field(default_factory=list)
+    # a11y / CWV 自動実行 (page_role に応じて runner が判定)
+    a11y: A11yConfig = field(default_factory=A11yConfig)
+    cwv: CwvConfig = field(default_factory=CwvConfig)
 
     @property
     def testcases_dir(self) -> Path:
@@ -205,12 +205,12 @@ class Config:
             roles=roles,
             playwright=PlaywrightConfig.from_raw(raw.get("playwright") or {}),
             runner=RunnerConfig.from_raw(raw.get("runner") or {}),
-            body_check=_body_check_from_raw(raw.get("body_check") or {}),
-            slug=_slug_from_raw(raw.get("slug") or {}),
             report=_report_from_raw(raw.get("report") or {}),
             config_path=config_path,
             tolerated_console_errors=list(raw.get("tolerated_console_errors") or []),
             tolerated_page_errors=list(raw.get("tolerated_page_errors") or []),
+            a11y=_a11y_from_raw(raw.get("a11y") or {}),
+            cwv=_cwv_from_raw(raw.get("cwv") or {}),
         )
 
         # fail-fast: requires_basic_auth=True なロールが宣言されているのに
@@ -241,25 +241,30 @@ def _role_from_raw(rid: str, raw: dict[str, Any]) -> Role:
     )
 
 
-def _body_check_from_raw(raw: dict[str, Any]) -> BodyCheckConfig:
-    return BodyCheckConfig(
-        fatal_patterns=list(raw.get("fatal_patterns") or []),
-        warning_patterns=list(raw.get("warning_patterns") or []),
-        not_found_strings=list(raw.get("not_found_strings") or []),
-    )
-
-
-def _slug_from_raw(raw: dict[str, Any]) -> SlugConfig:
-    return SlugConfig(
-        strip_extensions=list(raw.get("strip_extensions") or []),
-        query_capture_re=(str(raw["query_capture_re"]) if raw.get("query_capture_re") else None),
-    )
-
-
 def _report_from_raw(raw: dict[str, Any]) -> ReportConfig:
     labels_raw = raw.get("phase_labels") or {}
     return ReportConfig(
         title=str(raw.get("title", "シナリオ E2E テスト 実施報告書")),
         test_plan_link=str(raw.get("test_plan_link", "./test-plan.md")),
         phase_labels={int(k): str(v) for k, v in labels_raw.items()},
+    )
+
+
+def _a11y_from_raw(raw: dict[str, Any]) -> A11yConfig:
+    base = A11yConfig()
+    return A11yConfig(
+        enabled=bool(raw.get("enabled", base.enabled)),
+        auto_roles=list(raw.get("auto_roles") or base.auto_roles),
+        tags=list(raw.get("tags") or base.tags),
+        fail_on_violations=bool(raw.get("fail_on_violations", base.fail_on_violations)),
+    )
+
+
+def _cwv_from_raw(raw: dict[str, Any]) -> CwvConfig:
+    base = CwvConfig()
+    return CwvConfig(
+        enabled=bool(raw.get("enabled", base.enabled)),
+        auto_roles=list(raw.get("auto_roles") or base.auto_roles),
+        observe_ms=int(raw.get("observe_ms", base.observe_ms)),
+        fail_on_poor=bool(raw.get("fail_on_poor", base.fail_on_poor)),
     )

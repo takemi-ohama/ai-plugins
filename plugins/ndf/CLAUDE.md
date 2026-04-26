@@ -125,6 +125,30 @@ plugins/ndf/
 
 ## 開発履歴
 
+### v4.2.0 (BREAKING: playwright-scenario-test v0.3.0 OSS 品質化)
+- **`playwright-scenario-test` v0.3.0** (locator-first / web-first 全面刷新):
+  - **testcase YAML スキーマを刷新**: 旧 `path/method/data/extract` 構造を廃止。明示的 `kind` (`goto/click/fill/select/check/press/hover/extract/wait_for/wait_ms/expect_visible/expect_hidden/expect_text/expect_no_text/expect_url/expect_count/expect_aria_snapshot`) に統一
+  - **Locator 表現**: `{role: button, name: 保存}` / `{label: メールアドレス}` / `{testid: ...}` / `{css: ...}` 等の dict で記述。Playwright 公式の `get_by_*` 系 API に 1 対 1 対応
+  - **assertion は `expect()` のみ**: 自前 `body_check` と HTML 文字列 match を全廃。`expect_no_text` step で代替
+  - **新モジュール**:
+    - `scenario_test/locator_steps.py` — YAML step kind → Locator/expect API dispatcher (テーブル駆動)
+    - `scenario_test/evidence.py` — 1 testcase 分の HAR/trace/console/pageerror/axe/CWV を集中管理
+    - `scenario_test/a11y.py` — axe-core ランナー内蔵モジュール (page_role に応じて自動実行)
+    - `scenario_test/cwv.py` — Core Web Vitals ランナー内蔵モジュール (page_role に応じて自動実行)
+  - **削除**:
+    - `scenario_test/nav_helpers.py` (全関数を locator-first で置換)
+    - `scripts/trace_link.py` (`upload_evidence.py` に統合)
+    - 古い `path` ベース step / `body_check` / `slug` config / `enable_scroll_demo` config
+  - **新規 scripts**:
+    - `scripts/upload_evidence.py` — trace/HAR/video の Drive アップ統合 (拡張子から自動判定)
+    - `scripts/record_to_yaml.py` — Playwright codegen Python 出力 → 新スキーマ YAML 変換
+  - **Min-2 (slug 衝突)**: `_default_test_id(role, url)` で URL 全 path + sha1[:6] suffix を付与し衝突回避
+  - **Maj-7 (責務分離)**: `playwright_executor.py` 678 → 約 380 行へ縮小 (evidence は `EvidenceCollectors` へ完全分離)
+  - **report.md** に axe-core 違反 / Core Web Vitals metrics を表示
+  - templates/ を 6 ファイル全部新スキーマで書き直し
+  - docs/ から「v0.3.0 以降で検討」記述を解消、`navigate_post` / `find_click_target` / `detect_body_errors` 等の旧 helper 言及を削除
+- Skills: 36個 (変化なし)
+
 ### v4.1.0
 - **`playwright-scenario-test` v0.2.0** (理論ベース化):
   - `docs/` 配下に方法論を 6 ファイル (総論 / page role / 技法 / Playwright API / bug report) + checklists 11 ファイル (lp/list/item/edit/form/search/dashboard/auth/cart-checkout/modal-wizard/common) として整備

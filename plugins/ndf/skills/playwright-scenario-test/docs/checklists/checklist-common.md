@@ -107,14 +107,22 @@ E2E から検証可能な範囲。攻撃ではなく**挙動確認**まで。
 
 ## 10. 追加すべきプロジェクト固有チェック
 
-config.yaml の `body_check` で次を上書き:
+testcase YAML の最後に `kind: expect_no_text` step を並べる (web-first):
 
 ```yaml
-body_check:
-  fatal_patterns: [...]      # フレームワーク固有 fatal (例: PHP "Fatal error", Rails "RuntimeError:")
-  warning_patterns: [...]    # フレームワーク固有 warning
-  not_found_strings: [...]   # ローカライズされた "Page not found"
+- kind: expect_no_text                # フレームワーク fatal
+  name: "Fatal error が出ていないこと"
+  locator: { css: body }
+  text: "Fatal error"
+- kind: expect_no_text                # ローカライズされた 404 表示
+  name: "Page not found が出ていないこと"
+  locator: { css: body }
+  text: "Page not found"
 ```
+
+ページ全体に対する正規表現マッチではなく、locator + 部分一致で判定する。
+`Warning:` / `Notice:` のような先頭領域限定の判定が必要なら
+`locator: { css: "main, .page-top" }` で範囲を絞る。
 
 ## 参考文献
 
