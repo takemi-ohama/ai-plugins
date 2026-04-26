@@ -1,45 +1,135 @@
 ---
 name: playwright-scenario-test
-description: "Playwright + curl による Web シナリオ E2E テストの理論ベース実施フレームワーク。HTSM / ISTQB / FEW HICCUPPS に基づき page role 別の checklist + 必須技法マッピングを内蔵し、字幕・カーソル付き動画レポート + a11y / Core Web Vitals 計測 + Playwright trace を自動収集する。"
-when_to_use: "E2E テスト計画立案 / 不具合エビデンス収集 / 動画レポート / Google Drive 共有が必要なとき。LP / 一覧 / 詳細 / 編集 / 申込フォーム / 検索 / ダッシュボード / 認証 / カート / チェックアウト / モーダル / ウィザード / 設定 / エラーページ など page role 別の理論ベースチェックを行う。Triggers: 'E2E テスト', 'シナリオテスト', '動画エビデンス', 'Playwright', 'リリース前確認', '回帰テスト', 'a11y テスト', 'Core Web Vitals', 'LP テスト', '一覧ページ', '詳細ページ', '編集フォーム', '申込フォーム', '検索ページ', 'ダッシュボード', 'login テスト', 'カート / 決済', 'モーダル', 'ウィザード', 'page role'"
+description: "pytest-playwright 上の Web シナリオ E2E テスト実施フレームワーク。HTSM / ISTQB / FEW HICCUPPS に基づき page role 別の checklist + 必須技法マッピングを内蔵し、a11y / Core Web Vitals 自動計測 + Playwright trace / HAR / 動画 / Markdown レポート + Google Drive 共有を pytest fixture / hook として提供する。"
+when_to_use: "E2E テスト計画立案 / 不具合エビデンス収集 / 動画レポート / Google Drive 共有が必要なとき。LP / 一覧 / 詳細 / 編集 / 申込フォーム / 検索 / ダッシュボード / 認証 / カート / チェックアウト / モーダル / ウィザード / 設定 / エラーページ など page role 別の理論ベースチェックを行う。Triggers: 'E2E テスト', 'シナリオテスト', '動画エビデンス', 'Playwright', 'pytest-playwright', 'リリース前確認', '回帰テスト', 'a11y テスト', 'Core Web Vitals', 'page role', 'ndf_role', 'ndf_evidence'"
 allowed-tools:
   - Read
   - Bash(uv *)
-  - Bash(python *)
+  - Bash(pytest *)
   - Bash(playwright *)
+  - Bash(python *)
 ---
 
-# Playwright シナリオテスト Skill
+# Playwright シナリオテスト Skill (v0.3.0+)
 
-Web アプリの E2E シナリオを **理論ベース** で計画 → 並列実行 → 動画 + Markdown レポート生成 → Google Drive 共有 する一式の Skill。
+Web アプリの E2E シナリオを **理論ベース** で計画し、**pytest-playwright** 上で実行、**動画 + Markdown レポート + a11y/CWV** を自動収集する一式の Skill。
 
-「経験で書く」を排除し、**page role 別 checklist + テスト技法マトリクス** に従って機械的に計画を立てる。
+v0.3.0 で **自前 YAML DSL を全廃**し、利用者は **通常の pytest テスト** を書く形に移行した。NDF が提供するのは pytest plugin / fixture / marker / テンプレート / Drive 連携スクリプト。
 
 ## 提供物
 
 ```
 playwright-scenario-test/
-├── SKILL.md                    ← このファイル (実行手順とナビゲーション)
-├── pyproject.toml              ← uv プロジェクト定義
+├── SKILL.md                    ← このファイル
+├── pyproject.toml              ← uv プロジェクト定義 (pytest entry-point 含む)
+├── scenario_test/              ← Python パッケージ
+│   ├── pytest_plugin.py        ← pytest11 entry-point (addoption / markers / hooks)
+│   ├── pytest_report.py        ← report.md 生成
+│   ├── fixtures/               ← pytest fixtures
+│   │   ├── auth.py             — ndf_config / ndf_role_<id>
+│   │   ├── evidence.py         — ndf_evidence (HAR / trace / console / pageerror)
+│   │   ├── a11y.py             — page_role marker autouse で axe-core
+│   │   └── cwv.py              — page_role marker autouse で Core Web Vitals
+│   ├── a11y.py / cwv.py        ← axe-core / CWV ランナー (純関数)
+│   ├── hud.py / video.py       ← HUD overlay JS / webm→mp4 変換
+│   └── config.py               ← scenario.config.yaml ローダ
 ├── docs/                       ← テスト方法論 (HTSM / ISTQB / FEW HICCUPPS)
-│   ├── README.md               — ドキュメント目次
-│   ├── 01-methodology.md       — 総論
-│   ├── 02-page-roles.md        — page role 分類 (lp/list/item/edit/form/...)
-│   ├── 03-test-techniques.md   — テスト技法ライブラリ (EP/BVA/Decision Table/...)
-│   ├── 04-playwright-mapping.md — Playwright API → role / 観点 マッピング
-│   ├── 05-bug-report.md        — bug report 仕様 (ISO 29119-3 + FEW HICCUPPS)
-│   └── checklists/             — 役割別チェックリスト (12 ファイル)
-├── scenario_test/              ← 並列ランナー (Python パッケージ)
-├── scripts/                    ← 補助スクリプト (codegen / a11y / CWV / drive)
-│   ├── classify_page_role.py   — URL から page role を自動判定
-│   ├── generate_test_plan.py   — page_role + URL → testcase YAML 雛形
-│   ├── record_scenario.py      — Playwright codegen 起動ラッパー
-│   ├── record_to_yaml.py       — codegen の Python 出力 → testcase YAML 変換
-│   ├── run_a11y_scan.py        — axe-core 単発スキャン CLI (runner は内蔵で自動実行)
-│   ├── check_cwv.py            — Core Web Vitals 単発計測 CLI (runner は内蔵で自動実行)
-│   ├── upload_evidence.py      — trace / HAR / video を Drive にアップ + viewer URL 生成
-│   └── (drive 連携: gdrive_upload_dir / build_gdoc_with_drive_links / ...)
-└── templates/                  ← config / testcase YAML テンプレート (役割別 5 件 + 汎用 1 件 + curl)
+│   ├── 01-methodology.md  / 02-page-roles.md / 03-test-techniques.md
+│   ├── 04-playwright-mapping.md  / 05-bug-report.md
+│   └── checklists/             — 役割別 11 ファイル
+├── scripts/                    ← CLI 単発ツール
+│   ├── classify_page_role.py   — URL から page role 自動判定
+│   ├── run_a11y_scan.py / check_cwv.py — 単発スキャン
+│   ├── record_scenario.py      — Playwright codegen ラッパー
+│   ├── upload_evidence.py      — trace/HAR/動画/report の Drive アップ
+│   └── (Drive 連携: gdrive_upload_dir.py / build_gdoc_with_drive_links.py / ...)
+└── templates/                  ← 利用者プロジェクト用雛形
+    ├── scenario.config.yaml    — base_url / roles / a11y / CWV 設定
+    ├── conftest.py.template    — 利用者の conftest.py 雛形
+    ├── test_auth.py.template   — auth role のテスト例
+    ├── test_list.py.template   — list role のテスト例
+    ├── test_form.py.template   — form role のテスト例
+    └── test_dashboard.py.template — dashboard role のテスト例
+```
+
+## クイックスタート
+
+```bash
+# 1) skill をプロジェクトに連れて行く
+SKILL_DIR=.claude/skills/playwright-scenario-test
+cd $SKILL_DIR
+uv sync               # pytest / pytest-playwright / pytest-xdist が入る
+playwright install chromium
+
+# 2) 利用者プロジェクトに雛形をコピー
+PROJ=/path/to/your-app
+mkdir -p $PROJ/tests
+cp templates/scenario.config.yaml $PROJ/scenario.config.yaml
+cp templates/conftest.py.template $PROJ/tests/conftest.py
+cp templates/test_auth.py.template $PROJ/tests/test_auth.py
+
+# 3) base_url / roles を編集
+$EDITOR $PROJ/scenario.config.yaml
+
+# 4) 実行
+cd $PROJ
+uv run pytest --ndf-config=./scenario.config.yaml
+```
+
+## 利用者は通常の pytest テストを書く
+
+```python
+# tests/test_admin_dashboard.py
+import pytest
+from playwright.sync_api import Page, expect
+
+@pytest.mark.page_role("dashboard")
+@pytest.mark.role("admin")
+def test_admin_kpi_view(page: Page, ndf_role_admin):
+    page.goto("/admin/dashboard")
+    expect(page.get_by_role("heading", name="売上サマリ")).to_be_visible()
+    page.get_by_role("link", name="ユーザ管理").click()
+    expect(page).to_have_url(lambda u: "/admin/users" in u)
+```
+
+NDF が提供する fixture / marker:
+
+| 提供 | 種別 | 役割 |
+|---|---|---|
+| `ndf_config` | session fixture | `scenario.config.yaml` をロード (Config dataclass) |
+| `ndf_role_<id>` | function fixture (動的) | 該当 role で login 済の storage_state を context に注入 |
+| `ndf_evidence` | function fixture | HAR / trace / console.error / pageerror の集中管理 |
+| `ndf_a11y_scan` | helper | 任意のタイミングで axe-core を 1 回実行 |
+| `ndf_cwv_measure` | helper | 任意のタイミングで CWV を 1 回計測 |
+| `@pytest.mark.page_role("form")` | marker | a11y / CWV autouse の判定 (auto_roles 設定に従う) |
+| `@pytest.mark.role("admin")` | marker | report.md 集計用 (login 自体は `ndf_role_<id>` fixture) |
+| `@pytest.mark.phase(1)` | marker | report.md フェーズ集計 |
+| `@pytest.mark.priority("high")` | marker | report.md ソート |
+
+## CLI options
+
+| option | 役割 |
+|---|---|
+| `--ndf-config <path>` | `scenario.config.yaml` のパス。env `NDF_CONFIG` / CWD の同名ファイルでも可 |
+| `--ndf-out-dir <path>` | 成果物出力先 (default: `reports/<run-id>/`) |
+| `--ndf-no-evidence` | HAR / trace / video の収集を OFF |
+| `--ndf-hud` | HUD overlay (赤丸カーソル + 字幕) を全 page に inject |
+| `--ndf-drive-folder <id>` | session 終了時に report.md と evidence を Drive アップロード |
+
+pytest 標準と組み合わせて使える:
+
+```bash
+# page_role=form のテストだけ実行
+uv run pytest -m "page_role"
+
+# 4 worker で並列実行
+uv run pytest -n 4
+
+# 動画レポートを Drive へ自動アップロード
+uv run pytest --ndf-drive-folder=<FOLDER_ID>
+
+# pytest-html を組み合わせて HTML report も
+uv run pytest --html=reports/index.html --self-contained-html
 ```
 
 ## 標準ワークフロー (理論ベース計画)
@@ -48,221 +138,66 @@ playwright-scenario-test/
 [A] 対象 URL を渡される
        │
 [B] page role を判定                       scripts/classify_page_role.py --url <URL>
-       │     a11y tree + URL pattern + role 集計から自動推定
        ▼
 [C] 該当 checklist を開く                   docs/checklists/checklist-{role}.md
        │     全項目を「適用」or「不適用 (理由付き)」で判定
        ▼
 [D] 必須技法を確定                          docs/03-test-techniques.md § 11
-       │     例: form なら Decision Table 必須 + Pairwise
        ▼
-[E] testcase YAML 生成                      scripts/generate_test_plan.py
-       │     --role X --url Y --factors "..." で雛形 + Pairwise を自動展開
+[E] pytest テストを書く                     templates/test_<role>.py.template を起点に
+       │     `playwright codegen` で操作 → そのまま test 関数に貼る or 整形
        ▼
-[F] 必要なら codegen で操作録画              scripts/record_scenario.py <URL>
-       │     "経験で書く" を "録画 → コード生成" に置換
+[F] 実行                                   uv run pytest --ndf-config=./scenario.config.yaml
+       │     trace.zip / video / HAR / console / a11y / CWV を自動収集
        ▼
-[G] 実行                                   uv run scenario-test --config ./config.yaml
-       │     trace.zip / video / screenshot / HAR / console を自動収集
+[G] レポート確認                            reports/<run-id>/report.md
+       │     --ndf-drive-folder 指定で Drive にアップロード + viewer URL 化
        ▼
 [H] 不具合発見 → bug report                docs/05-bug-report.md
              FEW HICCUPPS の oracle 軸を必ず付与
-             trace / HAR / video は scripts/upload_evidence.py で Drive アップ + viewer URL 化
 ```
 
-各 step に対応するスクリプトが用意されており、AI が経験で実装する余地を構造的に排除している。
+## 単発 CLI ツール (補助)
 
-## クイックスタート (初回)
-
-```bash
-SKILL_DIR=.claude/skills/playwright-scenario-test  # or 絶対パス
-cd $SKILL_DIR
-
-# 依存解決 + Chromium インストール (1 回のみ)
-uv sync
-uv run playwright install chromium
-
-# 任意: a11y スキャンを使うなら
-uv sync --extra a11y
-
-# 任意: Drive 連携を使うなら
-uv sync --extra drive
-```
-
-## クイックスタート (テスト計画作成 → 実行)
-
-```bash
-SKILL=/work/ai-plugins/plugins/ndf/skills/playwright-scenario-test
-
-# 1. 対象 URL の page role を判定
-uv run --project $SKILL python $SKILL/scripts/classify_page_role.py \
-  --url https://staging.example.com/items
-# → primary_role: list (score: 2.5)
-
-# 2. checklist を開いて全項目チェック
-$EDITOR $SKILL/docs/checklists/checklist-list.md
-
-# 3. testcase YAML 雛形を生成
-mkdir -p my-e2e/testcases
-uv run --project $SKILL python $SKILL/scripts/generate_test_plan.py \
-  --role list --url https://staging.example.com/items \
-  --output my-e2e/testcases/TC-LST-items.yaml
-
-# 4. config.yaml を作成
-cp $SKILL/templates/config.example.yaml my-e2e/config.yaml
-$EDITOR my-e2e/config.yaml
-
-# 5. 実行
-cd my-e2e
-uv run --project $SKILL scenario-test --config ./config.yaml --workers 4
-
-# 6. a11y / CWV を補足計測
-uv run --project $SKILL python $SKILL/scripts/run_a11y_scan.py \
-  --url https://staging.example.com/items --output a11y.json
-uv run --project $SKILL python $SKILL/scripts/check_cwv.py \
-  --url https://staging.example.com/items --output cwv.json
-```
-
-## ケース絞り込み実行
-
-```bash
-# 特定の id / phase / role / type に絞る
-uv run --project $SKILL scenario-test --config ./config.yaml --filter "phase:50,51 role:user"
-uv run --project $SKILL scenario-test --config ./config.yaml --filter "id:TC-50-01"
-# page_role で絞る (docs/02-page-roles.md の役割名: lp / list / item / edit / form / search / dashboard / auth / cart / checkout / modal / wizard / error / settings)
-uv run --project $SKILL scenario-test --config ./config.yaml --filter "page_role:edit,form"
-uv run --project $SKILL scenario-test --config ./config.yaml --filter "page_role:cart,checkout phase:50"
-uv run --project $SKILL scenario-test --config ./config.yaml --list   # 一覧のみ
-```
-
-## Drive アップロード + Google Docs 化
-
-```bash
-# 1. レポートツリーを Drive にアップ (run-id ごとにフォルダ展開)
-uv run --project $SKILL python $SKILL/scripts/gdrive_upload_dir.py \
-  --local ./reports/ --parent <DRIVE_FOLDER_ID>
-
-# 2. Markdown → Google Docs (Drive リンク自動書き換え)
-uv run --project $SKILL python $SKILL/scripts/build_gdoc_with_drive_links.py \
-  --md ./reports/<run-id>/report.md --folder <DRIVE_FOLDER_ID> \
-  --run-id <run-id> --name "テスト報告書"
-
-# 3. trace.zip / HAR / video を bug report 用 URL 化 (--public で playwright.dev viewer URL 生成)
-uv run --project $SKILL python $SKILL/scripts/upload_evidence.py \
-  ./reports/<run-id>/TC-XX/<id>.trace.zip --kind trace --public
-# → https://trace.playwright.dev/?trace=https://drive.google.com/...
-uv run --project $SKILL python $SKILL/scripts/upload_evidence.py \
-  ./reports/<run-id>/TC-XX/<id>.har --kind har --public
-# → Drive WebView URL のみ (HAR は viewer なし)
-```
-
-## docs/ への入り口
-
-| やりたいこと | 参照ドキュメント |
+| Script | 用途 |
 |---|---|
-| テスト方法論の全体像 | [docs/01-methodology.md](docs/01-methodology.md) |
-| URL の役割を判定したい | [docs/02-page-roles.md](docs/02-page-roles.md) |
-| 役割ごとに何をテストするか | [docs/checklists/checklist-{role}.md](docs/checklists/) |
-| EP / BVA / Decision Table とは | [docs/03-test-techniques.md](docs/03-test-techniques.md) |
-| Playwright API の使い分け | [docs/04-playwright-mapping.md](docs/04-playwright-mapping.md) |
-| bug 起票テンプレート | [docs/05-bug-report.md](docs/05-bug-report.md) |
-| 全 role 共通の a11y / perf / sec | [docs/checklists/checklist-common.md](docs/checklists/checklist-common.md) |
+| `scripts/classify_page_role.py --url <URL>` | a11y tree + URL pattern + role 集計から page role 推定 |
+| `scripts/record_scenario.py <URL>` | Playwright codegen を起動し操作を Python コードで取得 |
+| `scripts/run_a11y_scan.py --url <URL>` | axe-core 単発スキャン |
+| `scripts/check_cwv.py --url <URL>` | CWV (LCP/CLS/TTFB) 単発計測 |
+| `scripts/upload_evidence.py <file> --kind trace --public` | Drive アップロード + Playwright Trace Viewer URL 生成 |
 
-## 設計方針
+## docs/ 配下 (理論ベース知識)
 
-### ユーザのプロジェクトは設定ファイルしか持たない
-
-Skill 自体が `pyproject.toml` を持つ独立した uv プロジェクトとして完結。
-ユーザのリポジトリには `config.yaml` + `testcases/*.yaml` だけ置く。
-これにより:
-- ユーザ側に Python コードが入らない → AI による drift / 改変リスクなし
-- Skill のバージョンアップが全プロジェクトに即時反映
-- プロジェクトを git に入れるとき含まれるのは config と testcase YAML だけ
-
-### 経験則の追放
-
-| 種類 | 配置 |
+| ファイル | 内容 |
 |---|---|
-| 業界標準 (ISO / WCAG / OWASP / ISTQB) | `docs/` |
-| ヒューリスティクス (HTSM / FEW HICCUPPS / Hendrickson) | `docs/` |
-| 個別プロジェクト慣習 (PHP / Rails 等) | testcase YAML の `kind: expect_no_text` step |
-| 動画/HUD の細かい数値 (字幕高さ・カーソル色) | `scenario_test/hud.py` のコード内定数 |
+| `docs/01-methodology.md` | 総論: HTSM / FEW HICCUPPS / ISO 29119-3 の位置付け |
+| `docs/02-page-roles.md` | page role 分類 (lp/list/item/edit/form/search/...) |
+| `docs/03-test-techniques.md` | テスト技法 (EP / BVA / Decision Table / Pairwise) と role 必須マッピング |
+| `docs/04-playwright-mapping.md` | Playwright API → role / 観点 マッピング |
+| `docs/05-bug-report.md` | bug report 仕様 (ISO 29119-3 + FEW HICCUPPS) |
+| `docs/checklists/checklist-<role>.md` | role 別チェックリスト (lp/list/item/edit/form/search/dashboard/auth/cart-checkout/modal-wizard/common) |
 
-「経験」を docs に書くのではなく、**理論を docs に書き、慣習は config に逃がす** のが規律。
+## テスト雛形 (templates/)
 
-## scenario_test ランナーの基本動作
+利用者は role に応じて `test_<role>.py.template` をコピーして編集する。各テンプレートには:
 
-各テストケースを `ProcessPoolExecutor` の独立プロセスで実行。それぞれが独自の Playwright インスタンスと動画ファイルを生成する (`--workers 4` 推奨)。
+- 該当 `page_role` marker
+- 該当 `ndf_role_<id>` fixture
+- `expect()` ベースの web-first assertion
+- 正常系 + 1 件以上の異常系
 
-各ステップ間に `step_delay_ms: 1800` (1.8 秒) の待機を入れ、動画でじっくり字幕を読める時間を確保する。CI で速度優先なら `0` に。
+が含まれる。
 
-詳細な動画 Know-How (HUD オーバーレイ / mp4 変換 / Drive 推奨スペック) は [docs/04-playwright-mapping.md](docs/04-playwright-mapping.md) と既存の `scenario_test/video.py` のコメントを参照。
+## 制約 / 注意
 
-## YAML テストケースの設計原則
+- **互換性**: v0.2.5 以前の YAML DSL は廃止 (PLAN17)。利用者は pytest テストへの書き直しが必要
+- **依存**: `pytest>=8.0`, `pytest-playwright>=0.5`, `pytest-xdist>=3.0`, `playwright>=1.50`
+- **トレース / HAR / 動画は機微情報を含む**: `upload_evidence.py --public` を付けない限り Drive にも非公開でアップ
+- **CI**: GitHub Actions では `uv run pytest -n auto` でそのまま回せる
 
-**1 シナリオで複数の機能を網羅する** — ログイン単独 / ログアウト単独 のような最小ケースは作らない。1 ロール = 1 シナリオで「ログイン → 主要画面 → 重要機能 → ログアウト」を一連で踏む。
+## 関連ドキュメント
 
-**理由**: 1 シナリオ = 1 動画 = 1 ストーリー。レビュアやステークホルダーは動画 1 本で全体感を把握できる。並列ワーカ間でログイン処理が独立するので、合計時間も最適。
-
-```yaml
-# testcases/admin-scenario.yaml の例 (v0.3.0 locator-first スキーマ)
-id: TC-10
-title: 管理者 - 全機能シナリオ
-phase: 10
-type: playwright
-role: admin
-page_role: dashboard
-post_login:
-  url_must_not_contain: ["TwoFactorAuth"]
-steps:
-  - kind: goto
-    name: ダッシュボード表示
-    path: /admin/dashboard
-    expect_status: 200
-  - kind: expect_visible
-    name: KPI カードが表示されている
-    locator: { role: heading, name: 売上サマリ }
-  - kind: click
-    name: ユーザ管理メニュー
-    locator: { role: link, name: ユーザ管理 }
-  - kind: expect_url
-    name: /admin/users へ遷移
-    contains: /admin/users
-  - kind: expect_no_text
-    name: フレームワーク fatal が出ていない
-    locator: { css: body }
-    text: "Fatal error"
-```
-
-`page_role` は KNOWN_PAGE_ROLES (lp/list/item/edit/form/search/dashboard/auth/cart/checkout/modal/wizard/error/settings) のいずれか。
-未知 role は load 時に warning が出る (typo 検出)。
-a11y / CWV は page_role に応じて runner が自動実行する (config.a11y / config.cwv の `auto_roles` で制御)。
-
-## 関連スキル (前提)
-
-- `google-auth` — Drive API 用 OAuth2 認証 (本スキルの Drive 系スクリプトが依存)
-- `google-drive` — Drive ファイル取得・アップロードの基礎
-
-## トラブルシューティング
-
-| 症状 | 原因 | 対処 |
-|---|---|---|
-| 動画に字幕が映らない | `add_init_script` 注入前に screenshot を撮っている | `wait_until="domcontentloaded"` で待機、screenshot は step_delay 後 |
-| 字幕がページ遷移で消える | `window.__pendingCaption` のみで保存 | `sessionStorage` にも保存し init script で復元 (実装済) |
-| Drive で「再生処理中」が長引く | viewport 1280×800 等の非標準アスペクト | 1280×720 (16:9) に変更 (config.example.yaml 既定) |
-| Drive 階層が二重になる | `--local` と `--parent` の組み合わせ誤り | `--local reports/ --parent <topfolder>` パターン厳守 |
-| 動画ファイル名が衝突する | `video.webm` 固定名 | `{TC-id}.mp4` でユニーク化 (実装済) |
-| クリック位置が画面上部だけ | 固定座標で flash | `<a href>` / `<form>` を JS で探して実座標を取得 |
-| HTTP 200 なのに本文が壊れている | エラー出力がページ内に漏れている | testcase YAML 末尾に `kind: expect_no_text` step (`text: "Fatal error"` 等) を追加 |
-| `playwright codegen` が起動しない | Chromium 未インストール | `uv run playwright install chromium` |
-
-## 参考文献の最上位
-
-- James Bach, "Heuristic Test Strategy Model" v6.3 (HTSM)
-- ISTQB CTFL Syllabus 4.2 (Black-box Test Techniques)
-- ISO/IEC/IEEE 29119-3:2021 (Test documentation)
-- W3C "WCAG 2.2"
-- OWASP Top 10:2025 + ASVS + WSTG
-- Playwright Python Docs (v1.50+)
-
-詳細・他文献は各 docs ファイルの「参考文献」節を参照。
+- `docs/README.md` — 知識マップ
+- `templates/scenario.config.yaml` — 設定例
+- `plugins/ndf/CLAUDE.md` v4.2.0 セクション — 本リリースの詳細

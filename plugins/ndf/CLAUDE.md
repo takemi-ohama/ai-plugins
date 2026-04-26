@@ -7,7 +7,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 4.1.0
+- **現在バージョン**: 4.2.0
 - **種類**: 統合プラグイン（Skills + Agents + Hooks / v4.0.0 で Codex MCP 廃止）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -124,6 +124,56 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v4.2.0 (playwright-scenario-test v0.3.0 — pure pytest-playwright 完全移行)
+
+> **注意**: 互換性破壊リリース。v0.2.5 までの自前 YAML DSL は **完全廃止** し、
+> 利用者は通常の pytest-playwright テストを書く形に移行する。詳細は
+> [PLAN17](../../../issues/PLAN17.md) を参照。
+
+- **`playwright-scenario-test` v0.3.0** (pure pytest-playwright):
+  - **アーキテクチャ全面刷新**: 自前 DSL (testcase YAML / runner / dispatcher /
+    locator_steps / cli) をすべて削除。代わりに pytest plugin として実装し、
+    利用者は `def test_xxx(page, ndf_role_admin): ...` を直接書く
+  - **新モジュール**:
+    - `scenario_test/pytest_plugin.py` — pytest11 entry-point。
+      `pytest_addoption` (`--ndf-config` / `--ndf-out-dir` / `--ndf-no-evidence`
+      / `--ndf-hud` / `--ndf-drive-folder`)、markers (`page_role` / `role` /
+      `phase` / `priority`)、`pytest_runtest_makereport` /
+      `pytest_terminal_summary` / `pytest_sessionfinish` hook
+    - `scenario_test/pytest_report.py` — `report.md` 生成 (`NdfTestEntry` +
+      `render_markdown` + `write_report`)
+    - `scenario_test/fixtures/auth.py` — `ndf_config` (session) /
+      `ndf_role_<id>` (動的生成、storage_state cache 付)
+    - `scenario_test/fixtures/evidence.py` — `ndf_evidence` /
+      `browser_context_args` override (HAR inject) / `ndf_out_dir`
+    - `scenario_test/fixtures/a11y.py` — `_ndf_a11y_autouse` (page_role marker
+      が付いた test に限り axe-core 自動実行) + `ndf_a11y_scan` 明示ヘルパ
+    - `scenario_test/fixtures/cwv.py` — `_ndf_cwv_autouse` (page_role marker
+      autouse で LCP/CLS/TTFB/longest_task 計測)
+  - **削除**:
+    - `scenario_test/testcase.py` の `Step` / `LocatorSpec` /
+      `KNOWN_STEP_KINDS` / `discover_testcases` 等
+    - `scenario_test/locator_steps.py` / `runner.py` / `cli.py` /
+      `playwright_executor.py` / `report.py` (旧)
+    - `scripts/record_to_yaml.py` / `generate_test_plan.py` (DSL 雛形版)
+    - `templates/testcase-*.yaml.template` 6 ファイル + `config.example.yaml`
+  - **新規 templates** (pytest 雛形):
+    - `templates/scenario.config.yaml` — base_url / roles / a11y / CWV 設定
+    - `templates/conftest.py.template`
+    - `templates/test_auth.py.template` / `test_list.py.template` /
+      `test_form.py.template` / `test_dashboard.py.template`
+  - **依存追加** (main): `pytest>=8.0`, `pytest-playwright>=0.5`,
+    `pytest-xdist>=3.0`
+  - **設計上の重要ポイント**:
+    - autouse fixture が `page` を直接要求すると pytest-playwright が全 test を
+      browser parametrize する問題を、`request.fixturenames` ガード +
+      `getfixturevalue` 遅延取得で回避
+    - `ndf_role_<id>` の login は session 内 1 回だけ実行し storage_state を
+      cache。新 context には cookies/origins を inject して再ログイン回避
+  - **検証**: 旧 126 + 新規 26 = **152 件 pure 関数テスト pass**
+  - SKILL.md は pytest 中心の構成に全面書き直し
+- Skills: 36個 (変化なし、playwright-scenario-test の中身が刷新)
 
 ### v4.1.1 (playwright-scenario-test v0.2.5 — locator-first DSL 中間版)
 
