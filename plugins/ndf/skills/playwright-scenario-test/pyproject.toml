@@ -34,9 +34,6 @@ dev = [
     "pytest>=8.0",
 ]
 
-[project.scripts]
-scenario-test = "scenario_test.cli:main"
-
 [project.entry-points."pytest11"]
 # pytest が auto-discover する plugin entry-point。
 # ``uv pip install -e .`` 後は ``pytest`` 起動だけで NDF plugin が有効になる。

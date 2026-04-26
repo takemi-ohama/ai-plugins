@@ -269,7 +269,9 @@ AI / 人間が「思いつき」でテストを書かないように、**page ro
 (*, IDOR/CSRF/XSS リスク) → Risk Testing
 ```
 
-このマッピングを `scripts/generate_test_plan.py` が機械的に適用する。
+このマッピングは利用者が pytest テストを書く際の指針として使う。
+``@pytest.mark.parametrize`` で各境界値 / 各 row を test 関数として展開し、
+4 軸以上は事前に Pairwise で削減してから ``parametrize`` する運用を推奨する。
 
 ## 参考文献
 

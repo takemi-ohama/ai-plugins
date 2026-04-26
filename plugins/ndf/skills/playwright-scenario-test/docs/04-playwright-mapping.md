@@ -172,7 +172,7 @@ def test_a11y(page):
     assert results.violations_count == 0, results.generate_report()
 ```
 
-公式 Locator の `to_match_aria_snapshot('''- heading "todos" - textbox ...''')` で a11y 構造のリグレッション検出も可能。testcase YAML では `kind: expect_aria_snapshot` step を使う (`text:` フィールドに snapshot YAML を渡す)。
+公式 Locator の `to_match_aria_snapshot('''- heading "todos" - textbox ...''')` で a11y 構造のリグレッション検出も可能。pytest テストでは ``expect(page.locator('main')).to_match_aria_snapshot(...)`` のように直接使う。
 
 ### Core Web Vitals
 
@@ -213,7 +213,7 @@ context.set_geolocation({"latitude": 35.68, "longitude": 139.69})
 
 ### 必須リスナー (本 Skill 標準)
 
-すべての testcase で次のリスナーを runner が自動付与する:
+``ndf_evidence`` fixture が次のリスナーを自動付与する (autouse 相当):
 
 ```python
 console_msgs = []

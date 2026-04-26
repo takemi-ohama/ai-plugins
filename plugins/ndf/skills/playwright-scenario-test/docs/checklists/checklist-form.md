@@ -8,8 +8,9 @@
 
 > ⚠️ **重要**: form の入力分岐はコードを読んで Decision Table を作る対象。
 > 経験で書かない。フォーム実装コード (HTML / JS / サーバ側 validator) を読んで分岐表を
-> 自前で作り、その後 `scripts/generate_test_plan.py --role form --factors "..."` で
-> Pairwise を自動生成する流れを推奨。
+> 自前で作り、その後 ``@pytest.mark.parametrize`` で各 row を test 関数として展開する。
+> 4 軸以上は Python 標準の ``itertools`` + 簡易 Pairwise で削減した上で
+> ``parametrize`` する運用を推奨。
 
 ## 必須テスト観点
 
@@ -85,7 +86,7 @@ factor2: { 配送: [標準, 速達, 店舗] }
 factor3: { 支払い: [カード, 銀振, PayPal] }
 factor4: { 顧客: [個人, 法人] }
 ```
-全 54 通り → All-Pairs で ~12 通り。`scripts/generate_test_plan.py` が自動生成.
+全 54 通り → All-Pairs で ~12 通り。``@pytest.mark.parametrize`` で 12 行展開して書く.
 
 ### FM12: ファイル添付 `[Domain / Statutes]`
 - 単一ファイル / 複数ファイル / 添付ゼロ

@@ -1,7 +1,7 @@
 """tests/ から scripts/ と scenario_test/ の両方を import 可能にする path 設定。
 
-scenario_test は scripts/ にディレクトリされていないので import 可能だが、
-scripts/generate_test_plan.py は package ではないため sys.path 追加が必要。
+scenario_test はパッケージなので import 可能。scripts/ 配下の単発スクリプト
+(upload_evidence.py 等) はパッケージ化されていないため sys.path 追加が必要。
 
 v0.3.0+: pytest plugin の自己テスト用に ``pytester`` を有効化する。
 """

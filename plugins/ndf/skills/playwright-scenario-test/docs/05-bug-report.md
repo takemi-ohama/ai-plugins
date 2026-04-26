@@ -23,7 +23,7 @@
 | `oracle` | enum | ✅ | FEW HICCUPPS のどの軸 (本 Skill 拡張) |
 | `page_role` | enum | ✅ | `lp` / `list` / `item` / ... (本 Skill 拡張) |
 | `evidence` | object | ✅ | screenshot / video / trace.zip / HAR / console / network |
-| `repro_command` | string | 推奨 | `scenario-test --filter id:TC-50-01 --headed` |
+| `repro_command` | string | 推奨 | `uv run pytest tests/test_form.py::test_create_user --headed` |
 | `workaround` | string | 任意 | あれば |
 | `related` | string[] | 任意 | 関連バグ / PR / 仕様リンク |
 | `status` | enum | ✅ | `New` / `Triaged` / `In progress` / `Fixed` / `Verified` / `Closed` / `Won't fix` |
@@ -109,7 +109,7 @@ trace/HAR を `upload_evidence.py` でアップロードしたあと、生成さ
 # BUG-2026-04-25-001 — 詳細ページの編集ボタンが他者所有データで非表示にならない
 
 - **detected_at**: 2026-04-25T14:32:01+09:00
-- **originator**: scenario-test (TC-30-edit-permission)
+- **originator**: pytest tests/test_item_permission.py::test_other_owners_edit_blocked
 - **page_role**: item
 - **oracle**: Statutes (OWASP WSTG IDOR / OWASP ASVS V8.2.5)
 - **severity**: S1 / **priority**: P1
@@ -156,8 +156,8 @@ trace/HAR を `upload_evidence.py` でアップロードしたあと、生成さ
 
 ## 再現コマンド
 ```bash
-uv run --project /path/to/skill scenario-test \
-  --config ./config.yaml --filter id:TC-30-edit-permission --headed
+uv run pytest tests/test_item_permission.py::test_other_owners_edit_blocked \
+  --ndf-config=./scenario.config.yaml --headed
 ```
 
 ## 関連
