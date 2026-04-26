@@ -24,10 +24,32 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 import pytest
 
 from scenario_test.config import Config, Login, Role
+
+
+def _same_origin(origin_url: str, base_url: str) -> bool:
+    """``origin_url`` が ``base_url`` と同一 origin (scheme + host + port) かを返す。
+
+    storage_state には認証対象以外のサードパーティ origin (広告 / 計測タグ等) が
+    含まれることがある。restore 時にそれらへ ``page.goto(url)`` するのは意図しない
+    外部送信になるため、本関数で base_url の origin に厳格一致するもののみ許可する。
+    """
+    try:
+        a = urlsplit(origin_url)
+        b = urlsplit(base_url)
+    except ValueError:
+        return False
+    return (
+        bool(a.scheme)
+        and bool(a.hostname)
+        and a.scheme == b.scheme
+        and a.hostname == b.hostname
+        and (a.port or None) == (b.port or None)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -243,10 +265,14 @@ def _make_role_fixture(role_id: str) -> Callable:
         cookies = state.get("cookies") or []
         if cookies:
             context.add_cookies(cookies)
+        # storage_state に含まれる広告/計測タグ等の third-party origin に対して
+        # 不用意に goto するのを避けるため、base_url と同一 origin のみ復元する。
         for origin in state.get("origins") or []:
             url = origin.get("origin")
             items = origin.get("localStorage") or []
             if not url or not items:
+                continue
+            if not _same_origin(url, ndf_config.base_url):
                 continue
             try:
                 page = context.new_page()
