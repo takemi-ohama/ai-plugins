@@ -125,8 +125,15 @@ plugins/ndf/
 
 ## 開発履歴
 
-### v4.2.0 (BREAKING: playwright-scenario-test v0.3.0 OSS 品質化)
-- **`playwright-scenario-test` v0.3.0** (locator-first / web-first 全面刷新):
+### v4.1.1 (playwright-scenario-test v0.2.5 — locator-first DSL 中間版)
+
+> **Note**: 当初は v0.3.0 として実装したが、Codex の独立レビューで「pure
+> pytest-playwright 移行の方が OSS 品質として優れている」と判断 (locator DSL は
+> 自前で再実装が必要、artifact 契約も pytest plugin の方が自然) し、v0.3.0 の
+> 番号は **pure pytest 完全移行** に予約しなおした (PLAN17 参照)。本リリースは
+> evidence/a11y/CWV/slug 衝突回避などの本質的改善のみを v0.2.5 として暫定提供。
+
+- **`playwright-scenario-test` v0.2.5** (locator-first / web-first 中間版):
   - **testcase YAML スキーマを刷新**: 旧 `path/method/data/extract` 構造を廃止。明示的 `kind` (`goto/click/fill/select/check/press/hover/extract/wait_for/wait_ms/expect_visible/expect_hidden/expect_text/expect_no_text/expect_url/expect_count/expect_aria_snapshot`) に統一
   - **Locator 表現**: `{role: button, name: 保存}` / `{label: メールアドレス}` / `{testid: ...}` / `{css: ...}` 等の dict で記述。Playwright 公式の `get_by_*` 系 API に 1 対 1 対応
   - **assertion は `expect()` のみ**: 自前 `body_check` と HTML 文字列 match を全廃。`expect_no_text` step で代替

@@ -56,8 +56,17 @@ _EXT_KIND: dict[str, str] = {
 _MIME_BY_KIND: dict[str, str] = {
     "trace": "application/zip",
     "har": "application/json",
-    "video": "video/mp4",  # webm でも mp4 mime で十分
+    "video": "video/mp4",  # detect_mime() で .webm を別 MIME に振り分ける
     "any": "application/octet-stream",
+}
+
+# codex Min-3: kind=video でも実体が .webm の場合は MIME を実体に合わせる
+# (Drive 側の preview/処理系の誤判定を避ける)
+_MIME_BY_EXT: dict[str, str] = {
+    ".webm": "video/webm",
+    ".mp4": "video/mp4",
+    ".har": "application/json",
+    ".zip": "application/zip",
 }
 
 ALLOWED_KINDS: frozenset[str] = frozenset(_MIME_BY_KIND)
@@ -66,6 +75,14 @@ ALLOWED_KINDS: frozenset[str] = frozenset(_MIME_BY_KIND)
 def detect_kind(path: Path) -> str:
     """拡張子から evidence kind を自動判定する。"""
     return _EXT_KIND.get(path.suffix.lower(), "any")
+
+
+def detect_mime(path: Path, kind: str) -> str:
+    """拡張子優先で MIME を決定し、未知拡張子は kind の既定値にフォールバック。"""
+    return _MIME_BY_EXT.get(
+        path.suffix.lower(),
+        _MIME_BY_KIND.get(kind, "application/octet-stream"),
+    )
 
 
 def upload(
@@ -105,7 +122,7 @@ def upload(
     if parent_folder_id:
         metadata["parents"] = [parent_folder_id]
     media = MediaFileUpload(
-        str(file_path), mimetype=_MIME_BY_KIND.get(kind, "application/octet-stream"),
+        str(file_path), mimetype=detect_mime(file_path, kind),
     )
     f = service.files().create(
         body=metadata, media_body=media, fields="id,webViewLink",

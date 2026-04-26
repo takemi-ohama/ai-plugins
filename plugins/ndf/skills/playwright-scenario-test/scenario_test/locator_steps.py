@@ -97,7 +97,13 @@ def _is_absolute_http_url(s: str) -> bool:
 
 def _handle_goto(step: Step, ctx: StepContext) -> str:
     path = expand_vars(step.path, ctx.nav_vars) or "/"
-    url = path if _is_absolute_http_url(path) else f"{ctx.base_url}{path}"
+    if _is_absolute_http_url(path):
+        url = path
+    else:
+        # codex Min-4: 先頭 `/` を忘れた相対 path を `{base_url}{path}` で直結すると
+        # `https://example.comitems` のような壊れた URL になる。明示 normalize する。
+        normalized = path if path.startswith("/") else f"/{path}"
+        url = f"{ctx.base_url}{normalized}"
     response = ctx.page.goto(url, timeout=step.timeout_ms or ctx.default_timeout_ms)
     code = response.status if response else 0
     if step.expect_status is not None and code != step.expect_status:

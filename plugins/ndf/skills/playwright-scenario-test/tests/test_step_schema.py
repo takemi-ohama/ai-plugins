@@ -32,10 +32,10 @@ class TestLocatorSpec:
         spec = LocatorSpec.from_raw({"css": ".alert-danger"})
         assert spec.kind == "css"
 
-    def test_priority_role_over_css(self):
-        # role が指定されていれば css は無視される
-        spec = LocatorSpec.from_raw({"role": "button", "css": ".btn"})
-        assert spec.kind == "role"
+    def test_multiple_kinds_rejected(self):
+        # codex Min-1: 複数 selector kind を黙って優先順で握りつぶさず ValueError
+        with pytest.raises(ValueError, match="locator は 1 種類のみ"):
+            LocatorSpec.from_raw({"role": "button", "css": ".btn"})
 
     def test_no_locator_raises(self):
         with pytest.raises(ValueError, match="有効な指定子"):

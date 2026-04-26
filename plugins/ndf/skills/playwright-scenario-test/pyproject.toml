@@ -1,7 +1,7 @@
 [project]
 name = "playwright-scenario-test"
-version = "0.3.0"
-description = "Playwright + curl による Web シナリオ E2E テストの汎用フレームワーク (Claude Code skill)。Locator-first / web-first assertion / page_role 別 a11y + CWV 自動付加 / HUD 字幕付き動画。"
+version = "0.2.5"
+description = "Playwright + curl による Web シナリオ E2E テストの汎用フレームワーク (Claude Code skill)。v0.2.5: locator-first 中間版 + a11y/CWV 統合 + 衝突回避 slug。v0.3.0 で pure pytest-playwright 移行予定。"
 requires-python = ">=3.11"
 dependencies = [
     "playwright>=1.50,<2.0",

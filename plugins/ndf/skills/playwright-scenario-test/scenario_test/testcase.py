@@ -57,18 +57,21 @@ class LocatorSpec:
     def from_raw(cls, raw: Any) -> "LocatorSpec":
         if not isinstance(raw, dict):
             raise ValueError(f"locator は dict で指定してください: {raw!r}")
-        chosen: tuple[str, str] | None = None
-        for k in _LOCATOR_KIND_PRIORITY:
-            if k in raw:
-                chosen = (k, str(raw[k]))
-                break
-        if chosen is None:
+        # codex Min-1: 複数 selector kind を黙って優先順で握りつぶさず、
+        # 「locator は 1 種類だけ」と明示エラーにする (typo 早期検出)。
+        present = [k for k in _LOCATOR_KIND_PRIORITY if k in raw]
+        if not present:
             raise ValueError(
                 f"locator に有効な指定子がありません ({_LOCATOR_KIND_PRIORITY} のいずれか): {raw!r}"
             )
+        if len(present) > 1:
+            raise ValueError(
+                f"locator は 1 種類のみ指定してください (複数検出: {present}): {raw!r}"
+            )
+        kind = present[0]
         return cls(
-            kind=chosen[0],
-            selector=chosen[1],
+            kind=kind,
+            selector=str(raw[kind]),
             name=str(raw["name"]) if raw.get("name") is not None else None,
             exact=bool(raw.get("exact", False)),
             nth=int(raw["nth"]) if raw.get("nth") is not None else None,

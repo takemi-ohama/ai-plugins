@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from upload_evidence import ALLOWED_KINDS, detect_kind, upload
+from upload_evidence import ALLOWED_KINDS, detect_kind, detect_mime, upload
 
 
 class TestDetectKind:
@@ -38,3 +38,20 @@ class TestUploadKindValidation:
 
     def test_allowed_kinds_set(self):
         assert ALLOWED_KINDS == frozenset({"trace", "har", "video", "any"})
+
+
+class TestDetectMime:
+    """codex Min-3: kind=video でも .webm は video/webm を返す。"""
+
+    def test_webm_returns_video_webm(self):
+        assert detect_mime(Path("recording.webm"), "video") == "video/webm"
+
+    def test_mp4_returns_video_mp4(self):
+        assert detect_mime(Path("recording.mp4"), "video") == "video/mp4"
+
+    def test_har_returns_application_json(self):
+        assert detect_mime(Path("session.har"), "har") == "application/json"
+
+    def test_unknown_extension_falls_back_to_kind_default(self):
+        assert detect_mime(Path("evidence.bin"), "any") == "application/octet-stream"
+        assert detect_mime(Path("evidence.bin"), "trace") == "application/zip"
