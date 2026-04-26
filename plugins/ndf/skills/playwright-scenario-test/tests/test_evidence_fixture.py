@@ -25,7 +25,7 @@ from scenario_test.config import (
 )
 from scenario_test.fixtures.a11y import _page_roles_from_marker as a11y_marker
 from scenario_test.fixtures.cwv import _page_roles_from_marker as cwv_marker
-from scenario_test.fixtures.evidence import NdfEvidence, _safe_slug
+from scenario_test.fixtures.evidence import NdfEvidence, _safe_slug, _safe_case_slug
 
 
 def _make_config(
@@ -62,6 +62,45 @@ def _make_config(
 )
 def test_safe_slug(name: str, expected_pattern: str):
     assert re.match(expected_pattern, _safe_slug(name, fallback="test"))
+
+
+# --- _safe_case_slug ------------------------------------------------
+
+
+def _node(nodeid: str):
+    return SimpleNamespace(nodeid=nodeid, name=nodeid.split("::")[-1])
+
+
+def test_safe_case_slug_is_idempotent(monkeypatch):
+    """同じ nodeid + 同じ worker は常に同じ slug (idempotent)。"""
+    monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
+    node = _node("tests/test_x.py::test_func")
+    assert _safe_case_slug(node) == _safe_case_slug(node)
+
+
+def test_safe_case_slug_different_nodeid_gives_different_slug(monkeypatch):
+    monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
+    slug_a = _safe_case_slug(_node("tests/test_x.py::test_a"))
+    slug_b = _safe_case_slug(_node("tests/test_x.py::test_b"))
+    assert slug_a != slug_b
+
+
+def test_safe_case_slug_xdist_worker_changes_slug(monkeypatch):
+    """PYTEST_XDIST_WORKER が変われば slug も変わる。"""
+    node = _node("tests/test_x.py::test_func")
+    monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw0")
+    slug_gw0 = _safe_case_slug(node)
+    monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw1")
+    slug_gw1 = _safe_case_slug(node)
+    assert slug_gw0 != slug_gw1
+
+
+def test_safe_case_slug_length_bounded(monkeypatch):
+    """slug が適切な長さに収まる (70 文字以内)。"""
+    monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
+    long_nodeid = "tests/" + "a" * 100 + ".py::test_very_long_name"
+    slug = _safe_case_slug(_node(long_nodeid))
+    assert len(slug) <= 70
 
 
 # --- NdfEvidence listeners ------------------------------------------

@@ -15,6 +15,8 @@ test 関数 ID から sub-dir を作って 1 test = 1 dir で隔離する。
 from __future__ import annotations
 
 import datetime as _dt
+import hashlib
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,8 +58,24 @@ _FILENAME_SAFE_RE = re.compile(r"[^\w\-]+")
 
 
 def _safe_slug(name: str, fallback: str = "test") -> str:
+    """文字列から安全なファイル名スラグを生成する (後方互換維持)。"""
     s = _FILENAME_SAFE_RE.sub("-", name).strip("-").lower()
     return s[:80] or fallback
+
+
+def _safe_case_slug(node: Any) -> str:
+    """nodeid + xdist worker + sha1[:6] suffix で衝突しない slug を生成する (Codex Major 2)。
+
+    - parametrize / 同名関数 / xdist 並列で trace.zip / request.har の上書きを防止。
+    - 既存の _safe_slug(name, fallback) 仕様は変えず、evidence fixture 内のみ本関数を使う。
+    """
+    nodeid = getattr(node, "nodeid", getattr(node, "name", "test"))
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "")
+    raw = f"{nodeid}@{worker}" if worker else nodeid
+    slug = _FILENAME_SAFE_RE.sub("-", raw).strip("-").lower()
+    digest = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:6]
+    # 60 文字 + "-" + sha1[:6] = 最大 67 文字程度に圧縮
+    return f"{slug[:60]}-{digest}".strip("-") or "test"
 
 
 @dataclass
@@ -189,29 +207,25 @@ def _ndf_config_optional(pytestconfig) -> Config | None:
     return None
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def browser_context_args(
-    browser_context_args, pytestconfig, ndf_out_dir
+    browser_context_args, request, pytestconfig, ndf_out_dir
 ) -> dict[str, Any]:
-    """pytest-playwright の ``browser_context_args`` を override し、
-    HAR 記録 path を session 共通で 1 ファイルに集約する。
+    """pytest-playwright の ``browser_context_args`` を function scope で override し、
+    1 test = 1 HAR を実現する (Codex Major 1)。
 
-    1 test = 1 HAR にしたい場合は ``ndf_evidence`` fixture 内で
-    ``context`` の ``new_context`` を別途張り替える方針 (今は session 内 1 HAR で
-    十分なケースが多い)。
-
-    ``--ndf-hud`` 指定時は ``ignore_https_errors`` 等の defaults と並んで
-    HUD overlay を ``add_init_script`` で全 page に inject する。
-    init_script の attach は ``new_context`` fixture (``ndf_new_context``) 経由
-    で行う (browser_context_args は dict のみ受け取り、add_init_script は dict
-    で渡せないため)。
+    - scope を function に変更し、``request.node`` ごとに ``case_dir/request.har``
+      を ``record_har_path`` に inject する。
+    - session 共通 HAR (``session.har``) は廃止。これにより
+      ``NdfEvidence.confirm_har()`` が常に None を返す不整合を解消。
+    - ``--ndf-no-evidence`` が True なら HAR 収集を OFF。
     """
     no_evidence = bool(pytestconfig.getoption("ndf_no_evidence", default=False))
     args = dict(browser_context_args or {})
     if not no_evidence:
-        args.setdefault(
-            "record_har_path", str(ndf_out_dir / "session.har")
-        )
+        case_dir = ndf_out_dir / _safe_case_slug(request.node)
+        case_dir.mkdir(parents=True, exist_ok=True)
+        args.setdefault("record_har_path", str(case_dir / "request.har"))
         args.setdefault("record_har_content", "omit")
     return args
 
@@ -236,7 +250,8 @@ def ndf_evidence(
     """
     enabled = not bool(pytestconfig.getoption("ndf_no_evidence", default=False))
     hud_enabled = bool(pytestconfig.getoption("ndf_hud", default=False))
-    case_dir = ndf_out_dir / _safe_slug(request.node.name, "test")
+    # _safe_case_slug で nodeid + xdist worker + sha1[:6] の衝突しない slug を使用 (Codex Major 2)
+    case_dir = ndf_out_dir / _safe_case_slug(request.node)
     case_dir.mkdir(parents=True, exist_ok=True)
 
     ev = NdfEvidence(

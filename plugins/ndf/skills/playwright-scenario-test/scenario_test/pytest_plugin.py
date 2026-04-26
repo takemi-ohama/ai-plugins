@@ -203,7 +203,13 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
                     trace_path=props.get("ndf_trace"),
                     console_errors=int(props.get("ndf_console_errors") or 0),
                     page_errors=int(props.get("ndf_page_errors") or 0),
-                    error_message=str(rep.longrepr) if rep.longrepr else None,
+                    # Amazon Q Critical-3: skipped 時の longrepr は tuple 形式のため
+                    # failed / error のときのみ str() 化する。他 outcome は None のまま。
+                    error_message=(
+                        str(rep.longrepr)
+                        if outcome_key in ("failed", "error") and rep.longrepr
+                        else None
+                    ),
                 )
             )
     return entries
