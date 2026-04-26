@@ -134,15 +134,30 @@ def pytest_runtest_makereport(item, call):
     FAIL 時には evidence の trace/HAR path を log に追記し、
     成果物 path / marker を rep.user_properties に保存して
     ``pytest_terminal_summary`` で report.md に集約する。
+
+    HAR lifecycle 修正 (Codex Major-1 完遂):
+    Playwright は HAR を ``context.close()`` 時に flush する。
+    ``ndf_evidence`` の finalizer は ``context`` の finalizer より先に動くため、
+    ``yield`` 直後の ``confirm_har()`` では HAR がまだ書き出されていない場合がある。
+    teardown phase の makereport は pytest-playwright の ``context`` finalizer が
+    teardown 中に完了した後に走るため、ここで再度 ``confirm_har()`` を呼んで
+    HAR の存在を確認し直す。
     """
     outcome = yield
     rep = outcome.get_result()
+
+    ev = getattr(item, "_ndf_evidence", None)
+
+    # teardown phase: context.close() 後に HAR が flush されるため confirm_har() 再呼び出し。
+    # call phase で既に har_relpath が確定していれば no-op。
+    if rep.when == "teardown" and ev is not None:
+        ev.confirm_har()
+        return
 
     if rep.when != "call":
         return
 
     # ndf_evidence fixture が attach した状態を直接参照
-    ev = getattr(item, "_ndf_evidence", None)
     if ev is not None:
         if ev.har_relpath:
             rep.user_properties.append(("ndf_har", str(ev.case_dir / ev.har_relpath)))
