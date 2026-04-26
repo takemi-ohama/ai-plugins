@@ -193,6 +193,7 @@ uv run pytest --html=reports/index.html --self-contained-html
 ## 制約 / 注意
 
 - **依存**: `pytest>=8.0`, `pytest-playwright>=0.5`, `pytest-xdist>=3.0`, `playwright>=1.50`
+- **認証情報は YAML に直書きしない**: `scenario.config.yaml` の `fields.Password` 等は `${ENV_VAR}` で参照し、実値は環境変数 (`.env` / `direnv` / shell export) で管理してください。リポジトリに認証情報をコミットしないこと (Codex Major 4)
 - **トレース / HAR / 動画は機微情報を含む**: `upload_evidence.py --public` を付けない限り Drive にも非公開でアップ
 - **CI**: GitHub Actions では `uv run pytest -n auto` でそのまま回せる
 

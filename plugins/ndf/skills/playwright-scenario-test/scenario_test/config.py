@@ -6,11 +6,47 @@
 
 from __future__ import annotations
 
+import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+
+# ---------------------------------------------------------------------------
+# 環境変数展開 (Codex Major 4)
+# ---------------------------------------------------------------------------
+
+_ENV_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
+
+
+def _expand_env_in_str(s: str) -> str:
+    """文字列中の ${VAR} / ${VAR:-default} を環境変数で展開する。"""
+    def repl(m: re.Match) -> str:
+        name, default = m.group(1), m.group(2)
+        val = os.environ.get(name)
+        if val is None:
+            if default is None:
+                raise ValueError(
+                    f"環境変数 ${{{name}}} が未定義です "
+                    "(default 指定 ${VAR:-default} または env を設定してください)"
+                )
+            return default
+        return val
+    return _ENV_RE.sub(repl, s)
+
+
+def _expand_env(value: Any) -> Any:
+    """dict / list / str を再帰的に走査して ${VAR} を展開する。"""
+    if isinstance(value, str):
+        return _expand_env_in_str(value)
+    if isinstance(value, list):
+        return [_expand_env(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _expand_env(v) for k, v in value.items()}
+    return value
 
 
 # --- 接続/認証 -------------------------------------------------------
@@ -189,6 +225,7 @@ class Config:
                 f"scenario.config.yaml の中身が空または辞書ではありません: {path}\n"
                 "templates/scenario.config.yaml をコピーして必要項目を埋めてください。"
             )
+        raw = _expand_env(raw)
         return cls._from_dict(raw, config_path=path.resolve())
 
     @classmethod

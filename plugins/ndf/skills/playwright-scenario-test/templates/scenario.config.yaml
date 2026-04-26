@@ -6,6 +6,11 @@
 #
 # pytest が起動する CWD に置けば ``--ndf-config`` 省略も可能。
 # 認証情報を含むため .gitignore 推奨。
+#
+# ⚠️ 認証情報の管理:
+#   YAML に直接書かず ${ENV_VAR} / ${ENV_VAR:-default} で参照してください。
+#   .env ファイルや shell export で環境変数を設定して使用します。
+#   例: export ADMIN_PASSWORD=secret  または  direnv / .env ファイルを活用
 
 # --- 接続先 ----------------------------------------------------------
 target:
@@ -15,8 +20,8 @@ target:
   # 省略時は空文字列が入り、role 側で `requires_basic_auth: true` を指定した
   # role のみが Basic 認証ヘッダを要求する。
   # basic_auth:
-  #   user: replace-me
-  #   password: replace-me
+  #   user: ${BASIC_AUTH_USER}
+  #   password: ${BASIC_AUTH_PASSWORD}
 
 # --- TLS 検査 (false で curl -k 相当) ---------------------------
 verify_tls: false
@@ -30,8 +35,11 @@ roles:
       path: /admin/login
       requires_basic_auth: true   # /admin/ 配下のみ Basic 認証ゲートが掛かる場合
       fields:
-        LoginID: admin@example.com
-        Password: replace-me
+        # 認証情報は環境変数で管理する (YAML 直書き禁止)
+        # export ADMIN_LOGIN_ID=admin@example.com
+        # export ADMIN_PASSWORD=secret
+        LoginID: ${ADMIN_LOGIN_ID}
+        Password: ${ADMIN_PASSWORD}
       # 任意: 独自フォーム名がある場合の優先セレクタ。省略時は role/type=submit
       # の汎用フォールバックを fixture が試行する。
       # submit_selectors:
@@ -44,8 +52,10 @@ roles:
       path: /user/login
       requires_basic_auth: false
       fields:
-        LoginID: user@example.com
-        Password: replace-me
+        # export USER_LOGIN_ID=user@example.com
+        # export USER_PASSWORD=secret
+        LoginID: ${USER_LOGIN_ID}
+        Password: ${USER_PASSWORD}
       fail_if_url_contains: /user/login
 
 # --- Playwright 設定 -----------------------------------------------
