@@ -87,6 +87,14 @@ def test_tolerated_patterns_default_empty():
     assert cfg.tolerated_page_errors == []
 
 
+def test_empty_yaml_raises_value_error(tmp_path):
+    """空 YAML ファイルを Config.load() すると ValueError が出ること (Codex Minor 7)。"""
+    p = tmp_path / "empty.yaml"
+    p.write_text("", encoding="utf-8")
+    with pytest.raises(ValueError, match="空または辞書ではありません"):
+        Config.load(p)
+
+
 def test_tolerated_patterns_loaded():
     raw = {
         **_BASE_RAW,

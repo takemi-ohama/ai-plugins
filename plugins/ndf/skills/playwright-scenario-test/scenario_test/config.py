@@ -74,22 +74,24 @@ class PlaywrightConfig:
 
     @classmethod
     def from_raw(cls, raw: dict[str, Any]) -> "PlaywrightConfig":
-        # 既定値は 1280x720 (HD 720p, 16:9) で統一。dataclass の default、
-        # templates/scenario.config.yaml、本メソッドの default すべて同じ値にする。
+        # dataclass の default を真実の源 (single source of truth) とする。
+        # fallback 値を base = cls() から参照することで、dataclass default と
+        # from_raw() の fallback が乖離するバグを防ぐ (Codex Minor 6)。
+        base = cls()
         viewport = raw.get("viewport") or {}
         video_size = raw.get("video_size") or {}
         return cls(
-            headless=bool(raw.get("headless", True)),
-            viewport_width=int(viewport.get("width", 1280)),
-            viewport_height=int(viewport.get("height", 720)),
-            slow_mo_ms=int(raw.get("slow_mo_ms", 0)),
-            video_width=int(video_size.get("width", 1280)),
-            video_height=int(video_size.get("height", 720)),
-            navigation_timeout_ms=int(raw.get("navigation_timeout_ms", 30000)),
-            step_delay_ms=int(raw.get("step_delay_ms", 1500)),
-            enable_overlay=bool(raw.get("enable_overlay", True)),
-            enable_trace=bool(raw.get("enable_trace", True)),
-            video_format=str(raw.get("video_format", "mp4")).lower(),
+            headless=bool(raw.get("headless", base.headless)),
+            viewport_width=int(viewport.get("width", base.viewport_width)),
+            viewport_height=int(viewport.get("height", base.viewport_height)),
+            slow_mo_ms=int(raw.get("slow_mo_ms", base.slow_mo_ms)),
+            video_width=int(video_size.get("width", base.video_width)),
+            video_height=int(video_size.get("height", base.video_height)),
+            navigation_timeout_ms=int(raw.get("navigation_timeout_ms", base.navigation_timeout_ms)),
+            step_delay_ms=int(raw.get("step_delay_ms", base.step_delay_ms)),
+            enable_overlay=bool(raw.get("enable_overlay", base.enable_overlay)),
+            enable_trace=bool(raw.get("enable_trace", base.enable_trace)),
+            video_format=str(raw.get("video_format", base.video_format)).lower(),
         )
 
     @classmethod
@@ -181,7 +183,12 @@ class Config:
                 "templates/scenario.config.yaml をコピーして作成してください。"
             )
         with path.open("r", encoding="utf-8") as fp:
-            raw: dict[str, Any] = yaml.safe_load(fp)
+            raw = yaml.safe_load(fp)
+        if not isinstance(raw, dict):
+            raise ValueError(
+                f"scenario.config.yaml の中身が空または辞書ではありません: {path}\n"
+                "templates/scenario.config.yaml をコピーして必要項目を埋めてください。"
+            )
         return cls._from_dict(raw, config_path=path.resolve())
 
     @classmethod
