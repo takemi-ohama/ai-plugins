@@ -22,6 +22,10 @@ drive = [
 a11y = [
     "axe-playwright-python>=0.1.4",
 ]
+# 開発用: pure function の単体テスト (uv run --extra dev pytest)
+dev = [
+    "pytest>=7.0",
+]
 
 [project.scripts]
 scenario-test = "scenario_test.cli:main"
@@ -32,3 +36,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["scenario_test"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

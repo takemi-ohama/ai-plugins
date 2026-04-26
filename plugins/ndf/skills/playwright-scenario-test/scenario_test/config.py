@@ -155,6 +155,12 @@ class Config:
     slug: SlugConfig
     report: ReportConfig
     config_path: Path  # 設定ファイルの絶対パス（testcases_dir の解決基点）
+    # docs/checklists/checklist-common.md C8/C9 の境界曖昧さに対応する「除外」設定。
+    # console.error / pageerror の本文がいずれかの正規表現にマッチした場合は
+    # 集計から除外し FAIL を抑制する。3rd party の既知 warning などを許容するための
+    # 抜け穴。空 (デフォルト) なら従来どおり 1 件で FAIL。
+    tolerated_console_errors: list[str] = field(default_factory=list)
+    tolerated_page_errors: list[str] = field(default_factory=list)
 
     @property
     def testcases_dir(self) -> Path:
@@ -192,7 +198,7 @@ class Config:
         )
         roles = {rid: _role_from_raw(rid, r) for rid, r in (raw.get("roles") or {}).items()}
 
-        return cls(
+        cfg = cls(
             base_url=target["base_url"].rstrip("/"),
             basic_auth=basic_auth,
             verify_tls=bool(raw.get("verify_tls", False)),
@@ -203,7 +209,21 @@ class Config:
             slug=_slug_from_raw(raw.get("slug") or {}),
             report=_report_from_raw(raw.get("report") or {}),
             config_path=config_path,
+            tolerated_console_errors=list(raw.get("tolerated_console_errors") or []),
+            tolerated_page_errors=list(raw.get("tolerated_page_errors") or []),
         )
+
+        # fail-fast: requires_basic_auth=True なロールが宣言されているのに
+        # basic_auth.user が空ならば実行時に HTTP 401 で必ず落ちる。先に検出して
+        # 設定不備として ValueError を投げる (Maj-4)。
+        for role in cfg.roles.values():
+            if role.login.requires_basic_auth and not basic_auth.user:
+                raise ValueError(
+                    f"role '{role.id}' は requires_basic_auth=True だが、"
+                    f"target.basic_auth.user が空 (config.yaml を確認してください)"
+                )
+
+        return cfg
 
 
 def _role_from_raw(rid: str, raw: dict[str, Any]) -> Role:

@@ -517,18 +517,35 @@ def run_playwright_testcase(
 
             # docs/checklists/checklist-common.md C8: console.error / pageerror を
             # 自動収集する。検出件数が >0 の testcase は無条件 FAIL とする (後段で集計)。
+            # ただし config.tolerated_console_errors / tolerated_page_errors にマッチする
+            # メッセージは「許容済み 3rd party warning」として除外する (C9 補助)。
+            tolerated_console_re = [re.compile(p) for p in config.tolerated_console_errors]
+            tolerated_page_re = [re.compile(p) for p in config.tolerated_page_errors]
+
             def _on_console(msg) -> None:
                 try:
-                    if msg.type == "error":
-                        console_errors.append(f"{msg.location.get('url', '?')}: {msg.text[:500]}")
-                except Exception:
-                    pass
+                    if msg.type != "error":
+                        return
+                    # msg.location は dict または None。getattr で safe access する
+                    # (Maj-1: 過去の実装は msg.location.get(...) で AttributeError を握りつぶしていた)。
+                    loc = getattr(msg, "location", None) or {}
+                    text = msg.text[:500]
+                    for rx in tolerated_console_re:
+                        if rx.search(text):
+                            return
+                    console_errors.append(f"{loc.get('url', '?')}: {text}")
+                except Exception as exc:
+                    log_lines.append(f"[console listener] error: {exc}")
 
             def _on_pageerror(exc) -> None:
                 try:
-                    page_errors.append(str(exc)[:1000])
-                except Exception:
-                    pass
+                    text = str(exc)[:1000]
+                    for rx in tolerated_page_re:
+                        if rx.search(text):
+                            return
+                    page_errors.append(text)
+                except Exception as listener_exc:
+                    log_lines.append(f"[pageerror listener] error: {listener_exc}")
 
             page.on("console", _on_console)
             page.on("pageerror", _on_pageerror)

@@ -128,6 +128,9 @@ uv run --project $SKILL python $SKILL/scripts/check_cwv.py \
 # 特定の id / phase / role / type に絞る
 uv run --project $SKILL scenario-test --config ./config.yaml --filter "phase:50,51 role:user"
 uv run --project $SKILL scenario-test --config ./config.yaml --filter "id:TC-50-01"
+# page_role で絞る (docs/02-page-roles.md の役割名: lp / list / item / edit / form / search / dashboard / auth / cart / checkout / modal / wizard / error / settings)
+uv run --project $SKILL scenario-test --config ./config.yaml --filter "page_role:edit,form"
+uv run --project $SKILL scenario-test --config ./config.yaml --filter "page_role:cart,checkout phase:50"
 uv run --project $SKILL scenario-test --config ./config.yaml --list   # 一覧のみ
 ```
 

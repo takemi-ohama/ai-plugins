@@ -6,12 +6,14 @@ import datetime as _dt
 import shutil
 import subprocess
 from pathlib import Path
+from urllib.parse import urlparse
 
 from scenario_test.config import Config
 from scenario_test.testcase import CurlCheck, StepRecord, TestCase, TestCaseResult
 
 
 _STATUS_MARKER = "__CURL_STATUS__:"
+_ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
 
 
 def _validate_url_part(part: str, label: str) -> None:
@@ -32,6 +34,21 @@ def _validate_url_part(part: str, label: str) -> None:
         )
 
 
+def _validate_base_url_scheme(base_url: str) -> None:
+    """base_url の URL スキームが http/https のみであることを保証する (Maj-8)。
+
+    `javascript:`, `data:`, `file:`, `gopher:` 等の curl 経由でも誤動作・情報漏えい
+    を引き起こすスキームを早期に拒否する。urlparse は schemeless URL に対して
+    scheme=='' を返すので、その場合も reject する。
+    """
+    parsed = urlparse(base_url)
+    if parsed.scheme not in _ALLOWED_URL_SCHEMES:
+        raise ValueError(
+            f"base_url の scheme は http/https のみ許可: scheme={parsed.scheme!r} "
+            f"url={base_url!r}"
+        )
+
+
 def _curl(
     base_url: str,
     path: str,
@@ -49,6 +66,7 @@ def _curl(
     """
     _validate_url_part(base_url, "base_url")
     _validate_url_part(path, "path")
+    _validate_base_url_scheme(base_url)
     cmd = ["curl", "-sS", "-o", "-", "-w", f"\n{_STATUS_MARKER}%{{http_code}}"]
     if not verify_tls:
         cmd.append("-k")

@@ -68,14 +68,22 @@ def upload_and_link(
             fileId=file_id, body={"type": "anyone", "role": "reader"}
         ).execute()
 
-    direct_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    viewer_url = f"https://trace.playwright.dev/?trace={quote(direct_url, safe='')}"
+    # playwright.dev viewer は GET で trace.zip を取りに行くため、URL は anyone/read 必須。
+    # 非公開アップロード時に viewer URL を出すと「壊れた URL」を bug チケットに貼られるので
+    # public=True の場合のみ生成する。
+    if public:
+        direct_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+        viewer_url = f"https://trace.playwright.dev/?trace={quote(direct_url, safe='')}"
+    else:
+        direct_url = None
+        viewer_url = None
 
     return {
         "file_id": file_id,
         "drive_view": f.get("webViewLink"),
         "direct_download": direct_url,
         "playwright_trace_viewer": viewer_url,
+        "is_public": public,
     }
 
 
@@ -101,19 +109,25 @@ def main() -> int:
     )
 
     if not args.public:
-        print("[NOTE] 非公開でアップロード済 (既定)。チーム共有が必要なら --public を付け直すか、",
-              file=sys.stderr)
-        print("       Drive 上で個別に共有設定してください。trace には DOM snapshot や",
+        print("[NOTE] 非公開でアップロード済 (既定)。trace には DOM snapshot や",
               file=sys.stderr)
         print("       入力痕跡が含まれるため、安易な anyone/read は避けてください。",
+              file=sys.stderr)
+        print("       チーム共有が必要なら Drive 上で個別に共有設定するか、再度 --public を付けて",
+              file=sys.stderr)
+        print("       実行してください。playwright.dev viewer URL は anyone/read 公開時のみ生成されます。",
               file=sys.stderr)
 
     print(f"file_id: {result['file_id']}")
     print(f"Drive: {result['drive_view']}")
-    print(f"Direct: {result['direct_download']}")
+    if result['direct_download']:
+        print(f"Direct: {result['direct_download']}")
     print()
-    print("Playwright Trace Viewer URL (bug report に記載):")
-    print(f"  {result['playwright_trace_viewer']}")
+    if result['playwright_trace_viewer']:
+        print("Playwright Trace Viewer URL (bug report に記載):")
+        print(f"  {result['playwright_trace_viewer']}")
+    else:
+        print("Playwright Trace Viewer URL: (非公開のため生成スキップ。--public で有効化)")
     return 0
 
 

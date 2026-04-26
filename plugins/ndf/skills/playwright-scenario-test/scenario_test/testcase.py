@@ -4,11 +4,22 @@ from __future__ import annotations
 
 import datetime as _dt
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+
+# docs/02-page-roles.md で定義された page role 集合。
+# scripts/generate_test_plan.py の ROLE_ITEM_COUNTS と同期させる。
+# 未知 role を testcase YAML に書いても load 時に warning を出すだけで
+# fail させない (将来の role 追加時に既存テストが落ちるのを避ける)。
+KNOWN_PAGE_ROLES: frozenset[str] = frozenset({
+    "lp", "list", "item", "edit", "form", "search", "dashboard", "auth",
+    "cart", "checkout", "modal", "wizard", "error", "settings",
+})
 
 
 # --- 入力モデル: テストケース YAML ----------------------------------
@@ -117,6 +128,16 @@ class TestCase:
             page_role = [str(r) for r in page_role_raw]
         else:
             page_role = []
+
+        # Maj-5: 未知 page_role を typo として検出する。fail にはせず stderr に warning。
+        # filter で 0 件マッチして「テストが何も走らない」前に気づけるようにする。
+        unknown = [r for r in page_role if r not in KNOWN_PAGE_ROLES]
+        if unknown:
+            print(
+                f"[testcase warning] {path}: 未知の page_role を検出: {unknown} "
+                f"(known: {sorted(KNOWN_PAGE_ROLES)})",
+                file=sys.stderr,
+            )
 
         return cls(
             id=str(raw["id"]),
@@ -228,15 +249,27 @@ def filter_testcases(
     return [c for c in cases if matches(c)]
 
 
-_FILTER_RE = re.compile(r"^([a-z]+):(.+)$")
+# Maj-5 補足: filter キー名は ASCII 小文字 + アンダースコアを許容する。
+# 過去版は `[a-z]+` のみで `page_role:` が無視されていた (matches() は対応済みなのに
+# parser 側で取り落としていた回帰)。
+_FILTER_RE = re.compile(r"^([a-z][a-z_]*):(.+)$")
 
 
 def parse_filter(spec: str) -> dict[str, list[str]]:
-    """`--filter "phase:50,51 role:user"` のような文字列をパースする。"""
+    """`--filter "phase:50,51 role:user"` のような文字列をパースする。
+
+    区切り規則:
+      - フィールド間は **空白** で区切る (`phase:50 role:user`)
+      - 同一フィールド内の複数値は **カンマ** で区切る (`phase:50,51`)
+
+    過去版はトップレベルで `,` を空白に置換してしまい `phase:50,51` が
+    `phase:[50]` だけ拾われる挙動になっていた。空白だけで split し、値部の
+    カンマ展開は regex キャプチャの後に行うことで両形式を両立する。
+    """
     out: dict[str, list[str]] = {}
     if not spec:
         return out
-    for token in spec.replace(",", " ").split():
+    for token in spec.split():
         m = _FILTER_RE.match(token.strip())
         if not m:
             continue

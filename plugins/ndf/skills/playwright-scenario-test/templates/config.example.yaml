@@ -104,6 +104,20 @@ body_check:
 #   warning_patterns: ["STRICT:", "Warning:", "Notice:", "Deprecated:"]
 #   not_found_strings: ["File not found"]
 
+# --- 許容する console.error / pageerror パターン (省略可) -------------
+# docs/checklists/checklist-common.md C8 では console.error / pageerror が
+# 1 件でも出たら無条件 FAIL だが、3rd party SDK の既知 warning など
+# プロジェクト責任外の noise を許容したい場合に正規表現で除外できる (C9)。
+# マッチした行は集計から除かれ、FAIL 判定にも寄与しない。
+tolerated_console_errors: []
+tolerated_page_errors: []
+# 例:
+# tolerated_console_errors:
+#   - "Failed to load resource: the server responded with a status of 404"  # 既知の missing favicon
+#   - "ResizeObserver loop limit exceeded"                                    # Chrome の良性 warning
+# tolerated_page_errors:
+#   - "ChunkLoadError"   # CDN 起因で再現しないケースを除外する場合のみ
+
 # --- スクショファイル名のスラッグ生成ルール (省略可) ------------------
 # path から作るスラッグの正規化ルール。空のままなら拡張子もクエリも残る。
 slug:

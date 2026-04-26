@@ -118,9 +118,12 @@ def _all_pairs(factors: list[Factor]) -> list[dict[str, str]]:
                 best_idx = i
         if best_cover == 0:
             break
-        chosen.append(full[best_idx])
-        # この case がカバーする pair を required から除去
+        # Min-1: 同じ要素を append → pop ではなく、先に pop してから append する。
+        # 過去版は full[best_idx] と pop(best_idx) で同オブジェクトを 2 度参照しており
+        # 読み手が混乱しやすかった。
         case = full.pop(best_idx)
+        chosen.append(case)
+        # この case がカバーする pair を required から除去
         required = {
             r for r in required
             if not (case.get(r[0]) == r[1] and case.get(r[2]) == r[3])
@@ -188,14 +191,17 @@ def _yaml_repr(v) -> str:
         # 数値はそのまま (期待は数値型)
         return str(v)
     if isinstance(v, str):
-        # 文字列は **常に JSON quote** で出力する。
-        # 型保持のため: '01', 'true', 'null', '12345' (郵便番号) などが
-        # safe_load 後に別型になるのを防ぐ。
+        # 型保持のため、quote 必須な文字列は常に JSON quote で出力する。
+        # 対象 (Maj-2 整理後):
+        #   - 空文字列
+        #   - YAML 特殊文字を含む (`:#[]{},...` 改行 / タブ含む)
+        #   - 前後空白を含む (parser によって trim される可能性)
+        #   - _YAML_RESERVED_RE にマッチ ('01' / 'true' / 'null' / '12345' / '0x1A' 等)
+        # それ以外 (普通の英字始まりや日本語) は素直にベタ書きする。
         if (not v
             or re.search(r"[:#\[\]{},&*!|>'\"%@`\n\r\t]", v)
             or v.strip() != v
-            or _YAML_RESERVED_RE.match(v)
-            or (v[0].isdigit() and any(c not in "0123456789." for c in v[1:]) is False)):
+            or _YAML_RESERVED_RE.match(v)):
             return json.dumps(v, ensure_ascii=False)
         return v
     return str(v)
@@ -242,6 +248,15 @@ def generate_yaml(
         header_comments += "#\n# Pairwise 適用済み (--factors 指定):\n"
         header_comments += f"#   入力因子: {', '.join(f.name for f in (factors or []))}\n"
         header_comments += f"#   全組合せ {sum(1 for _ in itertools.product(*(f.values for f in (factors or []))))} → All-Pairs で {len(pairs)} 件に削減\n"
+        # Maj-6: アルゴリズム品質の明示。greedy first-most-coverage は IPOG / orthogonal
+        # array より劣るため、3 因子以上の相互作用は捕捉できない点を明示する。
+        # 厳密に最小ケース集合が必要な場合は外部 PICT などを使うこと。
+        header_comments += (
+            "#\n"
+            "# Pairwise quality: greedy heuristic, 2-factor coverage only\n"
+            "#   - 3 因子以上の相互作用は捕捉しない (orthogonal array 未使用)\n"
+            "#   - 厳密最小化が必要なら外部 PICT (Microsoft) や allpairspy を別途利用\n"
+        )
 
     base_yaml = {
         "id": test_id,

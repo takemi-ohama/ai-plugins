@@ -46,14 +46,15 @@ def main() -> int:
     parser.add_argument("--user-agent", default=None)
     args = parser.parse_args()
 
-    # playwright CLI が見つかるか
+    # playwright CLI が見つかるか (Maj-3: 検出した絶対パスを subprocess に渡し、
+    # PATH 再検索による不一致や PATH 改竄リスクを避ける)
     pw = shutil.which("playwright")
     if not pw:
         print("ERROR: playwright CLI が見つかりません。", file=sys.stderr)
         print("  uv sync && uv run playwright install chromium", file=sys.stderr)
         return 2
 
-    cmd = ["playwright", "codegen", "--target", args.target]
+    cmd = [pw, "codegen", "--target", args.target]
     if args.device:
         cmd.extend(["--device", args.device])
     if args.load_storage:
