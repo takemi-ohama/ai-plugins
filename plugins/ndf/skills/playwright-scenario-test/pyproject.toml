@@ -9,6 +9,12 @@ dependencies = [
     # webm → mp4 変換用。Playwright 録画は webm のみ生成するが、
     # Google Drive のプレビュアでは mp4 (H.264) の方が安定するため変換する。
     "imageio-ffmpeg>=0.4",
+    # v0.3.0: pure pytest-playwright 移行
+    # pytest 本体と pytest-playwright fixture (page / context / browser_context_args)、
+    # pytest-xdist による並列実行を main 依存として要求する。
+    "pytest>=8.0",
+    "pytest-playwright>=0.5",
+    "pytest-xdist>=3.0",
 ]
 
 [project.optional-dependencies]
@@ -23,12 +29,18 @@ a11y = [
     "axe-playwright-python>=0.1.4",
 ]
 # 開発用: pure function の単体テスト (uv run --extra dev pytest)
+# pytest 本体は main deps に移行済 (v0.3.0)。dev には開発時のみの拡張を入れる余地。
 dev = [
-    "pytest>=7.0",
+    "pytest>=8.0",
 ]
 
 [project.scripts]
 scenario-test = "scenario_test.cli:main"
+
+[project.entry-points."pytest11"]
+# pytest が auto-discover する plugin entry-point。
+# ``uv pip install -e .`` 後は ``pytest`` 起動だけで NDF plugin が有効になる。
+ndf-scenario-test = "scenario_test.pytest_plugin"
 
 [build-system]
 requires = ["hatchling"]
