@@ -20,9 +20,13 @@ Phase 1 では fixture を提供するのみ。a11y / CWV / report 連携は Pha
 
 from __future__ import annotations
 
+import datetime as _dt
+from pathlib import Path
 from typing import Any
 
 import pytest
+
+from scenario_test.pytest_report import NdfTestEntry, write_report
 
 # 配下の fixture モジュールを pytest_plugins として読み込む
 # (こうすると entry-point 経由で plugin がロードされた瞬間に fixture が
@@ -127,30 +131,189 @@ def pytest_runtest_makereport(item, call):
     """test の各 phase 終了時に ``ndf_evidence`` の状態をレポートに紐付ける。
 
     Phase 2: FAIL 時に evidence の trace/HAR path を log に追記する。
-    Phase 3 (terminal_summary) でこの情報を report.md に集約する予定。
+    Phase 3: rep.user_properties に成果物 path / marker を保存し、
+             ``pytest_terminal_summary`` で report.md に集約する。
     """
     outcome = yield
     rep = outcome.get_result()
 
-    # ndf_evidence fixture が attach した状態を直接参照
-    ev = getattr(item, "_ndf_evidence", None)
-    if ev is None:
+    if rep.when != "call":
         return
 
-    if rep.when == "call":
-        # FAIL / PASS 問わず artifact 情報を rep.user_properties に保存
+    # ndf_evidence fixture が attach した状態を直接参照
+    ev = getattr(item, "_ndf_evidence", None)
+    if ev is not None:
         if ev.har_relpath:
             rep.user_properties.append(("ndf_har", str(ev.case_dir / ev.har_relpath)))
         if ev.trace_relpath:
             rep.user_properties.append(
                 ("ndf_trace", str(ev.case_dir / ev.trace_relpath))
             )
-        if ev.console_errors:
-            rep.user_properties.append(
-                ("ndf_console_errors", len(ev.console_errors))
+        rep.user_properties.append(("ndf_console_errors", len(ev.console_errors)))
+        rep.user_properties.append(("ndf_page_errors", len(ev.page_errors)))
+
+    # markers を user_properties に転写
+    page_roles: list[str] = []
+    for marker in item.iter_markers(name="page_role"):
+        for arg in marker.args:
+            if isinstance(arg, str):
+                page_roles.append(arg)
+            elif isinstance(arg, (list, tuple)):
+                page_roles.extend(str(a) for a in arg)
+    if page_roles:
+        rep.user_properties.append(("ndf_page_role", page_roles))
+
+    role_marker = item.get_closest_marker("role")
+    if role_marker is not None and role_marker.args:
+        rep.user_properties.append(("ndf_role", str(role_marker.args[0])))
+
+    phase_marker = item.get_closest_marker("phase")
+    if phase_marker is not None and phase_marker.args:
+        try:
+            rep.user_properties.append(("ndf_phase", int(phase_marker.args[0])))
+        except (TypeError, ValueError):
+            pass
+
+    priority_marker = item.get_closest_marker("priority")
+    if priority_marker is not None and priority_marker.args:
+        rep.user_properties.append(("ndf_priority", str(priority_marker.args[0])))
+
+
+# ---------------------------------------------------------------------------
+# Terminal summary / session finish (PLAN17 Task 6)
+# ---------------------------------------------------------------------------
+
+
+def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
+    """terminalreporter から ``NdfTestEntry`` のリストを構築する。"""
+    entries: list[NdfTestEntry] = []
+    for outcome_key in ("passed", "failed", "skipped", "error"):
+        for rep in terminalreporter.stats.get(outcome_key, []):
+            # rep.when != "call" の setup/teardown error は集約スキップ
+            if getattr(rep, "when", "call") not in ("call", "setup"):
+                continue
+            props = dict(rep.user_properties or [])
+            entries.append(
+                NdfTestEntry(
+                    nodeid=getattr(rep, "nodeid", "?"),
+                    name=getattr(rep, "head_line", getattr(rep, "nodeid", "?")),
+                    outcome=outcome_key,
+                    duration_s=float(getattr(rep, "duration", 0.0) or 0.0),
+                    page_role=list(props.get("ndf_page_role") or []),
+                    role=props.get("ndf_role"),
+                    phase=int(props.get("ndf_phase") or 0),
+                    priority=props.get("ndf_priority"),
+                    har_path=props.get("ndf_har"),
+                    trace_path=props.get("ndf_trace"),
+                    console_errors=int(props.get("ndf_console_errors") or 0),
+                    page_errors=int(props.get("ndf_page_errors") or 0),
+                    error_message=str(rep.longrepr) if rep.longrepr else None,
+                )
             )
-        if ev.page_errors:
-            rep.user_properties.append(("ndf_page_errors", len(ev.page_errors)))
+    return entries
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """``reports/<run-id>/report.md`` を生成する。
+
+    ``--ndf-out-dir`` 指定があればそこに、なければ session 開始時の
+    ``ndf_out_dir`` fixture と同じ規則で path を解決する。
+    """
+    # session 中で 1 件も test を回していない (collect-only など) ならスキップ
+    stats = terminalreporter.stats
+    if not any(stats.get(k) for k in ("passed", "failed", "skipped", "error")):
+        return
+
+    cached_cfg = getattr(config, "_ndf_config", None)
+    base_url = cached_cfg.base_url if cached_cfg is not None else None
+    title = (
+        cached_cfg.report.title
+        if cached_cfg is not None
+        else "シナリオ E2E テスト 実施報告書"
+    )
+
+    raw_out: str | None = config.getoption("ndf_out_dir", default=None)
+    if raw_out:
+        out_dir = Path(raw_out).resolve()
+    else:
+        run_id = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+        out_dir = (Path.cwd() / "reports" / run_id).resolve()
+
+    entries = _collect_entries(terminalreporter)
+    if not entries:
+        return
+
+    started = _dt.datetime.now() - _dt.timedelta(
+        seconds=sum(e.duration_s for e in entries)
+    )
+    finished = _dt.datetime.now()
+    path = write_report(
+        entries,
+        out_dir=out_dir,
+        started_at=started,
+        finished_at=finished,
+        title=title,
+        base_url=base_url,
+    )
+    terminalreporter.write_sep("-", "ndf report")
+    terminalreporter.write_line(f"report.md generated: {path}")
+
+    # session 後の Drive アップロードに使うため pickle 不要な情報を保存
+    config._ndf_report_path = path  # type: ignore[attr-defined]
+    config._ndf_out_dir = out_dir  # type: ignore[attr-defined]
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """``--ndf-drive-folder`` 指定時、生成済 report.md と evidence を Drive アップ。
+
+    PLAN17 Task 6: ``upload_evidence.upload`` を直接呼ぶ。失敗時は警告のみ
+    (test 結果には影響しない)。
+    """
+    folder_id: str | None = session.config.getoption(
+        "ndf_drive_folder", default=None
+    )
+    if not folder_id:
+        return
+
+    report_path: Path | None = getattr(session.config, "_ndf_report_path", None)
+    out_dir: Path | None = getattr(session.config, "_ndf_out_dir", None)
+    if report_path is None or out_dir is None:
+        return
+
+    try:
+        # scripts/ を import path に追加して upload_evidence をロード
+        import sys
+
+        scripts_dir = (
+            Path(__file__).resolve().parent.parent / "scripts"
+        )
+        if str(scripts_dir) not in sys.path:
+            sys.path.insert(0, str(scripts_dir))
+        import upload_evidence  # type: ignore  # noqa: I001
+
+        # report.md は kind=any でアップ
+        if report_path.exists():
+            upload_evidence.upload(
+                report_path, kind="any", parent_folder_id=folder_id, public=False
+            )
+
+        # trace.zip / *.har / *.mp4 を 1 階層下から拾い上げる
+        for sub in out_dir.iterdir():
+            if not sub.is_dir():
+                continue
+            for f in sub.iterdir():
+                if f.suffix in (".zip", ".har", ".mp4", ".webm"):
+                    kind = upload_evidence.detect_kind(f)
+                    upload_evidence.upload(
+                        f, kind=kind, parent_folder_id=folder_id, public=False
+                    )
+    except Exception as exc:  # pragma: no cover - depends on Drive auth
+        import warnings
+
+        warnings.warn(
+            f"[ndf] Drive upload 失敗 (session continues): {exc}",
+            stacklevel=1,
+        )
 
 
 def _try_load_config_silently(config: pytest.Config) -> Any | None:

@@ -199,6 +199,12 @@ def browser_context_args(
     1 test = 1 HAR にしたい場合は ``ndf_evidence`` fixture 内で
     ``context`` の ``new_context`` を別途張り替える方針 (今は session 内 1 HAR で
     十分なケースが多い)。
+
+    ``--ndf-hud`` 指定時は ``ignore_https_errors`` 等の defaults と並んで
+    HUD overlay を ``add_init_script`` で全 page に inject する。
+    init_script の attach は ``new_context`` fixture (``ndf_new_context``) 経由
+    で行う (browser_context_args は dict のみ受け取り、add_init_script は dict
+    で渡せないため)。
     """
     no_evidence = bool(pytestconfig.getoption("ndf_no_evidence", default=False))
     args = dict(browser_context_args or {})
@@ -224,9 +230,12 @@ def ndf_evidence(
     - ``--ndf-no-evidence`` が True なら trace/HAR を OFF にし、listener のみ動かす
     - ``page`` fixture から console / pageerror listener を attach
     - ``context.tracing.start/stop`` を裏で実行 (有効時)
+    - ``--ndf-hud`` 指定時は ``hud.HUD_INIT_SCRIPT`` を ``context.add_init_script``
+      で全 page に inject する (PLAN17 Task 5)
     - ``pytest_runtest_makereport`` から FAIL 時に ``ndf_evidence`` の状態を確認可能
     """
     enabled = not bool(pytestconfig.getoption("ndf_no_evidence", default=False))
+    hud_enabled = bool(pytestconfig.getoption("ndf_hud", default=False))
     case_dir = ndf_out_dir / _safe_slug(request.node.name, "test")
     case_dir.mkdir(parents=True, exist_ok=True)
 
@@ -239,6 +248,15 @@ def ndf_evidence(
     )
     ev.attach_listeners(page)
     ev.start_tracing(context)
+
+    # PLAN17 Task 5: HUD overlay (赤丸カーソル + 字幕) を init_script で inject。
+    if hud_enabled:
+        try:
+            from scenario_test.hud import HUD_INIT_SCRIPT
+
+            context.add_init_script(HUD_INIT_SCRIPT)
+        except Exception as exc:  # pragma: no cover
+            ev.log_lines.append(f"[hud] add_init_script 失敗: {exc}")
 
     # request.node に ev を保持して makereport hook から参照可能にする
     request.node._ndf_evidence = ev  # type: ignore[attr-defined]
