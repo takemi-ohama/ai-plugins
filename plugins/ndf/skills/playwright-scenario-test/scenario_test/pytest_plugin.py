@@ -135,13 +135,16 @@ def pytest_runtest_makereport(item, call):
     成果物 path / marker を rep.user_properties に保存して
     ``pytest_terminal_summary`` で report.md に集約する。
 
-    HAR lifecycle 修正 (Codex Major-1 完遂):
+    HAR lifecycle 修正 (Codex Major-1 完遂 / 3回目):
     Playwright は HAR を ``context.close()`` 時に flush する。
     ``ndf_evidence`` の finalizer は ``context`` の finalizer より先に動くため、
-    ``yield`` 直後の ``confirm_har()`` では HAR がまだ書き出されていない場合がある。
+    call phase の時点では ``har_relpath`` / ``trace_relpath`` がまだ未確定の場合がある。
+
     teardown phase の makereport は pytest-playwright の ``context`` finalizer が
     teardown 中に完了した後に走るため、ここで再度 ``confirm_har()`` を呼んで
-    HAR の存在を確認し直す。
+    HAR の存在を確認し直し、確定した path を teardown report の user_properties に
+    積む。``_collect_entries()`` が teardown report の ndf_har/ndf_trace を call
+    entry に merge することで、report.md に artifact path が反映される。
     """
     outcome = yield
     rep = outcome.get_result()
@@ -149,9 +152,16 @@ def pytest_runtest_makereport(item, call):
     ev = getattr(item, "_ndf_evidence", None)
 
     # teardown phase: context.close() 後に HAR が flush されるため confirm_har() 再呼び出し。
-    # call phase で既に har_relpath が確定していれば no-op。
+    # 確定した har_relpath / trace_relpath を teardown report の user_properties に積む。
+    # _collect_entries() がこの値を call entry に merge する。
     if rep.when == "teardown" and ev is not None:
         ev.confirm_har()
+        if ev.har_relpath:
+            rep.user_properties.append(("ndf_har", str(ev.case_dir / ev.har_relpath)))
+        if ev.trace_relpath:
+            rep.user_properties.append(
+                ("ndf_trace", str(ev.case_dir / ev.trace_relpath))
+            )
         return
 
     if rep.when != "call":
@@ -206,38 +216,62 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
     xfailed / xpassed も集約する (Codex Major 3)。
     pytest 内部では xfailed の rep は stats["xfailed"] に直接入るため、
     "xfailed" / "xpassed" キーを明示的に走査する。
+
+    artifact 伝搬 (Codex Major-1 / 3回目):
+    HAR は context.close() 時に flush されるため、call phase 時点では
+    har_relpath / trace_relpath が未確定の場合がある。
+    teardown phase の makereport で確定した ndf_har / ndf_trace を
+    call entry に merge することで、report.md に artifact path を反映する。
     """
-    entries: list[NdfTestEntry] = []
+    # Step 1: call/setup phase の entry を nodeid でインデックス化
+    call_entries: dict[str, NdfTestEntry] = {}
     for outcome_key in ("passed", "failed", "skipped", "error", "xfailed", "xpassed"):
         for rep in terminalreporter.stats.get(outcome_key, []):
-            # rep.when != "call" の setup/teardown error は集約スキップ
             if getattr(rep, "when", "call") not in ("call", "setup"):
                 continue
             props = dict(rep.user_properties or [])
-            entries.append(
-                NdfTestEntry(
-                    nodeid=getattr(rep, "nodeid", "?"),
-                    name=getattr(rep, "head_line", getattr(rep, "nodeid", "?")),
-                    outcome=outcome_key,
-                    duration_s=float(getattr(rep, "duration", 0.0) or 0.0),
-                    page_role=list(props.get("ndf_page_role") or []),
-                    role=props.get("ndf_role"),
-                    phase=int(props.get("ndf_phase") or 0),
-                    priority=props.get("ndf_priority"),
-                    har_path=props.get("ndf_har"),
-                    trace_path=props.get("ndf_trace"),
-                    console_errors=int(props.get("ndf_console_errors") or 0),
-                    page_errors=int(props.get("ndf_page_errors") or 0),
-                    # Amazon Q Critical-3: skipped 時の longrepr は tuple 形式のため
-                    # failed / error のときのみ str() 化する。他 outcome は None のまま。
-                    error_message=(
-                        str(rep.longrepr)
-                        if outcome_key in ("failed", "error") and rep.longrepr
-                        else None
-                    ),
-                )
+            nodeid = getattr(rep, "nodeid", "?")
+            entry = NdfTestEntry(
+                nodeid=nodeid,
+                name=getattr(rep, "head_line", nodeid),
+                outcome=outcome_key,
+                duration_s=float(getattr(rep, "duration", 0.0) or 0.0),
+                page_role=list(props.get("ndf_page_role") or []),
+                role=props.get("ndf_role"),
+                phase=int(props.get("ndf_phase") or 0),
+                priority=props.get("ndf_priority"),
+                har_path=props.get("ndf_har"),
+                trace_path=props.get("ndf_trace"),
+                console_errors=int(props.get("ndf_console_errors") or 0),
+                page_errors=int(props.get("ndf_page_errors") or 0),
+                # Amazon Q Critical-3: skipped 時の longrepr は tuple 形式のため
+                # failed / error のときのみ str() 化する。他 outcome は None のまま。
+                error_message=(
+                    str(rep.longrepr)
+                    if outcome_key in ("failed", "error") and rep.longrepr
+                    else None
+                ),
             )
-    return entries
+            call_entries[nodeid] = entry
+
+    # Step 2: teardown report の ndf_har / ndf_trace を call entry に merge する。
+    # teardown 時点で context.close() 後の確定値が積まれているため、
+    # call phase で None だった artifact path をここで埋める。
+    for outcome_key in ("passed", "failed", "skipped", "error", "xfailed", "xpassed"):
+        for rep in terminalreporter.stats.get(outcome_key, []):
+            if getattr(rep, "when", None) != "teardown":
+                continue
+            nodeid = getattr(rep, "nodeid", "?")
+            if nodeid not in call_entries:
+                continue
+            entry = call_entries[nodeid]
+            props = dict(rep.user_properties or [])
+            if not entry.har_path and props.get("ndf_har"):
+                entry.har_path = props["ndf_har"]
+            if not entry.trace_path and props.get("ndf_trace"):
+                entry.trace_path = props["ndf_trace"]
+
+    return list(call_entries.values())
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
