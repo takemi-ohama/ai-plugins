@@ -27,7 +27,12 @@ import pytest
 # 配下の fixture モジュールを pytest_plugins として読み込む
 # (こうすると entry-point 経由で plugin がロードされた瞬間に fixture が
 #  全 test に対して discover される)。
-pytest_plugins = ["scenario_test.fixtures.auth"]
+pytest_plugins = [
+    "scenario_test.fixtures.auth",
+    "scenario_test.fixtures.evidence",
+    "scenario_test.fixtures.a11y",
+    "scenario_test.fixtures.cwv",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +115,42 @@ def pytest_configure(config: pytest.Config) -> None:
                     setattr(plugin_self, name, fn)
         # session 中で再利用するためにキャッシュする。
         config._ndf_config = cfg  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
+# Reports / hooks
+# ---------------------------------------------------------------------------
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """test の各 phase 終了時に ``ndf_evidence`` の状態をレポートに紐付ける。
+
+    Phase 2: FAIL 時に evidence の trace/HAR path を log に追記する。
+    Phase 3 (terminal_summary) でこの情報を report.md に集約する予定。
+    """
+    outcome = yield
+    rep = outcome.get_result()
+
+    # ndf_evidence fixture が attach した状態を直接参照
+    ev = getattr(item, "_ndf_evidence", None)
+    if ev is None:
+        return
+
+    if rep.when == "call":
+        # FAIL / PASS 問わず artifact 情報を rep.user_properties に保存
+        if ev.har_relpath:
+            rep.user_properties.append(("ndf_har", str(ev.case_dir / ev.har_relpath)))
+        if ev.trace_relpath:
+            rep.user_properties.append(
+                ("ndf_trace", str(ev.case_dir / ev.trace_relpath))
+            )
+        if ev.console_errors:
+            rep.user_properties.append(
+                ("ndf_console_errors", len(ev.console_errors))
+            )
+        if ev.page_errors:
+            rep.user_properties.append(("ndf_page_errors", len(ev.page_errors)))
 
 
 def _try_load_config_silently(config: pytest.Config) -> Any | None:
