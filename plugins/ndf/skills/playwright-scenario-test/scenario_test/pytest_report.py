@@ -65,8 +65,12 @@ def render_markdown(
     failed = sum(1 for e in entries_list if e.outcome == "failed")
     skipped = sum(1 for e in entries_list if e.outcome == "skipped")
     errors = sum(1 for e in entries_list if e.outcome == "error")
+    xfailed = sum(1 for e in entries_list if e.outcome == "xfailed")
+    xpassed = sum(1 for e in entries_list if e.outcome == "xpassed")
     duration = (finished_at - started_at).total_seconds()
-    all_pass = total > 0 and passed == total
+    # xfailed は期待通りの失敗なので OK 扱い (NdfTestEntry.ok と同じ方針)
+    # xpassed は意図せず pass したため注意喚起 (全PASS とはしない)
+    all_pass = total > 0 and (passed + xfailed) == total and xpassed == 0
 
     lines: list[str] = [
         f"# {title}",
@@ -77,10 +81,30 @@ def render_markdown(
     ]
     if base_url:
         lines.append(f"- 対象URL : {base_url}")
+
+    # 集計サマリ行を構築
+    extra_parts: list[str] = []
+    if failed:
+        extra_parts.append(f"FAIL {failed}")
+    if skipped:
+        extra_parts.append(f"SKIP {skipped}")
+    if errors:
+        extra_parts.append(f"ERROR {errors}")
+    if xfailed:
+        extra_parts.append(f"XFAIL {xfailed}")
+    if xpassed:
+        extra_parts.append(f"XPASS {xpassed}")
+    # 全PASS でも xfailed / xpassed があれば内訳を明示する
+    if all_pass:
+        if extra_parts:
+            result_suffix = " (全PASS) / " + " / ".join(extra_parts)
+        else:
+            result_suffix = " (全PASS)"
+    else:
+        result_suffix = " / " + " / ".join(extra_parts) if extra_parts else ""
+
     lines.extend([
-        f"- **結果: {passed}/{total} test PASS"
-        + (f" (全PASS)" if all_pass else f" / FAIL {failed} / SKIP {skipped} / ERROR {errors}")
-        + "**",
+        f"- **結果: {passed}/{total} test PASS{result_suffix}**",
         "",
         "## サマリ",
         "",

@@ -181,9 +181,14 @@ def pytest_runtest_makereport(item, call):
 
 
 def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
-    """terminalreporter から ``NdfTestEntry`` のリストを構築する。"""
+    """terminalreporter から ``NdfTestEntry`` のリストを構築する。
+
+    xfailed / xpassed も集約する (Codex Major 3)。
+    pytest 内部では xfailed の rep は stats["xfailed"] に直接入るため、
+    "xfailed" / "xpassed" キーを明示的に走査する。
+    """
     entries: list[NdfTestEntry] = []
-    for outcome_key in ("passed", "failed", "skipped", "error"):
+    for outcome_key in ("passed", "failed", "skipped", "error", "xfailed", "xpassed"):
         for rep in terminalreporter.stats.get(outcome_key, []):
             # rep.when != "call" の setup/teardown error は集約スキップ
             if getattr(rep, "when", "call") not in ("call", "setup"):
@@ -245,9 +250,16 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     if not entries:
         return
 
-    started = _dt.datetime.now() - _dt.timedelta(
-        seconds=sum(e.duration_s for e in entries)
-    )
+    # Amazon Q Critical-4: xdist 並列実行時の session 開始時刻計算が不正確な問題を修正。
+    # terminalreporter._sessionstarttime (pytest 内部 float) を優先利用し、
+    # 無ければ従来の逐次実行前提の計算にフォールバックする。
+    session_start_ts = getattr(terminalreporter, "_sessionstarttime", None)
+    if session_start_ts is not None:
+        started = _dt.datetime.fromtimestamp(session_start_ts)
+    else:
+        started = _dt.datetime.now() - _dt.timedelta(
+            seconds=sum(e.duration_s for e in entries)
+        )
     finished = _dt.datetime.now()
     path = write_report(
         entries,

@@ -112,6 +112,53 @@ def test_render_markdown_page_role_and_role_columns():
     assert "form,list" in md
 
 
+def test_render_markdown_xfailed_counted_in_header():
+    """xfailed / xpassed がヘッダ集計に出ること (Codex Major 3)。"""
+    started = _dt.datetime(2026, 4, 26, 12, 0, 0)
+    finished = _dt.datetime(2026, 4, 26, 12, 0, 5)
+    md = render_markdown(
+        [
+            _entry(nodeid="t::ok", outcome="passed"),
+            _entry(nodeid="t::xf", outcome="xfailed"),
+            _entry(nodeid="t::xp", outcome="xpassed"),
+        ],
+        started_at=started,
+        finished_at=finished,
+    )
+    assert "XFAIL 1" in md
+    assert "XPASS 1" in md
+    # xpassed がある場合は全PASS にならない
+    assert "全PASS" not in md
+
+
+def test_render_markdown_xfailed_only_is_all_pass():
+    """xfailed のみ (xpassed なし) は全PASS 扱い。"""
+    started = _dt.datetime(2026, 4, 26, 12, 0, 0)
+    finished = _dt.datetime(2026, 4, 26, 12, 0, 5)
+    md = render_markdown(
+        [
+            _entry(nodeid="t::ok", outcome="passed"),
+            _entry(nodeid="t::xf", outcome="xfailed"),
+        ],
+        started_at=started,
+        finished_at=finished,
+    )
+    assert "全PASS" in md
+    assert "XFAIL 1" in md
+
+
+def test_render_markdown_xfailed_not_in_failure_section():
+    """xfailed は FAIL / ERROR の詳細セクションに出ない。"""
+    started = _dt.datetime(2026, 4, 26, 12, 0, 0)
+    finished = _dt.datetime(2026, 4, 26, 12, 0, 5)
+    md = render_markdown(
+        [_entry(nodeid="t::xf", outcome="xfailed")],
+        started_at=started,
+        finished_at=finished,
+    )
+    assert "FAIL / ERROR の詳細" not in md
+
+
 def test_write_report_produces_file(tmp_path: Path):
     started = _dt.datetime(2026, 4, 26, 12, 0, 0)
     finished = _dt.datetime(2026, 4, 26, 12, 0, 1)
