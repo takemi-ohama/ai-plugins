@@ -54,8 +54,8 @@ def test_scan_body_detects_fatal_anywhere_in_body():
     assert "Fatal error: bang" in v.snippet
 
 
-def test_scan_body_warning_only_in_head_bytes():
-    """warning_patterns は head N バイトに限ってマッチさせる。"""
+def test_scan_body_warning_only_in_head_chars():
+    """warning_patterns は head N 文字 (code points) に限ってマッチさせる。"""
     head_pollution = "STRICT: warning at top\n" + ("a" * 1000) + " STRICT: deep"
     violations = scan_body(
         head_pollution,

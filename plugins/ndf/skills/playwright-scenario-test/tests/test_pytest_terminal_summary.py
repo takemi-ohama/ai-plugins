@@ -12,7 +12,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from scenario_test.pytest_plugin import _collect_entries, pytest_terminal_summary
+from scenario_test.pytest_plugin import (
+    _collect_entries,
+    pytest_sessionfinish,
+    pytest_terminal_summary,
+)
 from scenario_test.pytest_report import NdfTestEntry
 
 
@@ -145,6 +149,44 @@ def test_collect_entries_promotes_teardown_error_with_error_outcome():
     assert entries[0].outcome == "error"
 
 
+def test_collect_entries_promotes_teardown_failure_on_xpassed_call():
+    """call=xpassed + teardown=failed → outcome=failed に昇格。"""
+    tr = _make_terminalreporter({
+        "xpassed": [_make_rep(nodeid="t::xp", outcome="xpassed", when="call")],
+        "": [
+            _make_rep(
+                nodeid="t::xp",
+                outcome="failed",
+                when="teardown",
+                user_properties=[("ndf_body_check_violations", 1)],
+                longrepr="body_check teardown failure on xpass",
+            )
+        ],
+    })
+    entries = _collect_entries(tr)
+    assert entries[0].outcome == "failed"
+    assert entries[0].body_check_violations == 1
+
+
+def test_collect_entries_promotes_teardown_failure_on_skipped_call():
+    """call=skipped + teardown=failed → outcome=failed に昇格。"""
+    tr = _make_terminalreporter({
+        "skipped": [_make_rep(nodeid="t::sk", outcome="skipped", when="call")],
+        "": [
+            _make_rep(
+                nodeid="t::sk",
+                outcome="failed",
+                when="teardown",
+                user_properties=[("ndf_body_check_violations", 3)],
+                longrepr="body_check teardown failure on skip",
+            )
+        ],
+    })
+    entries = _collect_entries(tr)
+    assert entries[0].outcome == "failed"
+    assert entries[0].body_check_violations == 3
+
+
 def test_collect_entries_does_not_overwrite_genuine_call_failure():
     """call phase の本物の failure は teardown failure で上書きしない。"""
     tr = _make_terminalreporter({
@@ -226,3 +268,105 @@ def test_terminal_summary_skips_when_no_tests(tmp_path: Path):
     pytest_terminal_summary(tr, exitstatus=0, config=config)
 
     assert not (tmp_path / "report.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# pytest_sessionfinish の Drive upload 分岐 (codex review2 P3)
+# ---------------------------------------------------------------------------
+
+
+def _make_session(*, drive_folder: str | None, report_path: Path, out_dir: Path):
+    """``pytest_sessionfinish`` 用の薄い session mock を作る。"""
+    config = MagicMock()
+    config.getoption = lambda name, default=None: (
+        drive_folder if name == "ndf_drive_folder" else default
+    )
+    config._ndf_report_path = report_path
+    config._ndf_out_dir = out_dir
+    session = MagicMock()
+    session.config = config
+    return session
+
+
+def test_sessionfinish_uploads_body_check_jsonl_with_any_kind(tmp_path: Path):
+    """body_check.jsonl が ``kind="any"`` で upload される (codex review2 P3)。
+
+    .zip / .har / .mp4 / .webm は ``detect_kind`` の結果、.jsonl は固定で ``any``
+    として upload されることを mock 経由で検証する。
+    """
+    out_dir = tmp_path / "out"
+    sub = out_dir / "case-x"
+    sub.mkdir(parents=True)
+    (sub / "trace.zip").write_bytes(b"")
+    (sub / "request.har").write_bytes(b"")
+    (sub / "video.mp4").write_bytes(b"")
+    (sub / "body_check.jsonl").write_text("{}\n", encoding="utf-8")
+    # 拾わない拡張子 (sanity)
+    (sub / "ignore.txt").write_text("x", encoding="utf-8")
+
+    report = out_dir / "report.md"
+    report.write_text("# r", encoding="utf-8")
+
+    uploads: list[tuple[str, str]] = []
+
+    def fake_upload(f, *, kind, parent_folder_id, public):
+        uploads.append((Path(f).name, kind))
+
+    def fake_detect_kind(f):
+        suffix = Path(f).suffix
+        return {".zip": "trace", ".har": "har", ".mp4": "video", ".webm": "video"}.get(
+            suffix, "any"
+        )
+
+    with patch.dict(
+        "sys.modules",
+        {
+            "scenario_test.uploaders": SimpleNamespace(
+                upload=fake_upload, detect_kind=fake_detect_kind
+            )
+        },
+    ):
+        session = _make_session(
+            drive_folder="DRIVE_FOLDER", report_path=report, out_dir=out_dir
+        )
+        pytest_sessionfinish(session, exitstatus=0)
+
+    by_name = dict(uploads)
+    # report.md は kind="any" でアップ (実装契約)
+    assert by_name.get("report.md") == "any"
+    # .jsonl は固定で kind="any"
+    assert by_name.get("body_check.jsonl") == "any"
+    # 既存の各種 evidence は detect_kind の結果が反映される
+    assert by_name.get("trace.zip") == "trace"
+    assert by_name.get("request.har") == "har"
+    assert by_name.get("video.mp4") == "video"
+    # 想定外拡張子は upload されない
+    assert "ignore.txt" not in by_name
+
+
+def test_sessionfinish_skips_when_no_drive_folder(tmp_path: Path):
+    """``--ndf-drive-folder`` 未指定なら upload は走らない。"""
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    report = out_dir / "report.md"
+    report.write_text("# r", encoding="utf-8")
+
+    uploads: list[str] = []
+
+    def fake_upload(*args, **kwargs):
+        uploads.append("called")
+
+    with patch.dict(
+        "sys.modules",
+        {
+            "scenario_test.uploaders": SimpleNamespace(
+                upload=fake_upload, detect_kind=lambda f: "any"
+            )
+        },
+    ):
+        session = _make_session(
+            drive_folder=None, report_path=report, out_dir=out_dir
+        )
+        pytest_sessionfinish(session, exitstatus=0)
+
+    assert uploads == []

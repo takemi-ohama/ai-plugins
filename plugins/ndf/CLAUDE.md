@@ -168,8 +168,8 @@ plugins/ndf/
     - body_check が teardown で `pytest.fail` した場合、call phase は passed
       のまま teardown report が failed/error になるため、`_collect_entries` で
       teardown 失敗を call entry に反映 (`outcome` を passed → failed に昇格)
-  - **検証**: 既存 102 件 + body_check 関連 31 件 + report 関連 6 件 + collect_entries
-    teardown 昇格 4 件 + その他 2 件 = **145 件 pure 関数テスト pass**
+  - **検証**: 既存 + body_check / report / collect_entries 昇格 / sessionfinish
+    upload を含めて **147 件 pure 関数テスト pass** (`uv run pytest -q`)
 - Skills: 36個 (変化なし、playwright-scenario-test の中身に opt-in 機能追加)
 
 ### v4.2.0 (playwright-scenario-test v0.3.0 — pure pytest-playwright 完全移行)

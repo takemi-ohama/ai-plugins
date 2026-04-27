@@ -124,7 +124,7 @@ cwv:
 #     - "Fatal error"
 #     - "Uncaught"
 #     - "Parse error"
-#   # 本文の先頭 warning_head_bytes バイトのみ走査
+#   # 本文の先頭 warning_head_chars 文字のみ走査
 #   # (本文中の説明文や入力例の "Notice:" 等を許容)
 #   warning_patterns:
 #     - "STRICT:"
