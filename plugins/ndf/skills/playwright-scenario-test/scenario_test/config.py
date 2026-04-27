@@ -190,9 +190,11 @@ class BodyCheckConfig:
 
     - ``fatal_patterns``: HTML 本文全体に対する substring match。1 つでも
       含まれれば violation。
-    - ``warning_patterns``: 本文の **先頭 ``warning_head_bytes`` バイト** に
+    - ``warning_patterns``: 本文の **先頭 ``warning_head_chars`` 文字** に
       対する substring match。本文中の説明文に含まれる "Notice:" 等は許容し、
       ページ最上段への漏れだけを拾う。
+      (PLAN18 の説明文は「先頭 300 文字」、code point ベース。日本語ページで
+      300 bytes だと先頭 1〜2 行しか見えず実用にならないため、文字数を採用。)
     - ``not_found_patterns``: 本文全体への substring match。
     - ``fail_on_match``: True なら violation 検出時に ``pytest.fail``。
       False なら情報収集のみ (report.md / body_check.jsonl には記録)。
@@ -213,7 +215,10 @@ class BodyCheckConfig:
         "Notice:",
         "Deprecated:",
     ])
-    warning_head_bytes: int = 300
+    # 文字数ベースの head 切り出し閾値 (code points)。PLAN18 のフィールド名は
+    # ``warning_head_bytes`` だったが、説明文は「先頭 300 文字」と書かれており
+    # 矛盾していた。実用上は文字数の方が日本語ページで安定するため採用。
+    warning_head_chars: int = 300
     not_found_patterns: list[str] = field(default_factory=lambda: [
         "File not found",
     ])
@@ -377,11 +382,17 @@ def _body_check_from_raw(raw: dict[str, Any]) -> BodyCheckConfig:
             return list(default)
         return [str(s) for s in value]
 
+    # ``warning_head_chars`` を新フィールド名として採用。旧名 ``warning_head_bytes``
+    # も alias として受理する (PLAN18 がフィールド名と説明文で矛盾していた経緯)。
+    head_chars = raw.get("warning_head_chars")
+    if head_chars is None:
+        head_chars = raw.get("warning_head_bytes", base.warning_head_chars)
+
     return BodyCheckConfig(
         enabled=bool(raw.get("enabled", base.enabled)),
         fatal_patterns=_patterns("fatal_patterns", base.fatal_patterns),
         warning_patterns=_patterns("warning_patterns", base.warning_patterns),
-        warning_head_bytes=int(raw.get("warning_head_bytes", base.warning_head_bytes)),
+        warning_head_chars=int(head_chars),
         not_found_patterns=_patterns("not_found_patterns", base.not_found_patterns),
         fail_on_match=bool(raw.get("fail_on_match", base.fail_on_match)),
     )

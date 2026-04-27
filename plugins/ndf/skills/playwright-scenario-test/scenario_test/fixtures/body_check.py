@@ -1,14 +1,19 @@
 """body_check fixture: ``page.on("response", ...)`` でレスポンス本文を監視し、
 PHP / SSR が HTML 本文に出力したエラー文字列を検出する (v0.4.0)。
 
-config.yaml の ``body_check.enabled: true`` で opt-in 有効化。``page`` fixture を
-要求している test に限り autouse で listener を attach する (a11y autouse と
-同じ guard 戦略)。``@pytest.mark.no_body_check`` を test に付ければ個別に
-opt-out 可能。
+config.yaml の ``body_check.enabled`` の default は ``True`` (PHP 系パターン
+内蔵)。``page`` fixture を要求している test に限り autouse で listener を
+attach する (a11y autouse と同じ guard 戦略)。
 
-backward compat:
-- ``body_check.enabled`` の default は False (config.py)
-- 既存利用者は config に何も書かなければ従来挙動 (検出ロジックなし)
+opt-out:
+- 全体無効化: ``body_check.enabled: false`` を config.yaml に明示
+- カテゴリ単位: ``fatal_patterns: []`` などで明示空指定
+- 個別 test: ``@pytest.mark.no_body_check`` を付与
+
+注意:
+- 同じ page を ``ndf_body_check_scan`` helper で手動スキャンしつつ autouse
+  listener も走らせると、同一 violation を重複加算する。helper は autouse の
+  listener が拾えないタイミング (例: SPA 内のローカル DOM 更新後) でのみ使う。
 """
 
 from __future__ import annotations
@@ -35,7 +40,7 @@ def _build_response_handler(cfg: BodyCheckConfig, ev: NdfEvidence):
     fatal = tuple(cfg.fatal_patterns)
     warn = tuple(cfg.warning_patterns)
     not_found = tuple(cfg.not_found_patterns)
-    head_bytes = int(cfg.warning_head_bytes)
+    head_chars = int(cfg.warning_head_chars)
 
     def _on_response(response) -> None:
         try:
@@ -52,7 +57,7 @@ def _build_response_handler(cfg: BodyCheckConfig, ev: NdfEvidence):
                 response.url,
                 fatal_patterns=fatal,
                 warning_patterns=warn,
-                warning_head_bytes=head_bytes,
+                warning_head_chars=head_chars,
                 not_found_patterns=not_found,
             )
             for v in violations:
@@ -111,7 +116,7 @@ def ndf_body_check_scan(page, ndf_evidence: NdfEvidence, _ndf_config_optional):
             page.url,
             fatal_patterns=config.body_check.fatal_patterns,
             warning_patterns=config.body_check.warning_patterns,
-            warning_head_bytes=config.body_check.warning_head_bytes,
+            warning_head_chars=config.body_check.warning_head_chars,
             not_found_patterns=config.body_check.not_found_patterns,
         )
         as_dicts = [v.to_dict() for v in violations]

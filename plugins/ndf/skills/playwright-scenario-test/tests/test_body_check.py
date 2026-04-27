@@ -61,12 +61,45 @@ def test_scan_body_warning_only_in_head_bytes():
         head_pollution,
         url="https://e.example/u.php",
         warning_patterns=["STRICT:"],
-        warning_head_bytes=100,
+        warning_head_chars=100,
     )
     # head のヒットだけ拾う (deep 側は無視)
     assert len(violations) == 1
     assert violations[0].category == "warning"
     assert violations[0].pattern == "STRICT:"
+
+
+def test_scan_body_warning_head_uses_code_points_not_bytes():
+    """warning_head_chars は **文字数** (code point) で切る。
+
+    PLAN18 のフィールド名は ``warning_head_bytes`` だが、説明文は
+    「先頭 300 文字」と書かれており、実用的にも日本語ページで bytes だと
+    100 字しか見られないため文字数を採用している。
+    日本語 (3 byte/字) を 200 字並べた後 ``Notice:`` を置いても、head
+    閾値 300 文字の中に収まれば検出できる。
+    """
+    body = ("あ" * 200) + "Notice: header leak"
+    violations = scan_body(
+        body,
+        url="https://e.example/jp.php",
+        warning_patterns=["Notice:"],
+        warning_head_chars=300,
+    )
+    # 文字数換算なので head 内 (200 字 < 300 字)
+    assert len(violations) == 1
+    assert violations[0].pattern == "Notice:"
+
+
+def test_scan_body_warning_head_excludes_beyond_chars():
+    """head 閾値より後ろにある warning は拾わない (文字数換算で正しく弾く)。"""
+    body = ("a" * 350) + "Notice: too late"
+    violations = scan_body(
+        body,
+        url="https://e.example/x.php",
+        warning_patterns=["Notice:"],
+        warning_head_chars=300,
+    )
+    assert violations == []
 
 
 def test_scan_body_warning_ignored_when_only_in_body_tail():
@@ -76,7 +109,7 @@ def test_scan_body_warning_ignored_when_only_in_body_tail():
         body,
         url="https://e.example/u.php",
         warning_patterns=["Notice:"],
-        warning_head_bytes=300,
+        warning_head_chars=300,
     )
     assert violations == []
 
@@ -110,7 +143,7 @@ def test_scan_body_handles_multiple_categories():
         fatal_patterns=["Fatal error"],
         warning_patterns=["STRICT:"],
         not_found_patterns=["File not found"],
-        warning_head_bytes=300,
+        warning_head_chars=300,
     )
     cats = {v.category for v in violations}
     assert cats == {"fatal", "warning", "not_found"}
@@ -163,7 +196,7 @@ def test_body_check_from_raw_defaults_when_empty():
     """
     cfg = _body_check_from_raw({})
     assert cfg.enabled is True
-    assert cfg.warning_head_bytes == 300
+    assert cfg.warning_head_chars == 300
     assert cfg.fail_on_match is True
     # 内蔵 PHP 系 default パターン
     assert "Fatal error" in cfg.fatal_patterns
@@ -179,12 +212,26 @@ def test_body_check_from_raw_explicit_empty_disables_category():
     assert cfg.warning_patterns != []
 
 
+def test_body_check_from_raw_accepts_legacy_warning_head_bytes_alias():
+    """旧フィールド名 ``warning_head_bytes`` も alias として受理する。"""
+    cfg = _body_check_from_raw({"warning_head_bytes": 250})
+    assert cfg.warning_head_chars == 250
+
+
+def test_body_check_from_raw_new_name_takes_priority_over_alias():
+    """新旧両方が指定されたら新名 ``warning_head_chars`` を優先する。"""
+    cfg = _body_check_from_raw(
+        {"warning_head_chars": 400, "warning_head_bytes": 100}
+    )
+    assert cfg.warning_head_chars == 400
+
+
 def test_body_check_from_raw_full():
     raw = {
         "enabled": True,
         "fatal_patterns": ["Fatal error", "Uncaught"],
         "warning_patterns": ["STRICT:"],
-        "warning_head_bytes": 200,
+        "warning_head_chars": 200,
         "not_found_patterns": ["File not found"],
         "fail_on_match": False,
     }
@@ -192,7 +239,7 @@ def test_body_check_from_raw_full():
     assert cfg.enabled is True
     assert cfg.fatal_patterns == ["Fatal error", "Uncaught"]
     assert cfg.warning_patterns == ["STRICT:"]
-    assert cfg.warning_head_bytes == 200
+    assert cfg.warning_head_chars == 200
     assert cfg.not_found_patterns == ["File not found"]
     assert cfg.fail_on_match is False
 
@@ -231,7 +278,7 @@ def _make_config_with_body_check(**kwargs) -> Config:
         enabled=kwargs.pop("enabled", True),
         fatal_patterns=kwargs.pop("fatal_patterns", ["Fatal error"]),
         warning_patterns=kwargs.pop("warning_patterns", ["STRICT:"]),
-        warning_head_bytes=kwargs.pop("warning_head_bytes", 300),
+        warning_head_chars=kwargs.pop("warning_head_chars", 300),
         not_found_patterns=kwargs.pop("not_found_patterns", []),
         fail_on_match=kwargs.pop("fail_on_match", True),
     )

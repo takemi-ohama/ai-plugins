@@ -131,7 +131,7 @@ cwv:
 #     - "Warning:"
 #     - "Notice:"
 #     - "Deprecated:"
-#   warning_head_bytes: 300
+#   warning_head_chars: 300   # (旧名 warning_head_bytes も alias で受理)
 #   not_found_patterns:
 #     - "File not found"
 #   fail_on_match: true   # false にすると情報収集モード (PASS のまま report に出力)

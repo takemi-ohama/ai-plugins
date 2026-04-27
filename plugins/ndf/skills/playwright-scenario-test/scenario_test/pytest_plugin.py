@@ -291,14 +291,18 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
             if detail:
                 entry.body_check_detail = list(detail)
             # body_check が teardown で pytest.fail を起こした場合、call phase
-            # は passed のまま teardown report のみ failed/error になる。
-            # entry.outcome が passed だった場合のみ teardown 失敗を反映する
-            # (call phase の本物の failure は上書きしない)。
+            # は passed / xfailed / xpassed / skipped のまま teardown report
+            # のみ failed/error になる。call phase の本物の failure は上書き
+            # しないが、それ以外の outcome は teardown 失敗を反映させる
+            # (xfail テストでも teardown の body_check fail は実バグ扱い)。
+            teardown_outcome = getattr(rep, "outcome", None)
             if (
-                entry.outcome == "passed"
-                and getattr(rep, "outcome", None) in ("failed", "error")
+                teardown_outcome in ("failed", "error")
+                and entry.outcome not in ("failed", "error")
             ):
-                entry.outcome = "failed"
+                entry.outcome = (
+                    "error" if teardown_outcome == "error" else "failed"
+                )
                 if rep.longrepr and not entry.error_message:
                     entry.error_message = str(rep.longrepr)
 
@@ -391,16 +395,20 @@ def pytest_sessionfinish(session, exitstatus):
                 report_path, kind="any", parent_folder_id=folder_id, public=False
             )
 
-        # trace.zip / *.har / *.mp4 を 1 階層下から拾い上げる
+        # trace.zip / *.har / *.mp4 / body_check.jsonl を 1 階層下から拾い上げる
         for sub in out_dir.iterdir():
             if not sub.is_dir():
                 continue
             for f in sub.iterdir():
-                if f.suffix in (".zip", ".har", ".mp4", ".webm"):
-                    kind = detect_kind(f)
-                    upload(
-                        f, kind=kind, parent_folder_id=folder_id, public=False
-                    )
+                suffix = f.suffix
+                if suffix not in (".zip", ".har", ".mp4", ".webm", ".jsonl"):
+                    continue
+                # detect_kind は body_check.jsonl 等の任意ファイルを未知の kind
+                # と扱うため、jsonl は ``any`` に固定する。
+                kind = "any" if suffix == ".jsonl" else detect_kind(f)
+                upload(
+                    f, kind=kind, parent_folder_id=folder_id, public=False
+                )
     except Exception as exc:  # pragma: no cover - depends on Drive auth
         import warnings
 

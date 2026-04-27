@@ -157,14 +157,10 @@ def render_markdown(
             lines.append("| # | URL | category | pattern | snippet |")
             lines.append("|---:|---|---|---|---|")
             for i, v in enumerate(e.body_check_detail[:20], start=1):
-                url = str(v.get("url", "?"))
-                cat = str(v.get("category", "?"))
-                pat = str(v.get("pattern", "?")).replace("|", "\\|")
-                snippet = (
-                    str(v.get("snippet", ""))
-                    .replace("|", "\\|")
-                    .replace("`", "\\`")
-                )
+                url = _escape_table_cell(str(v.get("url", "?")))
+                cat = _escape_table_cell(str(v.get("category", "?")))
+                pat = _escape_table_cell(str(v.get("pattern", "?")))
+                snippet = _escape_table_cell(str(v.get("snippet", "")))
                 if len(snippet) > 200:
                     snippet = snippet[:200] + "..."
                 lines.append(f"| {i} | `{url}` | {cat} | `{pat}` | {snippet} |")
@@ -175,6 +171,22 @@ def render_markdown(
             lines.append("")
 
     return "\n".join(lines) + "\n"
+
+
+def _escape_table_cell(text: str) -> str:
+    """Markdown 表のセル値を 1 行に潰してエスケープする。
+
+    改行・タブが残ると行が分割されて表が崩れるので空白に置換する。
+    ``|`` と backtick もエスケープして表構造とコード span を破壊しないようにする。
+    """
+    return (
+        text.replace("\r\n", " ")
+        .replace("\r", " ")
+        .replace("\n", " ")
+        .replace("\t", " ")
+        .replace("|", "\\|")
+        .replace("`", "\\`")
+    )
 
 
 def write_report(

@@ -53,14 +53,16 @@ def scan_body(
     *,
     fatal_patterns: Iterable[str] = (),
     warning_patterns: Iterable[str] = (),
-    warning_head_bytes: int = 300,
+    warning_head_chars: int = 300,
     not_found_patterns: Iterable[str] = (),
 ) -> list[BodyViolation]:
     """``body`` に該当パターンが出現すれば ``BodyViolation`` のリストで返す。
 
     - ``fatal_patterns`` / ``not_found_patterns`` は body 全体を substring で走査
-    - ``warning_patterns`` は ``body[:warning_head_bytes]`` のみを走査 (本文中の
-      説明文や入力例の "Notice:" 等を許容するため)
+    - ``warning_patterns`` は ``body[:warning_head_chars]`` (= 先頭 N 文字 /
+      code points) のみを走査。本文中の説明文や入力例の "Notice:" 等を許容する
+      ための head 検索。bytes ではなく code points で切るのは、日本語ページで
+      300 bytes ≒ 100 字相当となり実用にならないため。
 
     パターン文字列は **substring 比較** (正規表現ではない)。空文字列は無視する。
     """
@@ -69,7 +71,7 @@ def scan_body(
     if not body:
         return violations
 
-    head_size = max(0, int(warning_head_bytes))
+    head_size = max(0, int(warning_head_chars))
     head = body[:head_size] if head_size else ""
 
     for pat in fatal_patterns:

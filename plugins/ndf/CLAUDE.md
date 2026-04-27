@@ -149,7 +149,7 @@ plugins/ndf/
       enabled: true                    # default: true (機能無効化したい場合のみ false)
       fatal_patterns: ["Fatal error", "Uncaught", "Parse error"]
       warning_patterns: ["STRICT:", "Warning:", "Notice:", "Deprecated:"]
-      warning_head_bytes: 300          # warning_patterns は本文先頭 N バイトのみ走査
+      warning_head_chars: 300          # warning_patterns は本文先頭 N 文字のみ走査 (PLAN18 のフィールド名 warning_head_bytes も alias で受理)
       not_found_patterns: ["File not found"]
       fail_on_match: true              # false で情報収集モード
     ```
@@ -168,7 +168,8 @@ plugins/ndf/
     - body_check が teardown で `pytest.fail` した場合、call phase は passed
       のまま teardown report が failed/error になるため、`_collect_entries` で
       teardown 失敗を call entry に反映 (`outcome` を passed → failed に昇格)
-  - **検証**: 既存 102 件 + body_check 関連 27 件 + report 関連 4 件 = **133 件 pure 関数テスト pass**
+  - **検証**: 既存 102 件 + body_check 関連 31 件 + report 関連 6 件 + collect_entries
+    teardown 昇格 4 件 + その他 2 件 = **145 件 pure 関数テスト pass**
 - Skills: 36個 (変化なし、playwright-scenario-test の中身に opt-in 機能追加)
 
 ### v4.2.0 (playwright-scenario-test v0.3.0 — pure pytest-playwright 完全移行)

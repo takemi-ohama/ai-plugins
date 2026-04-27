@@ -124,16 +124,21 @@ body_check:
   enabled: true
   fatal_patterns: ["Fatal error", "Uncaught", "Parse error"]
   warning_patterns: ["STRICT:", "Warning:", "Notice:", "Deprecated:"]
-  warning_head_bytes: 300          # warning_patterns は本文先頭 N バイトのみ走査
+  warning_head_chars: 300          # warning_patterns は本文先頭 N 文字のみ走査 (旧名 warning_head_bytes も alias)
   not_found_patterns: ["File not found"]
   fail_on_match: true              # false で情報収集モード (PASS のまま report に記録)
 ```
 
-- 違反は `case_dir/body_check.jsonl` に 1 violation = 1 行で出力
+- 違反は `case_dir/body_check.jsonl` に 1 violation = 1 行で出力 (`jq`/`grep`
+  で集計しやすいよう flat structure にしている)
 - `report.md` のサマリ表に `body_check` カラムが、件数 > 0 の場合は詳細セクション
   (URL / pattern / snippet) が出力される
 - 機能ごと無効化したい場合は `body_check.enabled: false` を明示
+- 個別カテゴリのみ無効化したい場合は `fatal_patterns: []` のように明示空指定
 - 個別 test で skip したい場合は `@pytest.mark.no_body_check` を付与
+- 非 PHP プロジェクトでは default の `Notice:` / `Warning:` 等が誤検出になる
+  場合あり。その場合は `warning_patterns: []` で warning カテゴリだけ無効化するか
+  `enabled: false` で機能ごと off にする
 
 ## CLI options
 
