@@ -32,6 +32,7 @@ pytest_plugins = [
     "scenario_test.fixtures.evidence",
     "scenario_test.fixtures.a11y",
     "scenario_test.fixtures.cwv",
+    "scenario_test.fixtures.body_check",
 ]
 
 
@@ -89,6 +90,7 @@ _NDF_MARKERS: list[tuple[str, str]] = [
     ("role", "role(role_id): test がどの login role を要求するか (`ndf_role_<id>` 経由でも可)"),
     ("phase", "phase(num): report.md のフェーズ集計用 (1〜N の整数)"),
     ("priority", "priority(level): report.md のソート用 (high/mid/low など任意文字列)"),
+    ("no_body_check", "no_body_check: body_check autouse をこの test では skip する"),
 ]
 
 
@@ -153,7 +155,9 @@ def pytest_runtest_makereport(item, call):
 
     # teardown phase: context.close() 後に HAR が flush されるため confirm_har() 再呼び出し。
     # 確定した har_relpath / trace_relpath を teardown report の user_properties に積む。
-    # _collect_entries() がこの値を call entry に merge する。
+    # body_check_violations もこの phase で確定する (autouse fixture finalizer が
+    # pytest.fail 直前まで populate してから走る)。
+    # _collect_entries() がこれらの値を call entry に merge する。
     if rep.when == "teardown" and ev is not None:
         ev.confirm_har()
         if ev.har_relpath:
@@ -161,6 +165,13 @@ def pytest_runtest_makereport(item, call):
         if ev.trace_relpath:
             rep.user_properties.append(
                 ("ndf_trace", str(ev.case_dir / ev.trace_relpath))
+            )
+        rep.user_properties.append(
+            ("ndf_body_check_violations", len(ev.body_check_violations))
+        )
+        if ev.body_check_violations:
+            rep.user_properties.append(
+                ("ndf_body_check_detail", list(ev.body_check_violations))
             )
         return
 
@@ -254,9 +265,9 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
             )
             call_entries[nodeid] = entry
 
-    # Step 2: teardown report の ndf_har / ndf_trace を call entry に merge する。
-    # teardown 時点で context.close() 後の確定値が積まれているため、
-    # call phase で None だった artifact path をここで埋める。
+    # Step 2: teardown report の ndf_har / ndf_trace / body_check を call entry に merge する。
+    # teardown 時点で context.close() 後の確定値や body_check の violation 集計が
+    # 積まれているため、call phase で未確定だった値をここで埋める。
     # pytest は setup/teardown の rep を stats[""] (空文字キー) に格納するため、
     # "" キーも含めて全キーを走査する。
     for outcome_key in terminalreporter.stats:
@@ -272,6 +283,24 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
                 entry.har_path = props["ndf_har"]
             if not entry.trace_path and props.get("ndf_trace"):
                 entry.trace_path = props["ndf_trace"]
+            if "ndf_body_check_violations" in props:
+                entry.body_check_violations = int(
+                    props.get("ndf_body_check_violations") or 0
+                )
+            detail = props.get("ndf_body_check_detail")
+            if detail:
+                entry.body_check_detail = list(detail)
+            # body_check が teardown で pytest.fail を起こした場合、call phase
+            # は passed のまま teardown report のみ failed/error になる。
+            # entry.outcome が passed だった場合のみ teardown 失敗を反映する
+            # (call phase の本物の failure は上書きしない)。
+            if (
+                entry.outcome == "passed"
+                and getattr(rep, "outcome", None) in ("failed", "error")
+            ):
+                entry.outcome = "failed"
+                if rep.longrepr and not entry.error_message:
+                    entry.error_message = str(rep.longrepr)
 
     return list(call_entries.values())
 

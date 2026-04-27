@@ -7,7 +7,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 4.2.0
+- **現在バージョン**: 4.3.0
 - **種類**: 統合プラグイン（Skills + Agents + Hooks / v4.0.0 で Codex MCP 廃止）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -124,6 +124,52 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v4.3.0 (playwright-scenario-test v0.4.0 — body_check 復活)
+
+- **`playwright-scenario-test` v0.4.0**: 旧 v0.2.x の自前 YAML runner にあった
+  **`body_check`** 機能 (PHP / SSR がフロントに漏れさせる ``Fatal error`` /
+  ``Uncaught`` / ``STRICT:`` / ``Warning:`` / ``Notice:`` / ``File not found``
+  等を **テスト失敗として検出**) を **default 有効** で復活させた。
+  まだ開発・検証段階の skill のため互換性は重視せず、config 無記述でも
+  PHP プロジェクトで素直に効くよう default で `enabled=True` + PHP 系
+  パターンを内蔵する。詳細は [PLAN18](../../issues/PLAN18.md) を参照。
+  - **新モジュール**:
+    - `scenario_test/body_check.py` — 純粋関数 `scan_body` / `is_html_response`
+      と `BodyViolation` dataclass。substring match で fatal / warning /
+      not_found カテゴリの violation を返す
+    - `scenario_test/fixtures/body_check.py` — autouse fixture
+      (`_ndf_body_check_autouse`) と明示呼び出し用 helper (`ndf_body_check_scan`)。
+      `page.on("response", ...)` で全 HTML レスポンスを監視し、teardown で
+      `case_dir/body_check.jsonl` に書き出してから violation 数次第で
+      `pytest.fail`
+  - **新 config schema** (`scenario.config.yaml`, 省略可):
+    ```yaml
+    body_check:
+      enabled: true                    # default: true (機能無効化したい場合のみ false)
+      fatal_patterns: ["Fatal error", "Uncaught", "Parse error"]
+      warning_patterns: ["STRICT:", "Warning:", "Notice:", "Deprecated:"]
+      warning_head_bytes: 300          # warning_patterns は本文先頭 N バイトのみ走査
+      not_found_patterns: ["File not found"]
+      fail_on_match: true              # false で情報収集モード
+    ```
+    各キーは**省略すると dataclass の default**が効く (PHP 系パターン内蔵)。
+    明示的に空リストを書けばそのカテゴリのみ無効化できる。
+  - **新 marker**: `@pytest.mark.no_body_check` で個別テスト opt-out
+  - **report.md**:
+    - サマリ表に `body_check` カラムを追加 (違反件数)
+    - 違反があれば「body_check 違反の詳細」セクション (URL / pattern / snippet)
+      を生成 (PASS でも `fail_on_match=false` の情報収集モードで表示)
+  - **設計ポイント**:
+    - 既存利用者の test 挙動を変えないため `body_check.enabled` の default は
+      **False** (opt-in)。設定を書かない限り従来挙動 (検出ロジックなし) が維持される
+    - autouse fixture は a11y / cwv と同じく `request.fixturenames` ガードで
+      `page` を要求していない test を skip
+    - body_check が teardown で `pytest.fail` した場合、call phase は passed
+      のまま teardown report が failed/error になるため、`_collect_entries` で
+      teardown 失敗を call entry に反映 (`outcome` を passed → failed に昇格)
+  - **検証**: 既存 102 件 + body_check 関連 27 件 + report 関連 4 件 = **133 件 pure 関数テスト pass**
+- Skills: 36個 (変化なし、playwright-scenario-test の中身に opt-in 機能追加)
 
 ### v4.2.0 (playwright-scenario-test v0.3.0 — pure pytest-playwright 完全移行)
 

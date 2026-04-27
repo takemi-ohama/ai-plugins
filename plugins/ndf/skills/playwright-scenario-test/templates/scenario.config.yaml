@@ -108,6 +108,34 @@ cwv:
   observe_ms: 5000
   fail_on_poor: true
 
+# --- body_check (PHP / SSR エラー検出, v0.4.0) -----------------------
+# console.error / pageerror では拾えない、サーバ側で HTML 本文に直接出力された
+# "Fatal error" / "Warning:" 等のエラー文字列を検出する。
+# - default: enabled=true + PHP 系デフォルトパターン内蔵 (config を書かなくても効く)
+# - autouse: page fixture を要求する test に対して page.on("response") 経由で
+#   全 HTML レスポンスを監視。@pytest.mark.no_body_check で個別 opt-out 可能
+# - 各 test 終了時に case_dir/body_check.jsonl に違反詳細を出力
+# - 一切無効化したい場合は body_check.enabled: false を明示
+# - パターンを上書きしたい場合のみ下記キーを書く (省略すれば内蔵 default が効く)
+# body_check:
+#   enabled: true
+#   # 本文全体への substring match (1 つでも含まれれば violation)
+#   fatal_patterns:
+#     - "Fatal error"
+#     - "Uncaught"
+#     - "Parse error"
+#   # 本文の先頭 warning_head_bytes バイトのみ走査
+#   # (本文中の説明文や入力例の "Notice:" 等を許容)
+#   warning_patterns:
+#     - "STRICT:"
+#     - "Warning:"
+#     - "Notice:"
+#     - "Deprecated:"
+#   warning_head_bytes: 300
+#   not_found_patterns:
+#     - "File not found"
+#   fail_on_match: true   # false にすると情報収集モード (PASS のまま report に出力)
+
 # --- レポート設定 -----------------------------------------------------
 # pytest_terminal_summary が ``reports/<run-id>/report.md`` に書き出す
 # Markdown のタイトル等。

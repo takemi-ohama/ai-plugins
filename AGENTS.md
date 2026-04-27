@@ -62,7 +62,7 @@ ai-plugins/
 
 ## NDFプラグインについて
 
-**NDFプラグイン**は、このマーケットプレイスの主要プラグインです（v4.1.0）：
+**NDFプラグイン**は、このマーケットプレイスの主要プラグインです（v4.3.0）：
 - 8個の専門サブエージェント（director、data-analyst、corder、researcher、qa、debugger、devops-engineer、code-reviewer）
 - 36個のSkills（PR/コードレビューワークフロー、原則・ガイドライン、SQL最適化、データエクスポート、skill利用統計、Codex CLI連携、Playwrightシナリオテスト、Google Drive/Chat連携 等）
 - SessionStartフック（transcript保持期間自動管理 `cleanupPeriodDays >= 90`）

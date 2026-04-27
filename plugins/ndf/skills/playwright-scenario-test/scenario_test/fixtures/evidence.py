@@ -118,6 +118,9 @@ class NdfEvidence:
     axe_violations: list[dict[str, Any]] = field(default_factory=list)
     cwv_metrics: dict[str, float] = field(default_factory=dict)
     cwv_passed: bool = True
+    # PHP / SSR ページ本文エラー (body_check) 違反 (v0.4.0)。1 件 = 1 dict
+    # ({url, category, pattern, snippet})。
+    body_check_violations: list[dict[str, Any]] = field(default_factory=list)
 
     log_lines: list[str] = field(default_factory=list)
 
