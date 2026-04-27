@@ -98,13 +98,47 @@ NDF が提供する fixture / marker:
 |---|---|---|
 | `ndf_config` | session fixture | `scenario.config.yaml` をロード (Config dataclass) |
 | `ndf_role_<id>` | function fixture (動的) | 該当 role で login 済の storage_state を context に注入 |
-| `ndf_evidence` | function fixture | HAR / trace / console.error / pageerror の集中管理 |
+| `ndf_evidence` | function fixture | HAR / trace / console.error / pageerror / body_check の集中管理 |
 | `ndf_a11y_scan` | helper | 任意のタイミングで axe-core を 1 回実行 |
 | `ndf_cwv_measure` | helper | 任意のタイミングで CWV を 1 回計測 |
+| `ndf_body_check_scan` | helper | 任意のタイミングで現在の page 本文を 1 回 body_check |
 | `@pytest.mark.page_role("form")` | marker | a11y / CWV autouse の判定 (auto_roles 設定に従う) |
 | `@pytest.mark.role("admin")` | marker | report.md 集計用 (login 自体は `ndf_role_<id>` fixture) |
 | `@pytest.mark.phase(1)` | marker | report.md フェーズ集計 |
 | `@pytest.mark.priority("high")` | marker | report.md ソート |
+| `@pytest.mark.no_body_check` | marker | body_check autouse をこの test では skip |
+
+### body_check (PHP / SSR エラー検出, v0.4.0+)
+
+PHP / SSR が HTML 本文に直接出力した `Fatal error` / `Warning:` / `STRICT:` 等の
+エラー文字列は console.error / pageerror では拾えない。`body_check` は
+`page.on("response")` で全 HTML レスポンスを監視し、文字列パターンとの substring
+一致で violation を記録する。**default で enabled + PHP 系パターン内蔵** なので、
+config を書かなくても PHP プロジェクトでまず動く。
+
+パターンを上書きしたい場合のみ `scenario.config.yaml` で明示する:
+
+```yaml
+# scenario.config.yaml (省略可)
+body_check:
+  enabled: true
+  fatal_patterns: ["Fatal error", "Uncaught", "Parse error"]
+  warning_patterns: ["STRICT:", "Warning:", "Notice:", "Deprecated:"]
+  warning_head_chars: 300          # warning_patterns は本文先頭 N 文字のみ走査 (旧名 warning_head_bytes も alias)
+  not_found_patterns: ["File not found"]
+  fail_on_match: true              # false で情報収集モード (PASS のまま report に記録)
+```
+
+- 違反は `case_dir/body_check.jsonl` に 1 violation = 1 行で出力 (`jq`/`grep`
+  で集計しやすいよう flat structure にしている)
+- `report.md` のサマリ表に `body_check` カラムが、件数 > 0 の場合は詳細セクション
+  (URL / pattern / snippet) が出力される
+- 機能ごと無効化したい場合は `body_check.enabled: false` を明示
+- 個別カテゴリのみ無効化したい場合は `fatal_patterns: []` のように明示空指定
+- 個別 test で skip したい場合は `@pytest.mark.no_body_check` を付与
+- 非 PHP プロジェクトでは default の `Notice:` / `Warning:` 等が誤検出になる
+  場合あり。その場合は `warning_patterns: []` で warning カテゴリだけ無効化するか
+  `enabled: false` で機能ごと off にする
 
 ## CLI options
 

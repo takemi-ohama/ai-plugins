@@ -170,3 +170,159 @@ def test_write_report_produces_file(tmp_path: Path):
     assert path.exists()
     txt = path.read_text(encoding="utf-8")
     assert "1/1 test PASS" in txt
+
+
+def test_render_markdown_body_check_column_present_with_zero():
+    """body_check カラムは違反 0 件でもサマリ表に出る。"""
+    started = _dt.datetime(2026, 4, 26, 12, 0, 0)
+    finished = _dt.datetime(2026, 4, 26, 12, 0, 1)
+    md = render_markdown(
+        [_entry(nodeid="t::x")],
+        started_at=started,
+        finished_at=finished,
+    )
+    # 表ヘッダに body_check が含まれる
+    assert "body_check" in md
+    # サマリ表の row には末尾に "| 0 |" (body_check_violations) が出る
+    assert "| 0 |" in md
+
+
+def test_render_markdown_body_check_detail_section_for_violations():
+    started = _dt.datetime(2026, 4, 26, 12, 0, 0)
+    finished = _dt.datetime(2026, 4, 26, 12, 0, 1)
+    md = render_markdown(
+        [
+            _entry(
+                nodeid="t::pass_with_violations",
+                outcome="passed",
+                body_check_violations=2,
+                body_check_detail=[
+                    {
+                        "url": "https://e/u.php",
+                        "category": "warning",
+                        "pattern": "STRICT:",
+                        "snippet": "STRICT: page leak",
+                    },
+                    {
+                        "url": "https://e/v.php",
+                        "category": "fatal",
+                        "pattern": "Fatal error",
+                        "snippet": "Fatal error: oops",
+                    },
+                ],
+            ),
+        ],
+        started_at=started,
+        finished_at=finished,
+    )
+    assert "body_check 違反の詳細" in md
+    assert "STRICT:" in md
+    assert "Fatal error" in md
+    assert "https://e/u.php" in md
+
+
+def test_render_markdown_no_body_check_section_when_clean():
+    started = _dt.datetime(2026, 4, 26, 12, 0, 0)
+    finished = _dt.datetime(2026, 4, 26, 12, 0, 1)
+    md = render_markdown(
+        [_entry(nodeid="t::x")],
+        started_at=started,
+        finished_at=finished,
+    )
+    assert "body_check 違反の詳細" not in md
+
+
+def test_render_markdown_body_check_escapes_newlines_in_snippet():
+    """snippet に改行が混入しても表が崩れない (1 violation = 1 row)。"""
+    started = _dt.datetime(2026, 4, 26, 12, 0, 0)
+    finished = _dt.datetime(2026, 4, 26, 12, 0, 1)
+    md = render_markdown(
+        [
+            _entry(
+                nodeid="t::nl",
+                outcome="failed",
+                body_check_violations=1,
+                body_check_detail=[
+                    {
+                        "url": "https://e/u.php",
+                        "category": "fatal",
+                        "pattern": "Fatal error",
+                        "snippet": "line1\nline2\twith pipe | and `code`",
+                    }
+                ],
+            ),
+        ],
+        started_at=started,
+        finished_at=finished,
+    )
+    # detail セクションは存在する
+    assert "body_check 違反の詳細" in md
+    # 表の row には改行が混ざっていない (cell が複数行に割れない)
+    detail_section = md.split("body_check 違反の詳細", 1)[1]
+    table_rows = [
+        line for line in detail_section.splitlines()
+        if line.startswith("| 1 ")
+    ]
+    assert len(table_rows) == 1
+    row = table_rows[0]
+    assert "line1 line2 with pipe \\| and \\`code\\`" in row
+    # row 内に改行や生 backtick が残らない
+    assert "\n" not in row
+    assert "`code`" not in row  # backtick is escaped
+
+
+def test_render_markdown_body_check_escapes_pipe_in_pattern():
+    """pattern に ``|`` が含まれても表が崩れない。"""
+    started = _dt.datetime(2026, 4, 26, 12, 0, 0)
+    finished = _dt.datetime(2026, 4, 26, 12, 0, 1)
+    md = render_markdown(
+        [
+            _entry(
+                nodeid="t::pipe",
+                outcome="failed",
+                body_check_violations=1,
+                body_check_detail=[
+                    {
+                        "url": "https://e/x",
+                        "category": "fatal",
+                        "pattern": "Fatal | error",
+                        "snippet": "ok",
+                    }
+                ],
+            ),
+        ],
+        started_at=started,
+        finished_at=finished,
+    )
+    assert "Fatal \\| error" in md
+
+
+def test_render_markdown_body_check_truncates_at_20():
+    started = _dt.datetime(2026, 4, 26, 12, 0, 0)
+    finished = _dt.datetime(2026, 4, 26, 12, 0, 1)
+    detail = [
+        {
+            "url": f"https://e/u{i}.php",
+            "category": "warning",
+            "pattern": "STRICT:",
+            "snippet": f"hit {i}",
+        }
+        for i in range(25)
+    ]
+    md = render_markdown(
+        [
+            _entry(
+                nodeid="t::many",
+                outcome="failed",
+                body_check_violations=25,
+                body_check_detail=detail,
+            ),
+        ],
+        started_at=started,
+        finished_at=finished,
+    )
+    assert "body_check.jsonl" in md
+    # 表示されない 21 件目以降のひとつ (u24) が出ていないこと
+    assert "u24.php" not in md
+    # 表示される 1 件目は出る
+    assert "u0.php" in md

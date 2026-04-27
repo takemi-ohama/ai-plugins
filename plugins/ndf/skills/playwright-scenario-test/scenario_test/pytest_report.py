@@ -33,6 +33,9 @@ class NdfTestEntry:
     console_errors: int = 0
     page_errors: int = 0
     error_message: str | None = None
+    # body_check (PHP / SSR エラー検出, v0.4.0)
+    body_check_violations: int = 0
+    body_check_detail: list[dict] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -108,8 +111,8 @@ def render_markdown(
         "",
         "## サマリ",
         "",
-        "| nodeid | role | page_role | status | duration | console.error | pageerror |",
-        "|---|---|---|---|---|---|---|",
+        "| nodeid | role | page_role | status | duration | console.error | pageerror | body_check |",
+        "|---|---|---|---|---|---|---|---|",
     ])
 
     # phase / priority / nodeid の順でソート
@@ -122,7 +125,8 @@ def render_markdown(
         lines.append(
             f"| `{e.nodeid}` | {e.role or '-'} | {page_role} | "
             f"{e.status_label} | {e.duration_s:.2f}s | "
-            f"{e.console_errors} | {e.page_errors} |"
+            f"{e.console_errors} | {e.page_errors} | "
+            f"{e.body_check_violations} |"
         )
 
     failures = [e for e in sorted_entries if e.outcome in ("failed", "error")]
@@ -141,7 +145,48 @@ def render_markdown(
                 lines.append(f"- HAR: `{e.har_path}`")
             lines.append("")
 
+    body_check_hits = [e for e in sorted_entries if e.body_check_violations > 0]
+    if body_check_hits:
+        lines.extend(["", "## body_check 違反の詳細", ""])
+        for e in body_check_hits:
+            lines.append(
+                f"### `{e.nodeid}` — body_check {e.body_check_violations} 件 "
+                f"({e.status_label})"
+            )
+            lines.append("")
+            lines.append("| # | URL | category | pattern | snippet |")
+            lines.append("|---:|---|---|---|---|")
+            for i, v in enumerate(e.body_check_detail[:20], start=1):
+                url = _escape_table_cell(str(v.get("url", "?")))
+                cat = _escape_table_cell(str(v.get("category", "?")))
+                pat = _escape_table_cell(str(v.get("pattern", "?")))
+                snippet = _escape_table_cell(str(v.get("snippet", "")))
+                if len(snippet) > 200:
+                    snippet = snippet[:200] + "..."
+                lines.append(f"| {i} | `{url}` | {cat} | `{pat}` | {snippet} |")
+            if len(e.body_check_detail) > 20:
+                lines.append(
+                    f"\n_(表示は先頭 20 件のみ。詳細は ``body_check.jsonl`` を参照)_"
+                )
+            lines.append("")
+
     return "\n".join(lines) + "\n"
+
+
+def _escape_table_cell(text: str) -> str:
+    """Markdown 表のセル値を 1 行に潰してエスケープする。
+
+    改行・タブが残ると行が分割されて表が崩れるので空白に置換する。
+    ``|`` と backtick もエスケープして表構造とコード span を破壊しないようにする。
+    """
+    return (
+        text.replace("\r\n", " ")
+        .replace("\r", " ")
+        .replace("\n", " ")
+        .replace("\t", " ")
+        .replace("|", "\\|")
+        .replace("`", "\\`")
+    )
 
 
 def write_report(

@@ -32,6 +32,7 @@ pytest_plugins = [
     "scenario_test.fixtures.evidence",
     "scenario_test.fixtures.a11y",
     "scenario_test.fixtures.cwv",
+    "scenario_test.fixtures.body_check",
 ]
 
 
@@ -89,6 +90,7 @@ _NDF_MARKERS: list[tuple[str, str]] = [
     ("role", "role(role_id): test がどの login role を要求するか (`ndf_role_<id>` 経由でも可)"),
     ("phase", "phase(num): report.md のフェーズ集計用 (1〜N の整数)"),
     ("priority", "priority(level): report.md のソート用 (high/mid/low など任意文字列)"),
+    ("no_body_check", "no_body_check: body_check autouse をこの test では skip する"),
 ]
 
 
@@ -153,7 +155,9 @@ def pytest_runtest_makereport(item, call):
 
     # teardown phase: context.close() 後に HAR が flush されるため confirm_har() 再呼び出し。
     # 確定した har_relpath / trace_relpath を teardown report の user_properties に積む。
-    # _collect_entries() がこの値を call entry に merge する。
+    # body_check_violations もこの phase で確定する (autouse fixture finalizer が
+    # pytest.fail 直前まで populate してから走る)。
+    # _collect_entries() がこれらの値を call entry に merge する。
     if rep.when == "teardown" and ev is not None:
         ev.confirm_har()
         if ev.har_relpath:
@@ -161,6 +165,13 @@ def pytest_runtest_makereport(item, call):
         if ev.trace_relpath:
             rep.user_properties.append(
                 ("ndf_trace", str(ev.case_dir / ev.trace_relpath))
+            )
+        rep.user_properties.append(
+            ("ndf_body_check_violations", len(ev.body_check_violations))
+        )
+        if ev.body_check_violations:
+            rep.user_properties.append(
+                ("ndf_body_check_detail", list(ev.body_check_violations))
             )
         return
 
@@ -254,9 +265,9 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
             )
             call_entries[nodeid] = entry
 
-    # Step 2: teardown report の ndf_har / ndf_trace を call entry に merge する。
-    # teardown 時点で context.close() 後の確定値が積まれているため、
-    # call phase で None だった artifact path をここで埋める。
+    # Step 2: teardown report の ndf_har / ndf_trace / body_check を call entry に merge する。
+    # teardown 時点で context.close() 後の確定値や body_check の violation 集計が
+    # 積まれているため、call phase で未確定だった値をここで埋める。
     # pytest は setup/teardown の rep を stats[""] (空文字キー) に格納するため、
     # "" キーも含めて全キーを走査する。
     for outcome_key in terminalreporter.stats:
@@ -272,6 +283,28 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
                 entry.har_path = props["ndf_har"]
             if not entry.trace_path and props.get("ndf_trace"):
                 entry.trace_path = props["ndf_trace"]
+            if "ndf_body_check_violations" in props:
+                entry.body_check_violations = int(
+                    props.get("ndf_body_check_violations") or 0
+                )
+            detail = props.get("ndf_body_check_detail")
+            if detail:
+                entry.body_check_detail = list(detail)
+            # body_check が teardown で pytest.fail を起こした場合、call phase
+            # は passed / xfailed / xpassed / skipped のまま teardown report
+            # のみ failed/error になる。call phase の本物の failure は上書き
+            # しないが、それ以外の outcome は teardown 失敗を反映させる
+            # (xfail テストでも teardown の body_check fail は実バグ扱い)。
+            teardown_outcome = getattr(rep, "outcome", None)
+            if (
+                teardown_outcome in ("failed", "error")
+                and entry.outcome not in ("failed", "error")
+            ):
+                entry.outcome = (
+                    "error" if teardown_outcome == "error" else "failed"
+                )
+                if rep.longrepr and not entry.error_message:
+                    entry.error_message = str(rep.longrepr)
 
     return list(call_entries.values())
 
@@ -362,16 +395,20 @@ def pytest_sessionfinish(session, exitstatus):
                 report_path, kind="any", parent_folder_id=folder_id, public=False
             )
 
-        # trace.zip / *.har / *.mp4 を 1 階層下から拾い上げる
+        # trace.zip / *.har / *.mp4 / body_check.jsonl を 1 階層下から拾い上げる
         for sub in out_dir.iterdir():
             if not sub.is_dir():
                 continue
             for f in sub.iterdir():
-                if f.suffix in (".zip", ".har", ".mp4", ".webm"):
-                    kind = detect_kind(f)
-                    upload(
-                        f, kind=kind, parent_folder_id=folder_id, public=False
-                    )
+                suffix = f.suffix
+                if suffix not in (".zip", ".har", ".mp4", ".webm", ".jsonl"):
+                    continue
+                # detect_kind は body_check.jsonl 等の任意ファイルを未知の kind
+                # と扱うため、jsonl は ``any`` に固定する。
+                kind = "any" if suffix == ".jsonl" else detect_kind(f)
+                upload(
+                    f, kind=kind, parent_folder_id=folder_id, public=False
+                )
     except Exception as exc:  # pragma: no cover - depends on Drive auth
         import warnings
 

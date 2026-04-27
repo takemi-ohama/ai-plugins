@@ -177,6 +177,54 @@ class CwvConfig:
     fail_on_poor: bool = True
 
 
+# --- body_check (PHP / SSR エラー検出, v0.4.0) ----------------------
+
+@dataclass
+class BodyCheckConfig:
+    """ページ本文の文字列マッチ検出 (PHP / SSR プロジェクト向け)。
+
+    JavaScript ランタイム由来の console.error / pageerror では拾えない、
+    サーバ側で HTML 本文に直接出力された "Fatal error" / "Warning:" 等の
+    エラー文字列を、Playwright の ``page.on("response", ...)`` を介して
+    検出する。
+
+    - ``fatal_patterns``: HTML 本文全体に対する substring match。1 つでも
+      含まれれば violation。
+    - ``warning_patterns``: 本文の **先頭 ``warning_head_chars`` 文字** に
+      対する substring match。本文中の説明文に含まれる "Notice:" 等は許容し、
+      ページ最上段への漏れだけを拾う。
+      (PLAN18 の説明文は「先頭 300 文字」、code point ベース。日本語ページで
+      300 bytes だと先頭 1〜2 行しか見えず実用にならないため、文字数を採用。)
+    - ``not_found_patterns``: 本文全体への substring match。
+    - ``fail_on_match``: True なら violation 検出時に ``pytest.fail``。
+      False なら情報収集のみ (report.md / body_check.jsonl には記録)。
+
+    default は ``enabled=True`` + PHP 系のフロント漏れ検出パターンを内蔵。
+    config.yaml を書かなくてもまず PHP プロジェクトで素直に動く。
+    """
+
+    enabled: bool = True
+    fatal_patterns: list[str] = field(default_factory=lambda: [
+        "Fatal error",
+        "Uncaught",
+        "Parse error",
+    ])
+    warning_patterns: list[str] = field(default_factory=lambda: [
+        "STRICT:",
+        "Warning:",
+        "Notice:",
+        "Deprecated:",
+    ])
+    # 文字数ベースの head 切り出し閾値 (code points)。PLAN18 のフィールド名は
+    # ``warning_head_bytes`` だったが、説明文は「先頭 300 文字」と書かれており
+    # 矛盾していた。実用上は文字数の方が日本語ページで安定するため採用。
+    warning_head_chars: int = 300
+    not_found_patterns: list[str] = field(default_factory=lambda: [
+        "File not found",
+    ])
+    fail_on_match: bool = True
+
+
 # --- ルート ---------------------------------------------------------
 
 @dataclass
@@ -198,6 +246,8 @@ class Config:
     # a11y / CWV 自動実行 (page_role に応じて runner が判定)
     a11y: A11yConfig = field(default_factory=A11yConfig)
     cwv: CwvConfig = field(default_factory=CwvConfig)
+    # PHP / SSR ページ本文エラー検出 (v0.4.0, opt-in)
+    body_check: BodyCheckConfig = field(default_factory=BodyCheckConfig)
 
     @property
     def testcases_dir(self) -> Path:
@@ -254,6 +304,7 @@ class Config:
             tolerated_page_errors=list(raw.get("tolerated_page_errors") or []),
             a11y=_a11y_from_raw(raw.get("a11y") or {}),
             cwv=_cwv_from_raw(raw.get("cwv") or {}),
+            body_check=_body_check_from_raw(raw.get("body_check") or {}),
         )
 
         # fail-fast: requires_basic_auth=True なロールが宣言されているのに
@@ -310,4 +361,38 @@ def _cwv_from_raw(raw: dict[str, Any]) -> CwvConfig:
         auto_roles=list(raw.get("auto_roles") or base.auto_roles),
         observe_ms=int(raw.get("observe_ms", base.observe_ms)),
         fail_on_poor=bool(raw.get("fail_on_poor", base.fail_on_poor)),
+    )
+
+
+def _body_check_from_raw(raw: dict[str, Any]) -> BodyCheckConfig:
+    """``body_check`` セクションを ``BodyCheckConfig`` に変換する。
+
+    - キーが **省略** されている場合は dataclass の default 値を採用する
+      (config を書かなくても PHP 系のデフォルトパターンが効くようにするため)。
+    - キーが **明示的に空リスト** で書かれている場合はそのまま空リストにする
+      (default を上書きしてカテゴリを無効化したい場合の挙動)。
+    """
+    base = BodyCheckConfig()
+
+    def _patterns(key: str, default: list[str]) -> list[str]:
+        if key not in raw:
+            return list(default)
+        value = raw.get(key)
+        if value is None:
+            return list(default)
+        return [str(s) for s in value]
+
+    # ``warning_head_chars`` を新フィールド名として採用。旧名 ``warning_head_bytes``
+    # も alias として受理する (PLAN18 がフィールド名と説明文で矛盾していた経緯)。
+    head_chars = raw.get("warning_head_chars")
+    if head_chars is None:
+        head_chars = raw.get("warning_head_bytes", base.warning_head_chars)
+
+    return BodyCheckConfig(
+        enabled=bool(raw.get("enabled", base.enabled)),
+        fatal_patterns=_patterns("fatal_patterns", base.fatal_patterns),
+        warning_patterns=_patterns("warning_patterns", base.warning_patterns),
+        warning_head_chars=int(head_chars),
+        not_found_patterns=_patterns("not_found_patterns", base.not_found_patterns),
+        fail_on_match=bool(raw.get("fail_on_match", base.fail_on_match)),
     )
