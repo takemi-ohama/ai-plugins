@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from scenario_test.config import Config, _expand_env
+from scenario_test.config import Config, PlaywrightConfig, _expand_env
 
 
 _BASE_RAW = {
@@ -134,3 +134,30 @@ def test_tolerated_patterns_loaded():
         "ResizeObserver loop limit",
     ]
     assert cfg.tolerated_page_errors == ["ChunkLoadError"]
+
+
+# --- playwright.har_mode (Issue #62) ---------------------------------
+
+
+def test_har_mode_default_is_minimal():
+    """config を書かない場合 default は minimal (Issue #62 race 回避)。"""
+    cfg = PlaywrightConfig.from_raw({})
+    assert cfg.har_mode == "minimal"
+
+
+@pytest.mark.parametrize("value", ["minimal", "full", "none"])
+def test_har_mode_accepts_valid_values(value: str):
+    cfg = PlaywrightConfig.from_raw({"har_mode": value})
+    assert cfg.har_mode == value
+
+
+@pytest.mark.parametrize("raw,expected", [("FULL", "full"), ("Minimal", "minimal"), ("NONE", "none")])
+def test_har_mode_lowercased(raw: str, expected: str):
+    """大文字混じりでも lowercase 化される。"""
+    cfg = PlaywrightConfig.from_raw({"har_mode": raw})
+    assert cfg.har_mode == expected
+
+
+def test_har_mode_invalid_raises():
+    with pytest.raises(ValueError, match="har_mode"):
+        PlaywrightConfig.from_raw({"har_mode": "invalid"})
