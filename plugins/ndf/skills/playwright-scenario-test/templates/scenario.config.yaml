@@ -2,9 +2,9 @@
 #
 # 使い方:
 #   cp scenario.config.yaml ./scenario.config.yaml
-#   uv run pytest --ndf-config=./scenario.config.yaml
+#   uv run pytest --pwk-config=./scenario.config.yaml
 #
-# pytest が起動する CWD に置けば ``--ndf-config`` 省略も可能。
+# pytest が起動する CWD に置けば ``--pwk-config`` 省略も可能。
 # 認証情報を含むため .gitignore 推奨。
 #
 # ⚠️ 認証情報の管理:
@@ -27,7 +27,7 @@ target:
 verify_tls: false
 
 # --- ロール別ログイン情報 ---------------------------------------
-# pytest テストから ``ndf_role_<id>`` fixture で参照する
+# pytest テストから ``pwk_role_<id>`` fixture で参照する
 roles:
   admin:
     label: 管理者
@@ -80,7 +80,7 @@ playwright:
 
 # --- 許容する console.error / pageerror パターン -------------
 # 3rd party SDK の既知 warning など、プロジェクト責任外の noise を許容するときに
-# 正規表現で除外できる。マッチした行は ``ndf_evidence`` の集計から除かれる。
+# 正規表現で除外できる。マッチした行は ``pwk_evidence`` の集計から除かれる。
 tolerated_console_errors: []
 tolerated_page_errors: []
 # 例:

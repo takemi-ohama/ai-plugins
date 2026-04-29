@@ -11,12 +11,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from scenario_test.body_check import (
+from playwright_kit.body_check import (
     BodyViolation,
     is_html_response,
     scan_body,
 )
-from scenario_test.config import (
+from playwright_kit.config import (
     AccessibilityConfig,
     BasicAuth,
     BodyCheckConfig,
@@ -27,12 +27,12 @@ from scenario_test.config import (
     RunnerConfig,
     _body_check_from_raw,
 )
-from scenario_test.fixtures.body_check import (
+from playwright_kit.fixtures.body_check import (
     _build_response_handler,
     _format_violation_summary,
     _write_jsonl,
 )
-from scenario_test.fixtures.evidence import NdfEvidence
+from playwright_kit.fixtures.evidence import PwkEvidence
 
 
 # ---------------------------------------------------------------------
@@ -307,7 +307,7 @@ def _make_response(*, url: str, body: str, content_type: str = "text/html") -> M
 
 def test_response_handler_records_violation_for_html(tmp_path: Path):
     cfg = _make_config_with_body_check()
-    ev = NdfEvidence(case_dir=tmp_path, config=cfg, enabled=True)
+    ev = PwkEvidence(case_dir=tmp_path, config=cfg, enabled=True)
     handler = _build_response_handler(cfg.body_check, ev)
 
     handler(
@@ -323,7 +323,7 @@ def test_response_handler_records_violation_for_html(tmp_path: Path):
 
 def test_response_handler_skips_non_html(tmp_path: Path):
     cfg = _make_config_with_body_check()
-    ev = NdfEvidence(case_dir=tmp_path, config=cfg, enabled=True)
+    ev = PwkEvidence(case_dir=tmp_path, config=cfg, enabled=True)
     handler = _build_response_handler(cfg.body_check, ev)
 
     # JSON response with the same string must NOT be inspected
@@ -340,7 +340,7 @@ def test_response_handler_skips_non_html(tmp_path: Path):
 def test_response_handler_swallows_text_failure(tmp_path: Path):
     """response.text() が失敗しても test を落とさず log_lines に残らない (静かに skip)。"""
     cfg = _make_config_with_body_check()
-    ev = NdfEvidence(case_dir=tmp_path, config=cfg, enabled=True)
+    ev = PwkEvidence(case_dir=tmp_path, config=cfg, enabled=True)
     handler = _build_response_handler(cfg.body_check, ev)
 
     resp = MagicMock()
@@ -355,7 +355,7 @@ def test_response_handler_swallows_text_failure(tmp_path: Path):
 
 def test_write_jsonl_outputs_one_line_per_violation(tmp_path: Path):
     cfg = _make_config_with_body_check()
-    ev = NdfEvidence(case_dir=tmp_path, config=cfg, enabled=True)
+    ev = PwkEvidence(case_dir=tmp_path, config=cfg, enabled=True)
     ev.body_check_violations = [
         {"url": "u1", "category": "fatal", "pattern": "Fatal error", "snippet": "..."},
         {"url": "u2", "category": "warning", "pattern": "STRICT:", "snippet": "..."},
@@ -370,7 +370,7 @@ def test_write_jsonl_outputs_one_line_per_violation(tmp_path: Path):
 
 def test_write_jsonl_noop_when_no_violations(tmp_path: Path):
     cfg = _make_config_with_body_check()
-    ev = NdfEvidence(case_dir=tmp_path, config=cfg, enabled=True)
+    ev = PwkEvidence(case_dir=tmp_path, config=cfg, enabled=True)
     _write_jsonl(ev)
     assert not (tmp_path / "body_check.jsonl").exists()
 
@@ -388,7 +388,7 @@ def test_format_violation_summary_truncates_long_lists():
     assert "u9" not in s
 
 
-def test_ndf_evidence_default_body_check_violations_is_empty(tmp_path: Path):
+def test_pwk_evidence_default_body_check_violations_is_empty(tmp_path: Path):
     cfg = _make_config_with_body_check()
-    ev = NdfEvidence(case_dir=tmp_path, config=cfg, enabled=True)
+    ev = PwkEvidence(case_dir=tmp_path, config=cfg, enabled=True)
     assert ev.body_check_violations == []

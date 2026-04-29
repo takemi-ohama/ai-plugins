@@ -1,6 +1,6 @@
 """Phase 2 unit: evidence / accessibility / web_vitals fixture の純関数ロジック。
 
-Playwright を起動しないため、``NdfEvidence`` の listener / page_role marker
+Playwright を起動しないため、``PwkEvidence`` の listener / page_role marker
 の解釈 / autouse の guard 条件など、純粋なロジック部分のみをテストする。
 end-to-end は Phase 3 以降で smoke 化する。
 """
@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from scenario_test.config import (
+from playwright_kit.config import (
     AccessibilityConfig,
     BasicAuth,
     Config,
@@ -23,10 +23,10 @@ from scenario_test.config import (
     ReportConfig,
     RunnerConfig,
 )
-from scenario_test.fixtures.accessibility import _page_roles_from_marker as a11y_marker
-from scenario_test.fixtures.web_vitals import _page_roles_from_marker as cwv_marker
-from scenario_test.fixtures.evidence import (
-    NdfEvidence,
+from playwright_kit.fixtures.accessibility import _page_roles_from_marker as a11y_marker
+from playwright_kit.fixtures.web_vitals import _page_roles_from_marker as cwv_marker
+from playwright_kit.fixtures.evidence import (
+    PwkEvidence,
     _resolve_har_mode,
     _safe_case_slug,
     _safe_slug,
@@ -108,13 +108,13 @@ def test_safe_case_slug_length_bounded(monkeypatch):
     assert len(slug) <= 70
 
 
-# --- NdfEvidence listeners ------------------------------------------
+# --- PwkEvidence listeners ------------------------------------------
 
 
-def test_ndf_evidence_console_listener_filters_tolerated():
+def test_pwk_evidence_console_listener_filters_tolerated():
     """tolerated パターンに合致する console.error は記録されない。"""
     cfg = _make_config(tolerated_console=[r"benign 3rd-party warning"])
-    ev = NdfEvidence(case_dir=Path("/tmp/dummy"), config=cfg, enabled=True)
+    ev = PwkEvidence(case_dir=Path("/tmp/dummy"), config=cfg, enabled=True)
 
     benign = SimpleNamespace(
         type="error",
@@ -134,9 +134,9 @@ def test_ndf_evidence_console_listener_filters_tolerated():
     assert "ReferenceError" in ev.console_errors[0]
 
 
-def test_ndf_evidence_pageerror_listener_filters_tolerated():
+def test_pwk_evidence_pageerror_listener_filters_tolerated():
     cfg = _make_config(tolerated_page=[r"^Tolerable\b"])
-    ev = NdfEvidence(case_dir=Path("/tmp/dummy"), config=cfg, enabled=True)
+    ev = PwkEvidence(case_dir=Path("/tmp/dummy"), config=cfg, enabled=True)
 
     ev._on_pageerror(Exception("Tolerable: ignore me"))
     assert ev.page_errors == []
@@ -144,17 +144,17 @@ def test_ndf_evidence_pageerror_listener_filters_tolerated():
     assert ev.page_errors == ["Real bug here"]
 
 
-def test_ndf_evidence_console_listener_skips_non_error_type():
+def test_pwk_evidence_console_listener_skips_non_error_type():
     cfg = _make_config()
-    ev = NdfEvidence(case_dir=Path("/tmp/dummy"), config=cfg, enabled=True)
+    ev = PwkEvidence(case_dir=Path("/tmp/dummy"), config=cfg, enabled=True)
     info = SimpleNamespace(type="log", text="hello", location={})
     ev._on_console(info)
     assert ev.console_errors == []
 
 
-def test_ndf_evidence_runtime_error_summary():
+def test_pwk_evidence_runtime_error_summary():
     cfg = _make_config()
-    ev = NdfEvidence(case_dir=Path("/tmp/dummy"), config=cfg, enabled=True)
+    ev = PwkEvidence(case_dir=Path("/tmp/dummy"), config=cfg, enabled=True)
     assert ev.has_runtime_errors is False
     assert ev.runtime_error_summary() == ""
 
@@ -166,9 +166,9 @@ def test_ndf_evidence_runtime_error_summary():
     assert "pageerror 1 件" in summary
 
 
-def test_ndf_evidence_disabled_skips_tracing():
+def test_pwk_evidence_disabled_skips_tracing():
     cfg = _make_config()
-    ev = NdfEvidence(
+    ev = PwkEvidence(
         case_dir=Path("/tmp/dummy"),
         config=cfg,
         enabled=False,
@@ -181,18 +181,18 @@ def test_ndf_evidence_disabled_skips_tracing():
     fake_ctx.tracing.stop.assert_not_called()
 
 
-def test_ndf_evidence_confirm_har_sets_relpath(tmp_path: Path):
+def test_pwk_evidence_confirm_har_sets_relpath(tmp_path: Path):
     cfg = _make_config()
     har = tmp_path / "request.har"
     har.write_text("{}", encoding="utf-8")
-    ev = NdfEvidence(case_dir=tmp_path, config=cfg, enabled=True, har_path=har)
+    ev = PwkEvidence(case_dir=tmp_path, config=cfg, enabled=True, har_path=har)
     ev.confirm_har()
     assert ev.har_relpath == "request.har"
 
 
-def test_ndf_evidence_confirm_har_skips_when_missing(tmp_path: Path):
+def test_pwk_evidence_confirm_har_skips_when_missing(tmp_path: Path):
     cfg = _make_config()
-    ev = NdfEvidence(
+    ev = PwkEvidence(
         case_dir=tmp_path,
         config=cfg,
         enabled=True,
@@ -228,10 +228,10 @@ def test_page_role_marker_collector_returns_empty_when_no_marker():
 # --- _resolve_har_mode (Issue #62) -----------------------------------
 
 
-def _make_pytestconfig(ndf_har_mode: str | None = None) -> SimpleNamespace:
-    """``pytestconfig.getoption("ndf_har_mode", default=None)`` を模す軽量 stub。"""
+def _make_pytestconfig(pwk_har_mode: str | None = None) -> SimpleNamespace:
+    """``pytestconfig.getoption("pwk_har_mode", default=None)`` を模す軽量 stub。"""
     return SimpleNamespace(
-        getoption=lambda name, default=None: ndf_har_mode if name == "ndf_har_mode" else default
+        getoption=lambda name, default=None: pwk_har_mode if name == "pwk_har_mode" else default
     )
 
 

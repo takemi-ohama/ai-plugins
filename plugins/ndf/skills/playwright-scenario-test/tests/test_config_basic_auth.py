@@ -1,4 +1,4 @@
-"""scenario_test/config.py の Maj-4 fail-fast 検証 + Maj-10 tolerated_console_errors。
+"""playwright_kit/config.py の Maj-4 fail-fast 検証 + Maj-10 tolerated_console_errors。
 
 `requires_basic_auth=True` なロール宣言のときに `target.basic_auth.user` が空ならば
 Config.load 時点で ValueError を投げることを確認する。
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from scenario_test.config import Config, PlaywrightConfig, _expand_env
+from playwright_kit.config import Config, PlaywrightConfig, _expand_env
 
 
 _BASE_RAW = {

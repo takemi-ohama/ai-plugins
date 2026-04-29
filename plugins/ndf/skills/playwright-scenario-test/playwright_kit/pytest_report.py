@@ -1,7 +1,7 @@
 """pytest hook で集めた test result から Markdown レポートを生成する。
 
 ``pytest_terminal_summary`` から呼ばれ、``reports/<run-id>/report.md`` を生成する。
-``--ndf-drive-folder`` 指定時は Drive アップロードと URL 差し込みも担当。
+``--pwk-drive-folder`` 指定時は Drive アップロードと URL 差し込みも担当。
 """
 
 from __future__ import annotations
@@ -13,11 +13,11 @@ from typing import Iterable
 
 
 @dataclass
-class NdfTestEntry:
+class PwkTestEntry:
     """1 test 関数分のレポート用エントリ。
 
     pytest の ``TestReport`` から要点だけを抽出して保持する
-    (``user_properties`` 経由で ``ndf_evidence`` の状態が紐付く)。
+    (``user_properties`` 経由で ``pwk_evidence`` の状態が紐付く)。
     """
 
     nodeid: str
@@ -54,7 +54,7 @@ class NdfTestEntry:
 
 
 def render_markdown(
-    entries: Iterable[NdfTestEntry],
+    entries: Iterable[PwkTestEntry],
     *,
     started_at: _dt.datetime,
     finished_at: _dt.datetime,
@@ -71,7 +71,7 @@ def render_markdown(
     xfailed = sum(1 for e in entries_list if e.outcome == "xfailed")
     xpassed = sum(1 for e in entries_list if e.outcome == "xpassed")
     duration = (finished_at - started_at).total_seconds()
-    # xfailed は期待通りの失敗なので OK 扱い (NdfTestEntry.ok と同じ方針)
+    # xfailed は期待通りの失敗なので OK 扱い (PwkTestEntry.ok と同じ方針)
     # xpassed は意図せず pass したため注意喚起 (全PASS とはしない)
     all_pass = total > 0 and (passed + xfailed) == total and xpassed == 0
 
@@ -190,7 +190,7 @@ def _escape_table_cell(text: str) -> str:
 
 
 def write_report(
-    entries: Iterable[NdfTestEntry],
+    entries: Iterable[PwkTestEntry],
     *,
     out_dir: Path,
     started_at: _dt.datetime,

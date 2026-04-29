@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from scenario_test import accessibility, web_vitals
+from playwright_kit import accessibility, web_vitals
 
 
 class TestA11yIsAvailable:

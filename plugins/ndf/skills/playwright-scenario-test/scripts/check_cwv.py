@@ -1,6 +1,6 @@
 """Core Web Vitals (LCP/CLS/TTFB/longest_task) を 1 URL に対して計測する CLI。
 
-`scenario_test.cwv` モジュールの薄いラッパ。runner は testcase 内蔵で同 module
+`playwright_kit.cwv` モジュールの薄いラッパ。runner は testcase 内蔵で同 module
 を呼ぶため、本 CLI は外部 URL の単発計測専用。
 
 Usage:
@@ -23,7 +23,7 @@ _SKILL_ROOT = Path(__file__).resolve().parent.parent
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from scenario_test.web_vitals import THRESHOLDS, judge, measure_page  # noqa: E402
+from playwright_kit.web_vitals import THRESHOLDS, judge, measure_page  # noqa: E402
 
 
 def measure(

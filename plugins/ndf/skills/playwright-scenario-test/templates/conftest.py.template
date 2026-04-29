@@ -1,8 +1,8 @@
 """利用者プロジェクトの ``tests/conftest.py`` 雛形。
 
-NDF playwright-scenario-test を pytest-playwright 上で使うための共通設定。
-plugin (``scenario_test.pytest_plugin``) は entry-point 経由で auto-load される
-ため、import や ``pytest_plugins`` 宣言は不要。
+playwright-scenario-test (playwright_kit) を pytest-playwright 上で使うための
+共通設定。plugin (``playwright_kit.pytest_plugin``) は entry-point 経由で
+auto-load されるため、import や ``pytest_plugins`` 宣言は不要。
 
 利用者は本ファイルをプロジェクトの ``conftest.py`` にコピーし、必要に応じて
 fixture を追加する。
@@ -13,8 +13,8 @@ from __future__ import annotations
 import pytest
 
 # pytest-playwright の標準 fixture (browser_context_args / page) は plugin 経由で
-# 読み込まれる。NDF 側 fixture (ndf_config / ndf_role_<id> / ndf_evidence /
-# ndf_accessibility_scan / ndf_web_vitals_measure) も同様。
+# 読み込まれる。playwright_kit 側 fixture (pwk_config / pwk_role_<id> /
+# pwk_evidence / pwk_accessibility_scan / pwk_web_vitals_measure) も同様。
 
 # 例: 全 test で headless=False にしたい場合は ``--headed`` を pytest に渡すか、
 # ``browser_type_launch_args`` を override する:
@@ -27,5 +27,5 @@ import pytest
 # プロジェクト固有の fixture をここに追加する。例:
 #
 # @pytest.fixture
-# def admin_dashboard_url(ndf_config):
-#     return f"{ndf_config.base_url}/admin/dashboard"
+# def admin_dashboard_url(pwk_config):
+#     return f"{pwk_config.base_url}/admin/dashboard"

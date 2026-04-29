@@ -1,11 +1,11 @@
-"""Drive アップロード機能を scenario_test パッケージから直接 import するためのラッパー。
+"""Drive アップロード機能を playwright_kit パッケージから直接 import するためのラッパー。
 
 scripts/upload_evidence.py の CLI スタンドアロン用途 (利用者が
 ``python upload_evidence.py ...`` で叩く) を壊さずに、pytest_sessionfinish から
 安全に import できるようにする (Amazon Q Critical-5: sys.path 廃止)。
 
 使い方 (pytest_plugin.py から):
-    from scenario_test.uploaders import upload, detect_kind
+    from playwright_kit.uploaders import upload, detect_kind
 
 この module は google-auth スキルが存在しない環境でも import できる。
 実際のアップロード時のみ google-auth を必要とする (遅延 import)。

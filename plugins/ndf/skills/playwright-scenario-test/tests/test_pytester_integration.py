@@ -3,7 +3,7 @@
 本物の pytest セッションを隔離環境で実行し、以下 4 件を検証する:
 
 (a) auth cache hit/miss:
-    同 role に対して ndf_role_<id> fixture を 2 つの test で使ったとき、
+    同 role に対して pwk_role_<id> fixture を 2 つの test で使ったとき、
     _login_and_get_storage_state は 1 回だけ呼ばれること (2 回目は cache hit)。
     Playwright 実機不要: monkeypatch.setattr で fake に差し替え。
     call_count を stdout に出力して pytester から assert する。
@@ -12,7 +12,7 @@
     pytester で本物の pytest セッションを走らせ、
     FAIL した test の report.md 詳細セクションに request.har / trace.zip の
     パスが含まれることを確認する (Codex Major-1 artifact 伝搬の直接検証)。
-    本物の ndf_evidence fixture lifecycle を使用する。
+    本物の pwk_evidence fixture lifecycle を使用する。
 
 (c) call phase FAIL 時でも teardown 後の artifact が report.md に反映されること:
     call phase で pytest.fail() する test を pytester で実行し、
@@ -38,7 +38,7 @@ import pytest
 
 
 def test_auth_cache_hit_miss_via_pytester(pytester, tmp_path: Path):
-    """ndf_role_<id> fixture が session を跨いで cache hit し、
+    """pwk_role_<id> fixture が session を跨いで cache hit し、
     _login_and_get_storage_state が 2 回目以降呼ばれないことを検証する。
 
     Playwright 実機不要: conftest.py で _login_and_get_storage_state を
@@ -74,7 +74,7 @@ def test_auth_cache_hit_miss_via_pytester(pytester, tmp_path: Path):
             """
             from unittest.mock import MagicMock
             import pytest
-            import scenario_test.fixtures.auth as auth_mod
+            import playwright_kit.fixtures.auth as auth_mod
 
             _call_count = 0
 
@@ -85,7 +85,7 @@ def test_auth_cache_hit_miss_via_pytester(pytester, tmp_path: Path):
 
             @pytest.fixture(scope="session", autouse=True)
             def _patch_login():
-                import scenario_test.fixtures.auth as m
+                import playwright_kit.fixtures.auth as m
                 orig = m._login_and_get_storage_state
                 m._login_and_get_storage_state = _fake_login
                 yield
@@ -104,15 +104,15 @@ def test_auth_cache_hit_miss_via_pytester(pytester, tmp_path: Path):
     pytester.makepyfile(
         textwrap.dedent(
             """
-            import scenario_test.fixtures.auth as auth_mod
+            import playwright_kit.fixtures.auth as auth_mod
             import conftest as conftest_mod
 
-            def test_first_call_cache_miss(ndf_role_admin, context):
+            def test_first_call_cache_miss(pwk_role_admin, context):
                 # 1 回目: _login_and_get_storage_state が呼ばれる (cache miss)
                 context.add_cookies.assert_called()
                 print(f"CALL_COUNT_AFTER_FIRST={conftest_mod._call_count}")
 
-            def test_second_call_cache_hit(ndf_role_admin, context):
+            def test_second_call_cache_hit(pwk_role_admin, context):
                 # 2 回目: 同 role なので fake は再呼び出しされない (cache hit)
                 # call_count は 1 のまま変わっていないはず
                 print(f"CALL_COUNT_AFTER_SECOND={conftest_mod._call_count}")
@@ -123,7 +123,7 @@ def test_auth_cache_hit_miss_via_pytester(pytester, tmp_path: Path):
             """
         )
     )
-    res = pytester.runpytest("-v", "-s", f"--ndf-config={cfg_path}")
+    res = pytester.runpytest("-v", "-s", f"--pwk-config={cfg_path}")
     # 両方 passed であることを確認
     res.assert_outcomes(passed=2)
     # call_count が 1 であることを stdout から確認 (cache hit 証明)
@@ -132,18 +132,18 @@ def test_auth_cache_hit_miss_via_pytester(pytester, tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# (b) artifact path が report.md に反映されること (本物の ndf_evidence lifecycle)
+# (b) artifact path が report.md に反映されること (本物の pwk_evidence lifecycle)
 # ---------------------------------------------------------------------------
 
 
 def test_makereport_populates_artifact_paths_in_report(pytester, tmp_path: Path):
-    """本物の ndf_evidence fixture lifecycle を使い、
+    """本物の pwk_evidence fixture lifecycle を使い、
     FAIL した test の report.md 詳細セクションに
     request.har / trace.zip パスが含まれることを検証する。
 
     Codex Major-1 artifact 伝搬修正 (3回目) の直接検証:
     - call phase で pytest.fail() して FAIL test を作る
-    - ndf_evidence fixture の context は MagicMock で Playwright 実機不要
+    - pwk_evidence fixture の context は MagicMock で Playwright 実機不要
     - teardown で confirm_har() が動き、har_path / trace_path が確定
     - _collect_entries() の teardown merge により report.md に artifact path が出る
     """
@@ -186,9 +186,9 @@ def test_makereport_populates_artifact_paths_in_report(pytester, tmp_path: Path)
         )
     )
 
-    # ndf_evidence fixture を本物のまま使い、call で pytest.fail() して FAIL させる。
+    # pwk_evidence fixture を本物のまま使い、call で pytest.fail() して FAIL させる。
     # HAR ファイルは browser_context_args の record_har_path で指定されるが、
-    # MagicMock context では実際には作られないため、ndf_evidence の finalizer 前に
+    # MagicMock context では実際には作られないため、pwk_evidence の finalizer 前に
     # har_path を手動で作成する fixture を挟む。
     pytester.makepyfile(
         textwrap.dedent(
@@ -198,15 +198,15 @@ def test_makereport_populates_artifact_paths_in_report(pytester, tmp_path: Path)
             from unittest.mock import MagicMock
 
             @pytest.fixture(autouse=True)
-            def _create_dummy_har(ndf_evidence):
-                \"\"\"ndf_evidence の har_path に実体ファイルを作成し、
+            def _create_dummy_har(pwk_evidence):
+                \"\"\"pwk_evidence の har_path に実体ファイルを作成し、
                 confirm_har() が har_relpath を設定できるようにする。\"\"\"
-                if ndf_evidence.har_path:
-                    ndf_evidence.har_path.parent.mkdir(parents=True, exist_ok=True)
-                    ndf_evidence.har_path.write_text("{{}}", encoding="utf-8")
+                if pwk_evidence.har_path:
+                    pwk_evidence.har_path.parent.mkdir(parents=True, exist_ok=True)
+                    pwk_evidence.har_path.write_text("{{}}", encoding="utf-8")
                 yield
 
-            def test_fail_with_evidence(ndf_evidence):
+            def test_fail_with_evidence(pwk_evidence):
                 \"\"\"call phase で FAIL させ、teardown 後の artifact が
                 report.md に乗ることを確認するためのダミー FAIL test。\"\"\"
                 pytest.fail("intentional failure for artifact propagation test")
@@ -214,7 +214,7 @@ def test_makereport_populates_artifact_paths_in_report(pytester, tmp_path: Path)
         )
     )
 
-    res = pytester.runpytest("-v", "--ndf-out-dir", str(out_dir))
+    res = pytester.runpytest("-v", "--pwk-out-dir", str(out_dir))
     # 1 件 FAIL であることを確認
     res.assert_outcomes(failed=1)
 
@@ -280,23 +280,23 @@ def test_artifact_propagation_call_to_teardown(pytester, tmp_path: Path):
             from pathlib import Path
 
             @pytest.fixture(autouse=True)
-            def _ensure_har(ndf_evidence):
+            def _ensure_har(pwk_evidence):
                 # HAR ファイルを事前作成して confirm_har() が har_relpath をセットできるようにする
-                if ndf_evidence.har_path:
-                    ndf_evidence.har_path.parent.mkdir(parents=True, exist_ok=True)
-                    ndf_evidence.har_path.write_text("{}", encoding="utf-8")
+                if pwk_evidence.har_path:
+                    pwk_evidence.har_path.parent.mkdir(parents=True, exist_ok=True)
+                    pwk_evidence.har_path.write_text("{}", encoding="utf-8")
                 yield
 
-            def test_call_fail_artifact_propagation(ndf_evidence):
+            def test_call_fail_artifact_propagation(pwk_evidence):
                 # call phase で FAIL させる
-                # teardown で ndf_evidence.confirm_har() が呼ばれ har_relpath が確定
+                # teardown で pwk_evidence.confirm_har() が呼ばれ har_relpath が確定
                 # _collect_entries の teardown merge で report.md に har path が乗るはず
                 pytest.fail("call phase failure to test artifact propagation")
             """
         )
     )
 
-    res = pytester.runpytest("-v", "--ndf-out-dir", str(out_dir))
+    res = pytester.runpytest("-v", "--pwk-out-dir", str(out_dir))
     res.assert_outcomes(failed=1)
 
     report_files = list(out_dir.glob("report.md"))
@@ -327,7 +327,7 @@ def test_sessionstarttime_affects_report_header(tmp_path: Path):
     from types import SimpleNamespace
     from unittest.mock import MagicMock, patch
 
-    from scenario_test.pytest_plugin import pytest_terminal_summary
+    from playwright_kit.pytest_plugin import pytest_terminal_summary
 
     def _make_rep(nodeid="t::ok", outcome="passed", when="call"):
         return SimpleNamespace(
@@ -348,12 +348,12 @@ def test_sessionstarttime_affects_report_header(tmp_path: Path):
 
     config = MagicMock()
     config.getoption.return_value = str(tmp_path / "with_ts")
-    config._ndf_config = None
+    config._pwk_config = None
 
     captured_started: list[_dt.datetime] = []
 
     orig_write = __import__(
-        "scenario_test.pytest_report", fromlist=["write_report"]
+        "playwright_kit.pytest_report", fromlist=["write_report"]
     ).write_report
 
     def _capture_write(entries, *, out_dir, started_at, finished_at, **kwargs):
@@ -366,7 +366,7 @@ def test_sessionstarttime_affects_report_header(tmp_path: Path):
             **kwargs,
         )
 
-    with patch("scenario_test.pytest_plugin.write_report", side_effect=_capture_write):
+    with patch("playwright_kit.pytest_plugin.write_report", side_effect=_capture_write):
         pytest_terminal_summary(tr_with_ts, exitstatus=0, config=config)
 
     assert len(captured_started) == 1
@@ -382,7 +382,7 @@ def test_sessionstarttime_affects_report_header(tmp_path: Path):
 
     config2 = MagicMock()
     config2.getoption.return_value = str(tmp_path / "no_ts")
-    config2._ndf_config = None
+    config2._pwk_config = None
 
     captured_started2: list[_dt.datetime] = []
 
@@ -397,7 +397,7 @@ def test_sessionstarttime_affects_report_header(tmp_path: Path):
         )
 
     before = _dt.datetime.now()
-    with patch("scenario_test.pytest_plugin.write_report", side_effect=_capture_write2):
+    with patch("playwright_kit.pytest_plugin.write_report", side_effect=_capture_write2):
         pytest_terminal_summary(tr_no_ts, exitstatus=0, config=config2)
     after = _dt.datetime.now()
 

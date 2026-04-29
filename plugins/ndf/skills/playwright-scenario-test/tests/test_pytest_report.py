@@ -1,4 +1,4 @@
-"""Phase 3 unit: ``scenario_test.pytest_report`` の純粋関数テスト。
+"""Phase 3 unit: ``playwright_kit.pytest_report`` の純粋関数テスト。
 
 pytest_terminal_summary 経由の集約は Playwright を要するため smoke では扱わず、
 ``render_markdown`` と ``write_report`` を直接呼んで Markdown 出力を検証する。
@@ -9,10 +9,10 @@ from __future__ import annotations
 import datetime as _dt
 from pathlib import Path
 
-from scenario_test.pytest_report import NdfTestEntry, render_markdown, write_report
+from playwright_kit.pytest_report import PwkTestEntry, render_markdown, write_report
 
 
-def _entry(**overrides) -> NdfTestEntry:
+def _entry(**overrides) -> PwkTestEntry:
     base = dict(
         nodeid="tests/test_x.py::test_y",
         name="test_y",
@@ -20,7 +20,7 @@ def _entry(**overrides) -> NdfTestEntry:
         duration_s=0.42,
     )
     base.update(overrides)
-    return NdfTestEntry(**base)  # type: ignore[arg-type]
+    return PwkTestEntry(**base)  # type: ignore[arg-type]
 
 
 def test_status_label_mapping():

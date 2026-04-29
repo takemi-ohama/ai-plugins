@@ -11,9 +11,9 @@ from typing import Iterator
 
 import pytest
 
-from scenario_test import web_vitals as web_vitals_mod
-from scenario_test.config import Config
-from scenario_test.fixtures.evidence import NdfEvidence
+from playwright_kit import web_vitals as web_vitals_mod
+from playwright_kit.config import Config
+from playwright_kit.fixtures.evidence import PwkEvidence
 
 
 def _page_roles_from_marker(item) -> list[str]:
@@ -28,9 +28,9 @@ def _page_roles_from_marker(item) -> list[str]:
 
 
 @pytest.fixture()
-def ndf_web_vitals_measure(page, ndf_evidence: NdfEvidence, _ndf_config_optional):
-    """明示呼び出し用: ``metrics = ndf_web_vitals_measure()`` で 1 度計測。"""
-    config: Config | None = _ndf_config_optional
+def pwk_web_vitals_measure(page, pwk_evidence: PwkEvidence, _pwk_config_optional):
+    """明示呼び出し用: ``metrics = pwk_web_vitals_measure()`` で 1 度計測。"""
+    config: Config | None = _pwk_config_optional
 
     def _measure(*, observe_ms: int | None = None) -> dict[str, float]:
         ms = (
@@ -43,24 +43,24 @@ def ndf_web_vitals_measure(page, ndf_evidence: NdfEvidence, _ndf_config_optional
             )
         )
         metrics = web_vitals_mod.measure_page(page, observe_ms=ms)
-        ndf_evidence.web_vitals_metrics.update(metrics)
-        ndf_evidence.web_vitals_passed = web_vitals_mod.passed(ndf_evidence.web_vitals_metrics)
+        pwk_evidence.web_vitals_metrics.update(metrics)
+        pwk_evidence.web_vitals_passed = web_vitals_mod.passed(pwk_evidence.web_vitals_metrics)
         return metrics
 
     return _measure
 
 
 @pytest.fixture(autouse=True)
-def _ndf_web_vitals_autouse(request) -> Iterator[None]:
+def _pwk_web_vitals_autouse(request) -> Iterator[None]:
     """``page_role`` marker が付いた test の終了直前に Web Vitals 計測を行う。
 
     accessibility autouse と同じく ``page`` fixture を要求している test のみ対象。
 
-    Issue #60 fix: 旧版の ``"ndf_evidence" not in request.fixturenames`` ガードを
-    廃止。test 引数に ``ndf_evidence`` を書いていなくても ``getfixturevalue``
+    Issue #60 fix: 旧版の ``"pwk_evidence" not in request.fixturenames`` ガードを
+    廃止。test 引数に ``pwk_evidence`` を書いていなくても ``getfixturevalue``
     経由で lazy 取得し、Web Vitals autouse が走るようにする。
 
-    teardown order 対策 (Issue #61): ``yield`` 後に ``ndf_evidence`` を fetch
+    teardown order 対策 (Issue #61): ``yield`` 後に ``pwk_evidence`` を fetch
     しようとすると LIFO 解放済の AssertionError になるため、setup phase で
     ``ev`` / ``page`` を取得して closure に保持する。
     """
@@ -69,7 +69,7 @@ def _ndf_web_vitals_autouse(request) -> Iterator[None]:
         yield
         return
 
-    config: Config | None = request.getfixturevalue("_ndf_config_optional")
+    config: Config | None = request.getfixturevalue("_pwk_config_optional")
     if config is None or not config.web_vitals.enabled:
         yield
         return
@@ -84,7 +84,7 @@ def _ndf_web_vitals_autouse(request) -> Iterator[None]:
         return
 
     # setup phase: closure に保持。
-    ndf_evidence: NdfEvidence = request.getfixturevalue("ndf_evidence")
+    pwk_evidence: PwkEvidence = request.getfixturevalue("pwk_evidence")
     page = request.getfixturevalue("page")
 
     yield
@@ -97,13 +97,13 @@ def _ndf_web_vitals_autouse(request) -> Iterator[None]:
         return
 
     metrics = web_vitals_mod.measure_page(page, observe_ms=int(config.web_vitals.observe_ms))
-    ndf_evidence.web_vitals_metrics.update(metrics)
-    ndf_evidence.web_vitals_passed = web_vitals_mod.passed(ndf_evidence.web_vitals_metrics)
+    pwk_evidence.web_vitals_metrics.update(metrics)
+    pwk_evidence.web_vitals_passed = web_vitals_mod.passed(pwk_evidence.web_vitals_metrics)
 
     detail = ", ".join(
         f"{k}={v:.1f}({web_vitals_mod.judge(k, v)})" for k, v in metrics.items()
     ) or "no metrics collected"
-    ndf_evidence.log_lines.append(f"[web_vitals autouse] {detail}")
+    pwk_evidence.log_lines.append(f"[web_vitals autouse] {detail}")
 
-    if not ndf_evidence.web_vitals_passed and config.web_vitals.fail_on_poor:
+    if not pwk_evidence.web_vitals_passed and config.web_vitals.fail_on_poor:
         pytest.fail(f"[web_vitals] poor metric を検出: {detail}")

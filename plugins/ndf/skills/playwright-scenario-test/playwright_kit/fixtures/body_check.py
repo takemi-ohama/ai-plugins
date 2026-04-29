@@ -11,7 +11,7 @@ opt-out:
 - 個別 test: ``@pytest.mark.no_body_check`` を付与
 
 注意:
-- 同じ page を ``ndf_body_check_scan`` helper で手動スキャンしつつ autouse
+- 同じ page を ``pwk_body_check_scan`` helper で手動スキャンしつつ autouse
   listener も走らせると、同一 violation を重複加算する。helper は autouse の
   listener が拾えないタイミング (例: SPA 内のローカル DOM 更新後) でのみ使う。
 """
@@ -23,15 +23,15 @@ from typing import Any, Iterator
 
 import pytest
 
-from scenario_test.body_check import (
+from playwright_kit.body_check import (
     is_html_response,
     scan_body,
 )
-from scenario_test.config import BodyCheckConfig, Config
-from scenario_test.fixtures.evidence import NdfEvidence
+from playwright_kit.config import BodyCheckConfig, Config
+from playwright_kit.fixtures.evidence import PwkEvidence
 
 
-def _build_response_handler(cfg: BodyCheckConfig, ev: NdfEvidence):
+def _build_response_handler(cfg: BodyCheckConfig, ev: PwkEvidence):
     """``page.on("response", ...)`` 用の handler を closure として作る。
 
     listener 内で発生する例外は test 失敗には伝播させず ``ev.log_lines`` に
@@ -68,7 +68,7 @@ def _build_response_handler(cfg: BodyCheckConfig, ev: NdfEvidence):
     return _on_response
 
 
-def _write_jsonl(ev: NdfEvidence) -> None:
+def _write_jsonl(ev: PwkEvidence) -> None:
     """1 violation = 1 行で ``case_dir/body_check.jsonl`` に書き出す。"""
     if not ev.body_check_violations:
         return
@@ -95,13 +95,13 @@ def _format_violation_summary(violations: list[dict[str, Any]], limit: int = 5) 
 
 
 @pytest.fixture()
-def ndf_body_check_scan(page, ndf_evidence: NdfEvidence, _ndf_config_optional):
-    """明示呼び出し用: ``violations = ndf_body_check_scan()`` で現在の page 本文を 1 度スキャン。
+def pwk_body_check_scan(page, pwk_evidence: PwkEvidence, _pwk_config_optional):
+    """明示呼び出し用: ``violations = pwk_body_check_scan()`` で現在の page 本文を 1 度スキャン。
 
     autouse 経路を使わず、特定タイミング (例: フォーム送信後の 200 応答) で
     本文を再評価したい場合の helper。
     """
-    config: Config | None = _ndf_config_optional
+    config: Config | None = _pwk_config_optional
 
     def _scan() -> list[dict[str, Any]]:
         if config is None or not config.body_check.enabled:
@@ -109,7 +109,7 @@ def ndf_body_check_scan(page, ndf_evidence: NdfEvidence, _ndf_config_optional):
         try:
             body = page.content()
         except Exception as exc:
-            ndf_evidence.log_lines.append(f"[body_check] page.content() failed: {exc}")
+            pwk_evidence.log_lines.append(f"[body_check] page.content() failed: {exc}")
             return []
         violations = scan_body(
             body,
@@ -120,14 +120,14 @@ def ndf_body_check_scan(page, ndf_evidence: NdfEvidence, _ndf_config_optional):
             not_found_patterns=config.body_check.not_found_patterns,
         )
         as_dicts = [v.to_dict() for v in violations]
-        ndf_evidence.body_check_violations.extend(as_dicts)
+        pwk_evidence.body_check_violations.extend(as_dicts)
         return as_dicts
 
     return _scan
 
 
 @pytest.fixture(autouse=True)
-def _ndf_body_check_autouse(request) -> Iterator[None]:
+def _pwk_body_check_autouse(request) -> Iterator[None]:
     """``page`` を要求する test に限り、HTML response への body_check を自動実行する。
 
     ガード戦略:
@@ -135,8 +135,8 @@ def _ndf_body_check_autouse(request) -> Iterator[None]:
     - config.body_check.enabled が False なら何もしない
     - ``@pytest.mark.no_body_check`` が付いている test は skip
 
-    ``ndf_evidence`` は ``getfixturevalue`` で setup phase に lazy resolve する。
-    test 関数の引数に ``ndf_evidence`` を書いていなくても listener が attach される
+    ``pwk_evidence`` は ``getfixturevalue`` で setup phase に lazy resolve する。
+    test 関数の引数に ``pwk_evidence`` を書いていなくても listener が attach される
     (Issue #60)。
 
     teardown 時に違反があれば ``case_dir/body_check.jsonl`` に書き出し、
@@ -146,7 +146,7 @@ def _ndf_body_check_autouse(request) -> Iterator[None]:
         yield
         return
 
-    config: Config | None = request.getfixturevalue("_ndf_config_optional")
+    config: Config | None = request.getfixturevalue("_pwk_config_optional")
     if config is None or not config.body_check.enabled:
         yield
         return
@@ -158,7 +158,7 @@ def _ndf_body_check_autouse(request) -> Iterator[None]:
     page = request.getfixturevalue("page")
     # setup phase で fetch して closure に保持する (Issue #61 と同じ teardown
     # order 問題を防ぐ)。
-    ev: NdfEvidence = request.getfixturevalue("ndf_evidence")
+    ev: PwkEvidence = request.getfixturevalue("pwk_evidence")
     handler = _build_response_handler(config.body_check, ev)
 
     try:

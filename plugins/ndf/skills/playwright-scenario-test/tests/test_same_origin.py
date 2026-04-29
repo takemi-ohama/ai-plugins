@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from scenario_test.fixtures.auth import _same_origin
+from playwright_kit.fixtures.auth import _same_origin
 
 
 def test_same_origin_exact_match() -> None:
