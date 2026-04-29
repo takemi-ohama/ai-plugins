@@ -25,7 +25,12 @@ from scenario_test.config import (
 )
 from scenario_test.fixtures.a11y import _page_roles_from_marker as a11y_marker
 from scenario_test.fixtures.cwv import _page_roles_from_marker as cwv_marker
-from scenario_test.fixtures.evidence import NdfEvidence, _safe_slug, _safe_case_slug
+from scenario_test.fixtures.evidence import (
+    NdfEvidence,
+    _resolve_har_mode,
+    _safe_case_slug,
+    _safe_slug,
+)
 
 
 def _make_config(
@@ -218,3 +223,42 @@ def test_page_role_marker_collector_returns_empty_when_no_marker():
     item.iter_markers.return_value = []
     assert a11y_marker(item) == []
     assert cwv_marker(item) == []
+
+
+# --- _resolve_har_mode (Issue #62) -----------------------------------
+
+
+def _make_pytestconfig(ndf_har_mode: str | None = None) -> SimpleNamespace:
+    """``pytestconfig.getoption("ndf_har_mode", default=None)`` を模す軽量 stub。"""
+    return SimpleNamespace(
+        getoption=lambda name, default=None: ndf_har_mode if name == "ndf_har_mode" else default
+    )
+
+
+def _make_config_with_har_mode(har_mode: str) -> Config:
+    """``_make_config`` の派生で playwright.har_mode のみ差し替える。"""
+    cfg = _make_config()
+    cfg.playwright.har_mode = har_mode  # type: ignore[assignment]
+    return cfg
+
+
+def test_resolve_har_mode_default_minimal_when_no_inputs():
+    """CLI も config も無ければ default ``minimal`` (PlaywrightConfig 由来)。"""
+    assert _resolve_har_mode(_make_pytestconfig(None), None) == "minimal"
+
+
+def test_resolve_har_mode_falls_back_to_config():
+    """CLI 未指定時は config.playwright.har_mode が効く。"""
+    cfg = _make_config_with_har_mode("full")
+    assert _resolve_har_mode(_make_pytestconfig(None), cfg) == "full"
+
+
+def test_resolve_har_mode_cli_overrides_config():
+    """CLI 指定が config より優先される。"""
+    cfg = _make_config_with_har_mode("none")
+    assert _resolve_har_mode(_make_pytestconfig("full"), cfg) == "full"
+
+
+def test_resolve_har_mode_lowercases_cli_value():
+    """argparse choices で担保されているが defensive な lowercase 化を確認。"""
+    assert _resolve_har_mode(_make_pytestconfig("FULL"), None) == "full"

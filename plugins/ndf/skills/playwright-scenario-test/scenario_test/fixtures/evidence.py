@@ -24,7 +24,7 @@ from typing import Any, Iterator
 
 import pytest
 
-from scenario_test.config import Config
+from scenario_test.config import Config, PlaywrightConfig
 
 
 # ---------------------------------------------------------------------------
@@ -233,17 +233,22 @@ def _ndf_config_optional(pytestconfig) -> Config | None:
 
 
 def _resolve_har_mode(pytestconfig, ndf_config) -> str:
-    """``--ndf-har-mode`` CLI > ``playwright.har_mode`` config > default("minimal")。
+    """``--ndf-har-mode`` CLI > ``playwright.har_mode`` config > ``PlaywrightConfig`` default。
 
     Issue #62 対策で default は ``minimal``。``--ndf-no-evidence`` が True の場合
     呼び出し側で HAR を一切 inject しない (本関数の戻り値は使われない)。
+
+    default 値は ``PlaywrightConfig().har_mode`` から引くことで dataclass 側との
+    二重管理を防ぐ。
     """
     cli = pytestconfig.getoption("ndf_har_mode", default=None)
     if cli:
+        # ``pytest_plugin.py`` の argparse ``choices`` で値は担保済だが、
+        # API 経由 (``--config`` 等) で大文字が来た場合に備える defensive normalize。
         return str(cli).lower()
     if ndf_config is not None:
         return str(ndf_config.playwright.har_mode).lower()
-    return "minimal"
+    return PlaywrightConfig().har_mode
 
 
 @pytest.fixture()
@@ -278,8 +283,9 @@ def browser_context_args(
     case_dir.mkdir(parents=True, exist_ok=True)
     args.setdefault("record_har_path", str(case_dir / "request.har"))
     if har_mode == "minimal":
-        # Playwright の record_har_mode="minimal" は request/response の
-        # 主要メタデータのみ。content は記録されないので omit 指定は不要。
+        # Playwright の record_har_mode="minimal" (Playwright >= 1.30) は
+        # request/response の主要メタデータのみ。content は記録されないので
+        # omit 指定は不要。
         args.setdefault("record_har_mode", "minimal")
     else:  # "full"
         # 既存挙動 (body 含む) を維持しつつ content だけは省略する。

@@ -10,7 +10,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
@@ -91,7 +91,8 @@ class ReportConfig:
 # メタデータのみ記録し、Basic 認証 + redirect が連続するページで navigation を
 # abort させる race を回避する (Issue #62)。"full" は body も含めた完全な HAR、
 # "none" は HAR を出力しない (= ``record_har_path`` を inject しない)。
-HAR_MODES = ("minimal", "full", "none")
+HarMode = Literal["minimal", "full", "none"]
+HAR_MODES: tuple[HarMode, ...] = ("minimal", "full", "none")
 
 
 @dataclass
@@ -114,12 +115,13 @@ class PlaywrightConfig:
     # 録画後の動画フォーマット: "webm" (Playwright 既定) | "mp4" (H.264 変換)
     # mp4 は Google Drive プレビュアで再生互換性が高い。
     video_format: str = "mp4"
-    # HAR 録画モード (Issue #62)。
+    # HAR 録画モード (Issue #62)。Playwright >= 1.30 で導入された
+    # ``record_har_mode`` に対応する。
     # - "minimal" (default): メタデータのみ記録。Basic 認証 + redirect が混在
     #   するページで ``record_har_path`` 起因の ERR_ABORTED race を回避する。
     # - "full": Playwright 既定の full HAR (body + content)。
     # - "none": HAR を一切出力しない (= ``record_har_path`` を inject しない)。
-    har_mode: str = "minimal"
+    har_mode: HarMode = "minimal"
 
     @classmethod
     def from_raw(cls, raw: dict[str, Any]) -> "PlaywrightConfig":
@@ -129,12 +131,13 @@ class PlaywrightConfig:
         base = cls()
         viewport = raw.get("viewport") or {}
         video_size = raw.get("video_size") or {}
-        har_mode = str(raw.get("har_mode", base.har_mode)).lower()
-        if har_mode not in HAR_MODES:
+        har_mode_raw = str(raw.get("har_mode", base.har_mode)).lower()
+        if har_mode_raw not in HAR_MODES:
             raise ValueError(
                 f"playwright.har_mode は {HAR_MODES} のいずれかを指定してください "
-                f"(指定値: {har_mode!r})"
+                f"(指定値: {har_mode_raw!r})"
             )
+        har_mode: HarMode = har_mode_raw  # type: ignore[assignment]
         return cls(
             headless=bool(raw.get("headless", base.headless)),
             viewport_width=int(viewport.get("width", base.viewport_width)),

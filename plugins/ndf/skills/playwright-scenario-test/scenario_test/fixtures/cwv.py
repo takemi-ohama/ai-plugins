@@ -55,6 +55,10 @@ def _ndf_cwv_autouse(request) -> Iterator[None]:
 
     a11y と同じく ``page`` fixture を要求している test のみ対象。
 
+    Issue #60 fix: 旧版の ``"ndf_evidence" not in request.fixturenames`` ガードを
+    廃止。test 引数に ``ndf_evidence`` を書いていなくても ``getfixturevalue``
+    経由で lazy 取得し、CWV autouse が走るようにする。
+
     teardown order 対策 (Issue #61): ``yield`` 後に ``ndf_evidence`` を fetch
     しようとすると LIFO 解放済の AssertionError になるため、setup phase で
     ``ev`` / ``page`` を取得して closure に保持する。

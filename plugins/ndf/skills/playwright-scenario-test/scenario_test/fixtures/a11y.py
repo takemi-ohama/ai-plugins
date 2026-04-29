@@ -72,6 +72,10 @@ def _ndf_a11y_autouse(request) -> Iterator[None]:
     parametrize してしまうため、ここでは ``request.fixturenames`` を見て
     必要な test だけ取得する。
 
+    Issue #60 fix: 旧版の ``"ndf_evidence" not in request.fixturenames`` ガードを
+    廃止。test 引数に ``ndf_evidence`` を書いていなくても ``getfixturevalue``
+    経由で lazy 取得し、a11y autouse が走るようにする。
+
     teardown order 対策 (Issue #61): pytest fixture の teardown は LIFO のため、
     ``yield`` 後に ``getfixturevalue("ndf_evidence")`` を呼ぶと「既に解放済」
     AssertionError が発生する。setup phase で ``ev`` / ``page`` を取得して
