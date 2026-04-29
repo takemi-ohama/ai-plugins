@@ -4,11 +4,11 @@ CLI options:
 - ``--ndf-config <path>``: scenario.config.yaml を指定
 - ``--ndf-out-dir <path>``: 成果物 (HAR / trace / 動画 / report) の出力先
 - ``--ndf-no-evidence``: evidence 収集を OFF
-- ``--ndf-hud``: HUD overlay を ON
+- ``--ndf-overlay``: overlay (赤丸カーソル + 字幕、旧名 HUD) を ON
 - ``--ndf-drive-folder <id>``: Drive 連携
 
 markers:
-- ``page_role(*roles)``: a11y / CWV autouse の判定材料
+- ``page_role(*roles)``: accessibility / web vitals autouse の判定材料
 - ``role(role_id)``: login する role を明示 (`ndf_role_<id>` fixture と並用可)
 - ``phase(num)``: report.md のフェーズ集計用
 - ``priority(level)``: report.md のソート用
@@ -30,8 +30,8 @@ from scenario_test.pytest_report import NdfTestEntry, write_report
 pytest_plugins = [
     "scenario_test.fixtures.auth",
     "scenario_test.fixtures.evidence",
-    "scenario_test.fixtures.a11y",
-    "scenario_test.fixtures.cwv",
+    "scenario_test.fixtures.accessibility",
+    "scenario_test.fixtures.web_vitals",
     "scenario_test.fixtures.body_check",
 ]
 
@@ -75,10 +75,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         ),
     )
     group.addoption(
-        "--ndf-hud",
+        "--ndf-overlay",
         action="store_true",
         default=False,
-        help="HUD overlay (字幕 + カーソル) を全 page に inject する",
+        help="overlay (赤丸カーソル + 字幕、旧名 HUD) を全 page に inject する",
     )
     group.addoption(
         "--ndf-drive-folder",
@@ -99,7 +99,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 _NDF_MARKERS: list[tuple[str, str]] = [
-    ("page_role", "page_role(*roles): a11y / CWV autouse の判定 (例: form, list, dashboard)"),
+    ("page_role", "page_role(*roles): accessibility / web vitals autouse の判定 (例: form, list, dashboard)"),
     ("role", "role(role_id): test がどの login role を要求するか (`ndf_role_<id>` 経由でも可)"),
     ("phase", "phase(num): report.md のフェーズ集計用 (1〜N の整数)"),
     ("priority", "priority(level): report.md のソート用 (high/mid/low など任意文字列)"),

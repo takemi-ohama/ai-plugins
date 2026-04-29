@@ -116,8 +116,8 @@ class NdfEvidence:
     console_errors: list[str] = field(default_factory=list)
     page_errors: list[str] = field(default_factory=list)
     axe_violations: list[dict[str, Any]] = field(default_factory=list)
-    cwv_metrics: dict[str, float] = field(default_factory=dict)
-    cwv_passed: bool = True
+    web_vitals_metrics: dict[str, float] = field(default_factory=dict)
+    web_vitals_passed: bool = True
     # PHP / SSR ページ本文エラー (body_check) 違反 (v0.4.0)。1 件 = 1 dict
     # ({url, category, pattern, snippet})。
     body_check_violations: list[dict[str, Any]] = field(default_factory=list)
@@ -307,12 +307,12 @@ def ndf_evidence(
     - ``--ndf-no-evidence`` が True なら trace/HAR を OFF にし、listener のみ動かす
     - ``page`` fixture から console / pageerror listener を attach
     - ``context.tracing.start/stop`` を裏で実行 (有効時)
-    - ``--ndf-hud`` 指定時は ``hud.HUD_INIT_SCRIPT`` を ``context.add_init_script``
+    - ``--ndf-overlay`` 指定時は ``overlay.OVERLAY_INIT_SCRIPT`` を ``context.add_init_script``
       で全 page に inject する
     - ``pytest_runtest_makereport`` から FAIL 時に ``ndf_evidence`` の状態を確認可能
     """
     enabled = not bool(pytestconfig.getoption("ndf_no_evidence", default=False))
-    hud_enabled = bool(pytestconfig.getoption("ndf_hud", default=False))
+    overlay_enabled = bool(pytestconfig.getoption("ndf_overlay", default=False))
     # _safe_case_slug で nodeid + xdist worker + sha1[:6] の衝突しない slug を使用 (Codex Major 2)
     case_dir = ndf_out_dir / _safe_case_slug(request.node)
     case_dir.mkdir(parents=True, exist_ok=True)
@@ -332,14 +332,14 @@ def ndf_evidence(
     ev.attach_listeners(page)
     ev.start_tracing(context)
 
-    # HUD overlay (赤丸カーソル + 字幕) を init_script で inject。
-    if hud_enabled:
+    # overlay (赤丸カーソル + 字幕、旧名 HUD) を init_script で inject。
+    if overlay_enabled:
         try:
-            from scenario_test.hud import HUD_INIT_SCRIPT
+            from scenario_test.overlay import OVERLAY_INIT_SCRIPT
 
-            context.add_init_script(HUD_INIT_SCRIPT)
+            context.add_init_script(OVERLAY_INIT_SCRIPT)
         except Exception as exc:  # pragma: no cover
-            ev.log_lines.append(f"[hud] add_init_script 失敗: {exc}")
+            ev.log_lines.append(f"[overlay] add_init_script 失敗: {exc}")
 
     # request.node に ev を保持して makereport hook から参照可能にする
     request.node._ndf_evidence = ev  # type: ignore[attr-defined]

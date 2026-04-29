@@ -1,4 +1,4 @@
-"""Phase 2 unit: evidence / a11y / cwv fixture の純関数ロジック。
+"""Phase 2 unit: evidence / accessibility / web_vitals fixture の純関数ロジック。
 
 Playwright を起動しないため、``NdfEvidence`` の listener / page_role marker
 の解釈 / autouse の guard 条件など、純粋なロジック部分のみをテストする。
@@ -15,16 +15,16 @@ from unittest.mock import MagicMock
 import pytest
 
 from scenario_test.config import (
-    A11yConfig,
+    AccessibilityConfig,
     BasicAuth,
     Config,
-    CwvConfig,
+    WebVitalsConfig,
     PlaywrightConfig,
     ReportConfig,
     RunnerConfig,
 )
-from scenario_test.fixtures.a11y import _page_roles_from_marker as a11y_marker
-from scenario_test.fixtures.cwv import _page_roles_from_marker as cwv_marker
+from scenario_test.fixtures.accessibility import _page_roles_from_marker as a11y_marker
+from scenario_test.fixtures.web_vitals import _page_roles_from_marker as cwv_marker
 from scenario_test.fixtures.evidence import (
     NdfEvidence,
     _resolve_har_mode,
@@ -48,8 +48,8 @@ def _make_config(
         config_path=Path("/tmp/scenario.config.yaml"),
         tolerated_console_errors=tolerated_console or [],
         tolerated_page_errors=tolerated_page or [],
-        a11y=A11yConfig(),
-        cwv=CwvConfig(),
+        accessibility=AccessibilityConfig(),
+        web_vitals=WebVitalsConfig(),
     )
 
 

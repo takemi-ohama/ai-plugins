@@ -23,7 +23,7 @@ _SKILL_ROOT = Path(__file__).resolve().parent.parent
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from scenario_test.cwv import THRESHOLDS, judge, measure_page  # noqa: E402
+from scenario_test.web_vitals import THRESHOLDS, judge, measure_page  # noqa: E402
 
 
 def measure(

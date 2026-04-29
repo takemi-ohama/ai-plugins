@@ -172,10 +172,10 @@ class RunnerConfig:
         )
 
 
-# --- a11y / CWV (v0.3.0) ---------------------------------------------
+# --- accessibility / web vitals (v0.3.0) -----------------------------
 
 @dataclass
-class A11yConfig:
+class AccessibilityConfig:
     """axe-core 自動スキャンの設定 (page_role に応じて runner が自動実行)。"""
     enabled: bool = True
     auto_roles: list[str] = field(default_factory=lambda: [
@@ -189,7 +189,7 @@ class A11yConfig:
 
 
 @dataclass
-class CwvConfig:
+class WebVitalsConfig:
     """Core Web Vitals 自動計測の設定 (page_role に応じて runner が自動実行)。"""
     enabled: bool = True
     auto_roles: list[str] = field(default_factory=lambda: [
@@ -266,9 +266,9 @@ class Config:
     # 抜け穴。空 (デフォルト) なら従来どおり 1 件で FAIL。
     tolerated_console_errors: list[str] = field(default_factory=list)
     tolerated_page_errors: list[str] = field(default_factory=list)
-    # a11y / CWV 自動実行 (page_role に応じて runner が判定)
-    a11y: A11yConfig = field(default_factory=A11yConfig)
-    cwv: CwvConfig = field(default_factory=CwvConfig)
+    # accessibility / web_vitals 自動実行 (page_role に応じて runner が判定)
+    accessibility: AccessibilityConfig = field(default_factory=AccessibilityConfig)
+    web_vitals: WebVitalsConfig = field(default_factory=WebVitalsConfig)
     # PHP / SSR ページ本文エラー検出 (v0.4.0, opt-in)
     body_check: BodyCheckConfig = field(default_factory=BodyCheckConfig)
 
@@ -325,8 +325,8 @@ class Config:
             config_path=config_path,
             tolerated_console_errors=list(raw.get("tolerated_console_errors") or []),
             tolerated_page_errors=list(raw.get("tolerated_page_errors") or []),
-            a11y=_a11y_from_raw(raw.get("a11y") or {}),
-            cwv=_cwv_from_raw(raw.get("cwv") or {}),
+            accessibility=_accessibility_from_raw(raw.get("accessibility") or {}),
+            web_vitals=_web_vitals_from_raw(raw.get("web_vitals") or {}),
             body_check=_body_check_from_raw(raw.get("body_check") or {}),
         )
 
@@ -367,9 +367,9 @@ def _report_from_raw(raw: dict[str, Any]) -> ReportConfig:
     )
 
 
-def _a11y_from_raw(raw: dict[str, Any]) -> A11yConfig:
-    base = A11yConfig()
-    return A11yConfig(
+def _accessibility_from_raw(raw: dict[str, Any]) -> AccessibilityConfig:
+    base = AccessibilityConfig()
+    return AccessibilityConfig(
         enabled=bool(raw.get("enabled", base.enabled)),
         auto_roles=list(raw.get("auto_roles") or base.auto_roles),
         tags=list(raw.get("tags") or base.tags),
@@ -377,9 +377,9 @@ def _a11y_from_raw(raw: dict[str, Any]) -> A11yConfig:
     )
 
 
-def _cwv_from_raw(raw: dict[str, Any]) -> CwvConfig:
-    base = CwvConfig()
-    return CwvConfig(
+def _web_vitals_from_raw(raw: dict[str, Any]) -> WebVitalsConfig:
+    base = WebVitalsConfig()
+    return WebVitalsConfig(
         enabled=bool(raw.get("enabled", base.enabled)),
         auto_roles=list(raw.get("auto_roles") or base.auto_roles),
         observe_ms=int(raw.get("observe_ms", base.observe_ms)),

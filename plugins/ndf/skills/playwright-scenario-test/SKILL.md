@@ -12,7 +12,7 @@ allowed-tools:
 
 # Playwright シナリオテスト Skill
 
-Web アプリの E2E シナリオを **理論ベース** で計画し、**pytest-playwright** 上で実行、**動画 + Markdown レポート + a11y/CWV** を自動収集する一式の Skill。
+Web アプリの E2E シナリオを **理論ベース** で計画し、**pytest-playwright** 上で実行、**動画 + Markdown レポート + accessibility/web_vitals** を自動収集する一式の Skill。
 
 利用者は **通常の pytest テスト** を書く。NDF が提供するのは pytest plugin / fixture / marker / テンプレート / Drive 連携スクリプト。
 
@@ -44,7 +44,7 @@ playwright-scenario-test/
 │   ├── upload_evidence.py      — trace/HAR/動画/report の Drive アップ
 │   └── (Drive 連携: gdrive_upload_dir.py / build_gdoc_with_drive_links.py / ...)
 └── templates/                  ← 利用者プロジェクト用雛形
-    ├── scenario.config.yaml    — base_url / roles / a11y / CWV 設定
+    ├── scenario.config.yaml    — base_url / roles / accessibility / web_vitals 設定
     ├── conftest.py.template    — 利用者の conftest.py 雛形
     ├── test_auth.py.template   — auth role のテスト例
     ├── test_list.py.template   — list role のテスト例
@@ -99,10 +99,10 @@ NDF が提供する fixture / marker:
 | `ndf_config` | session fixture | `scenario.config.yaml` をロード (Config dataclass) |
 | `ndf_role_<id>` | function fixture (動的) | 該当 role で login 済の storage_state を context に注入 |
 | `ndf_evidence` | function fixture | HAR / trace / console.error / pageerror / body_check の集中管理 |
-| `ndf_a11y_scan` | helper | 任意のタイミングで axe-core を 1 回実行 |
-| `ndf_cwv_measure` | helper | 任意のタイミングで CWV を 1 回計測 |
+| `ndf_accessibility_scan` | helper | 任意のタイミングで axe-core を 1 回実行 |
+| `ndf_web_vitals_measure` | helper | 任意のタイミングで CWV を 1 回計測 |
 | `ndf_body_check_scan` | helper | 任意のタイミングで現在の page 本文を 1 回 body_check |
-| `@pytest.mark.page_role("form")` | marker | a11y / CWV autouse の判定 (auto_roles 設定に従う) |
+| `@pytest.mark.page_role("form")` | marker | accessibility / web_vitals autouse の判定 (auto_roles 設定に従う) |
 | `@pytest.mark.role("admin")` | marker | report.md 集計用 (login 自体は `ndf_role_<id>` fixture) |
 | `@pytest.mark.phase(1)` | marker | report.md フェーズ集計 |
 | `@pytest.mark.priority("high")` | marker | report.md ソート |
@@ -147,7 +147,7 @@ body_check:
 | `--ndf-config <path>` | `scenario.config.yaml` のパス。env `NDF_CONFIG` / CWD の同名ファイルでも可 |
 | `--ndf-out-dir <path>` | 成果物出力先 (default: `reports/<run-id>/`) |
 | `--ndf-no-evidence` | HAR / trace / video の収集を OFF |
-| `--ndf-hud` | HUD overlay (赤丸カーソル + 字幕) を全 page に inject |
+| `--ndf-overlay` | HUD overlay (赤丸カーソル + 字幕) を全 page に inject |
 | `--ndf-drive-folder <id>` | session 終了時に report.md と evidence を Drive アップロード |
 
 pytest 標準と組み合わせて使える:
@@ -182,7 +182,7 @@ uv run pytest --html=reports/index.html --self-contained-html
        │     `playwright codegen` で操作 → そのまま test 関数に貼る or 整形
        ▼
 [F] 実行                                   uv run pytest --ndf-config=./scenario.config.yaml
-       │     trace.zip / video / HAR / console / a11y / CWV を自動収集
+       │     trace.zip / video / HAR / console / accessibility / web_vitals を自動収集
        ▼
 [G] レポート確認                            reports/<run-id>/report.md
        │     --ndf-drive-folder 指定で Drive にアップロード + viewer URL 化

@@ -235,7 +235,7 @@ page.on("pageerror", lambda exc: errors.append(str(exc)))
 | trace | `--tracing retain-on-failure` | 同等 | Python |
 | merge-reports | `pytest_terminal_summary` で集計 | builtin | Python (`scenario_test/pytest_report.py`) |
 
-**結論**: Python `pytest-playwright` を採用。理由は (1) HUD overlay / 字幕焼き込み / a11y / CWV / Drive 連携を pytest plugin として一体化済み、(2) `def test_xxx(page, ndf_role_admin): ...` を直接書く設計のため pytest fixture / marker と相性が良い、(3) merge-reports は `pytest_terminal_summary` hook で同等機能を提供.
+**結論**: Python `pytest-playwright` を採用。理由は (1) HUD overlay / 字幕焼き込み / accessibility / web_vitals / Drive 連携を pytest plugin として一体化済み、(2) `def test_xxx(page, ndf_role_admin): ...` を直接書く設計のため pytest fixture / marker と相性が良い、(3) merge-reports は `pytest_terminal_summary` hook で同等機能を提供.
 
 ## 参考文献
 

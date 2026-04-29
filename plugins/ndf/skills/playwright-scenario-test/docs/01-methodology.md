@@ -63,7 +63,7 @@ James Bach の **Heuristic Test Strategy Model** (v6.3) は、テスト戦略を
 
 | page role | 必須技法 | 推奨追加 |
 |---|---|---|
-| LP | Claims Testing, Domain Testing (viewport) | a11y / CWV |
+| LP | Claims Testing, Domain Testing (viewport) | accessibility / web_vitals |
 | list | Equivalence Partitioning, BVA, Pairwise (フィルタ次元 ≥3) | State Transition |
 | item | Domain Testing (id partition), Risk Testing (IDOR) | Claims |
 | edit | BVA, Equivalence Partitioning, Decision Table | State Transition (dirty/saving/error) |
@@ -115,10 +115,10 @@ James Bach の **Heuristic Test Strategy Model** (v6.3) は、テスト戦略を
        ▼
 [5] pytest テストを書く → templates/test_{role}.py.template
        │ playwright codegen で操作録画 → そのまま test 関数に貼ってもよい
-       │ @pytest.mark.page_role(...) を付けると a11y / CWV が autouse で走る
+       │ @pytest.mark.page_role(...) を付けると accessibility / web_vitals が autouse で走る
        ▼
 [6] 実行 → uv run pytest --ndf-config=./scenario.config.yaml -n 4
-       │ trace.zip / video / screenshot / HAR / console / a11y / CWV を自動収集
+       │ trace.zip / video / screenshot / HAR / console / accessibility / web_vitals を自動収集
        │ reports/<run-id>/report.md が pytest_terminal_summary で生成
        ▼
 [7] FAIL → docs/05-bug-report.md の構造で報告 (FEW HICCUPPS 軸付与)
@@ -133,7 +133,7 @@ James Bach の **Heuristic Test Strategy Model** (v6.3) は、テスト戦略を
 | 業界標準 (ISO / WCAG / OWASP / ISTQB) | docs/ 配下 (このディレクトリ) | 出典がある。揺らぎが小さい |
 | ヒューリスティクス (HTSM / FEW HICCUPPS / Hendrickson) | docs/ 配下 | 「思考の道具」として再利用 |
 | 個別プロジェクトの慣習 (PHP / Rails / 等) | scenario.config.yaml の `tolerated_console_errors` / `tolerated_page_errors` 正規表現 | 個別カスタマイズ |
-| 動画/HUD の細かい数値 (字幕高さ・カーソル色) | scenario_test/hud.py のコード内定数 | 表示 UX の調整。理論の対象外 |
+| 動画/HUD の細かい数値 (字幕高さ・カーソル色) | scenario_test/overlay.py のコード内定数 | 表示 UX の調整。理論の対象外 |
 
 「経験」を docs に書くのではなく、**理論を docs に書き、慣習は config に逃がす** のが本 Skill の規律。
 

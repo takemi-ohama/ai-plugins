@@ -15,10 +15,10 @@ import pytest
 
 from scenario_test.fixtures.evidence import NdfEvidence
 from scenario_test.config import (
-    A11yConfig,
+    AccessibilityConfig,
     BasicAuth,
     Config,
-    CwvConfig,
+    WebVitalsConfig,
     PlaywrightConfig,
     ReportConfig,
     RunnerConfig,
@@ -40,8 +40,8 @@ def _make_ev(
         runner=RunnerConfig(),
         report=ReportConfig(),
         config_path=tmp_path / "scenario.config.yaml",
-        a11y=A11yConfig(),
-        cwv=CwvConfig(),
+        accessibility=AccessibilityConfig(),
+        web_vitals=WebVitalsConfig(),
     )
     har_path = tmp_path / "request.har"
     trace_path = tmp_path / "trace.zip"

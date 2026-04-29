@@ -24,7 +24,7 @@ _SKILL_ROOT = Path(__file__).resolve().parent.parent
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from scenario_test.a11y import DEFAULT_TAGS, scan_page  # noqa: E402
+from scenario_test.accessibility import DEFAULT_TAGS, scan_page  # noqa: E402
 
 
 def scan(

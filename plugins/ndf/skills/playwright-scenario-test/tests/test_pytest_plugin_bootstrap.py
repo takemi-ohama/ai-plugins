@@ -28,7 +28,7 @@ def test_addoption_registered(pytester):
     assert "--ndf-config" in out
     assert "--ndf-out-dir" in out
     assert "--ndf-no-evidence" in out
-    assert "--ndf-hud" in out
+    assert "--ndf-overlay" in out
     assert "--ndf-drive-folder" in out
 
 

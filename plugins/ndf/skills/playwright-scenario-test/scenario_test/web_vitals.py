@@ -1,10 +1,19 @@
-"""runner 内蔵の Core Web Vitals 計測モジュール。
+"""runner 内蔵の Core Web Vitals (Web Vitals) 計測モジュール。
+
+Core Web Vitals は Google が定義する「ユーザ体感パフォーマンス指標」群で、
+本モジュールは以下の 4 指標を計測する:
+
+- **LCP** (Largest Contentful Paint): 最大コンテンツ描画時間 (体感ロード速度)
+- **CLS** (Cumulative Layout Shift): 累積レイアウトずれ量 (視覚的安定性)
+- **TTFB** (Time To First Byte): 初バイト到達時間 (サーバ応答速さ)
+- **longest_task** (Long Tasks API): 観測した最長タスクのミリ秒値 (応答性代理指標)
 
 `scripts/check_cwv.py` (CLI) はこのモジュールの薄いラッパで、runner からは
-`measure_page(page)` を直接呼び出して `EvidenceCollectors.cwv_metrics` に格納する。
+`measure_page(page)` を直接呼び出して `EvidenceCollectors.web_vitals_metrics` に
+格納する。
 
 page_role が `lp / list / dashboard` のとき runner が自動実行する
-(config.cwv.auto_roles で上書き可能)。
+(config.web_vitals.auto_roles で上書き可能)。
 
 注意:
 - INP は実 user 入力ベースの指標であり Playwright で完全再現は不可能。
@@ -29,7 +38,7 @@ THRESHOLDS: dict[str, dict[str, float]] = {
     "longest_task_ms": {"good": 50, "poor": 200},
 }
 
-# page_role × CWV 自動実行のデフォルト対象。インタラクション主体 (form / cart) は
+# page_role × Web Vitals 自動実行のデフォルト対象。インタラクション主体 (form / cart) は
 # 過度な負荷になるため除外し、初回表示性能が UX に直結する role に限定する。
 DEFAULT_AUTO_ROLES: frozenset[str] = frozenset({"lp", "list", "dashboard", "search"})
 
@@ -83,7 +92,7 @@ _PERF_JS = r"""
 
 
 def measure_page(page: Page, *, observe_ms: int = 5000) -> dict[str, float]:
-    """既にロード済みの Page で CWV を `observe_ms` ミリ秒観察し、metrics dict を返す。
+    """既にロード済みの Page で Core Web Vitals を `observe_ms` ミリ秒観察し、metrics dict を返す。
 
     Returns: `{"lcp_ms": float, "cls": float, "ttfb_ms": float, "longest_task_ms": float}`
             計測失敗した metric は dict から除外される。
@@ -129,5 +138,5 @@ def should_auto_measure(
     *,
     auto_roles: frozenset[str] = DEFAULT_AUTO_ROLES,
 ) -> bool:
-    """testcase の page_role に基づき CWV を自動計測すべきか判定する。"""
+    """testcase の page_role に基づき Web Vitals を自動計測すべきか判定する。"""
     return any(r in auto_roles for r in page_roles)

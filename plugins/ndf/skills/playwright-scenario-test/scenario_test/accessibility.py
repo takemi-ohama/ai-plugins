@@ -1,11 +1,14 @@
-"""runner 内蔵の axe-core スキャンモジュール。
+"""runner 内蔵の Web アクセシビリティ (axe-core) スキャンモジュール。
+
+Web アクセシビリティ (旧称 a11y) は WCAG 準拠の機械検査を指し、本モジュールは
+axe-core (axe-playwright-python) で WCAG 2.0/2.1/2.2 AA レベルの違反を検出する。
 
 `scripts/run_a11y_scan.py` (CLI) はこのモジュールの薄いラッパで、
 runner からは `scan_page(page, ...)` を直接呼び出して `EvidenceCollectors`
 の `axe_violations` に格納する。
 
 page_role が `lp / list / form / dashboard / cart / checkout / settings / auth`
-のとき runner が自動実行する (config.a11y.auto_roles で上書き可能)。
+のとき runner が自動実行する (config.accessibility.auto_roles で上書き可能)。
 """
 
 from __future__ import annotations

@@ -3,7 +3,7 @@ PHP / SSR が HTML 本文に出力したエラー文字列を検出する (v0.4.
 
 config.yaml の ``body_check.enabled`` の default は ``True`` (PHP 系パターン
 内蔵)。``page`` fixture を要求している test に限り autouse で listener を
-attach する (a11y autouse と同じ guard 戦略)。
+attach する (accessibility autouse と同じ guard 戦略)。
 
 opt-out:
 - 全体無効化: ``body_check.enabled: false`` を config.yaml に明示
@@ -35,7 +35,7 @@ def _build_response_handler(cfg: BodyCheckConfig, ev: NdfEvidence):
     """``page.on("response", ...)`` 用の handler を closure として作る。
 
     listener 内で発生する例外は test 失敗には伝播させず ``ev.log_lines`` に
-    記録するに留める (a11y / pageerror listener と同じ防御方針)。
+    記録するに留める (accessibility / pageerror listener と同じ防御方針)。
     """
     fatal = tuple(cfg.fatal_patterns)
     warn = tuple(cfg.warning_patterns)

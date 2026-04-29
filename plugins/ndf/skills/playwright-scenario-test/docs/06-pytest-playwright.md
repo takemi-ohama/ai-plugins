@@ -60,16 +60,16 @@ addopts = "--headed --browser firefox --tracing retain-on-failure"
 | fixture | `ndf_config` | NDF | session | `scenario.config.yaml` をロード |
 | fixture | `ndf_role_<id>` (動的生成) | NDF | function | 該当 role で login 済 storage_state を context に inject |
 | fixture | `ndf_evidence` | NDF | function | HAR / trace / console / pageerror の集中管理 |
-| fixture | `ndf_a11y_scan` | NDF | function | 任意のタイミングで axe-core を 1 回実行 |
-| fixture | `ndf_cwv_measure` | NDF | function | 任意のタイミングで CWV を 1 回計測 |
+| fixture | `ndf_accessibility_scan` | NDF | function | 任意のタイミングで axe-core を 1 回実行 |
+| fixture | `ndf_web_vitals_measure` | NDF | function | 任意のタイミングで CWV を 1 回計測 |
 | fixture | `browser_context_args` (override) | NDF | function | HAR `record_har_path` を inject (上書きしないこと) |
-| marker | `@pytest.mark.page_role(...)` | NDF | — | a11y / CWV autouse の判定 (auto_roles 設定に従う) |
+| marker | `@pytest.mark.page_role(...)` | NDF | — | accessibility / web_vitals autouse の判定 (auto_roles 設定に従う) |
 | marker | `@pytest.mark.role(role_id)` | NDF | — | report.md 集計用 (login は `ndf_role_<id>` 側で行う) |
 | marker | `@pytest.mark.phase(num)` / `priority(level)` | NDF | — | report.md ソート / フェーズ集計 |
 | CLI | `--ndf-config <path>` | NDF | — | `scenario.config.yaml` パス |
 | CLI | `--ndf-out-dir <path>` | NDF | — | 成果物出力先 (default: `reports/<run-id>/`) |
 | CLI | `--ndf-no-evidence` | NDF | — | HAR / trace / video の収集を OFF |
-| CLI | `--ndf-hud` | NDF | — | HUD overlay を inject (録画用) |
+| CLI | `--ndf-overlay` | NDF | — | HUD overlay を inject (録画用) |
 | CLI | `--ndf-drive-folder <id>` | NDF | — | session 終了時に Drive へアップ |
 
 ## 5. fixture override パターン
@@ -173,7 +173,7 @@ NDF では現状 visual regression は autouse 化していない。必要な te
 
 ## 11. autouse fixture の落とし穴
 
-NDF の a11y / CWV autouse fixture は **`page` を直接 fixture 引数に取らない**。理由:
+NDF の accessibility / web_vitals autouse fixture は **`page` を直接 fixture 引数に取らない**。理由:
 
 - pytest-playwright が `page` を function scope で要求するため、autouse fixture が `page` を要求すると **全 test が browser parametrize される**
 - 結果として「page_role marker 無し」の純 unit test まで browser を立ち上げてしまう

@@ -1,7 +1,8 @@
-"""CWV fixture: ``page_role`` marker に応じた Core Web Vitals 自動計測。
+"""Web Vitals fixture: ``page_role`` marker に応じた Core Web Vitals 自動計測。
 
 ``@pytest.mark.page_role("dashboard")`` 等が付与された test の終了直前に
-LCP / CLS / TTFB / longest_task を計測する。
+LCP (Largest Contentful Paint) / CLS (Cumulative Layout Shift) /
+TTFB (Time To First Byte) / longest_task (Long Tasks API) を計測する。
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ from typing import Iterator
 
 import pytest
 
-from scenario_test import cwv as cwv_mod
+from scenario_test import web_vitals as web_vitals_mod
 from scenario_test.config import Config
 from scenario_test.fixtures.evidence import NdfEvidence
 
@@ -27,8 +28,8 @@ def _page_roles_from_marker(item) -> list[str]:
 
 
 @pytest.fixture()
-def ndf_cwv_measure(page, ndf_evidence: NdfEvidence, _ndf_config_optional):
-    """明示呼び出し用: ``metrics = ndf_cwv_measure()`` で 1 度計測。"""
+def ndf_web_vitals_measure(page, ndf_evidence: NdfEvidence, _ndf_config_optional):
+    """明示呼び出し用: ``metrics = ndf_web_vitals_measure()`` で 1 度計測。"""
     config: Config | None = _ndf_config_optional
 
     def _measure(*, observe_ms: int | None = None) -> dict[str, float]:
@@ -36,28 +37,28 @@ def ndf_cwv_measure(page, ndf_evidence: NdfEvidence, _ndf_config_optional):
             int(observe_ms)
             if observe_ms is not None
             else (
-                int(config.cwv.observe_ms)
+                int(config.web_vitals.observe_ms)
                 if config is not None
                 else 5000
             )
         )
-        metrics = cwv_mod.measure_page(page, observe_ms=ms)
-        ndf_evidence.cwv_metrics.update(metrics)
-        ndf_evidence.cwv_passed = cwv_mod.passed(ndf_evidence.cwv_metrics)
+        metrics = web_vitals_mod.measure_page(page, observe_ms=ms)
+        ndf_evidence.web_vitals_metrics.update(metrics)
+        ndf_evidence.web_vitals_passed = web_vitals_mod.passed(ndf_evidence.web_vitals_metrics)
         return metrics
 
     return _measure
 
 
 @pytest.fixture(autouse=True)
-def _ndf_cwv_autouse(request) -> Iterator[None]:
-    """``page_role`` marker が付いた test の終了直前に CWV 計測を行う。
+def _ndf_web_vitals_autouse(request) -> Iterator[None]:
+    """``page_role`` marker が付いた test の終了直前に Web Vitals 計測を行う。
 
-    a11y と同じく ``page`` fixture を要求している test のみ対象。
+    accessibility autouse と同じく ``page`` fixture を要求している test のみ対象。
 
     Issue #60 fix: 旧版の ``"ndf_evidence" not in request.fixturenames`` ガードを
     廃止。test 引数に ``ndf_evidence`` を書いていなくても ``getfixturevalue``
-    経由で lazy 取得し、CWV autouse が走るようにする。
+    経由で lazy 取得し、Web Vitals autouse が走るようにする。
 
     teardown order 対策 (Issue #61): ``yield`` 後に ``ndf_evidence`` を fetch
     しようとすると LIFO 解放済の AssertionError になるため、setup phase で
@@ -69,15 +70,15 @@ def _ndf_cwv_autouse(request) -> Iterator[None]:
         return
 
     config: Config | None = request.getfixturevalue("_ndf_config_optional")
-    if config is None or not config.cwv.enabled:
+    if config is None or not config.web_vitals.enabled:
         yield
         return
     page_roles = _page_roles_from_marker(request.node)
     if not page_roles:
         yield
         return
-    if not cwv_mod.should_auto_measure(
-        page_roles, auto_roles=frozenset(config.cwv.auto_roles)
+    if not web_vitals_mod.should_auto_measure(
+        page_roles, auto_roles=frozenset(config.web_vitals.auto_roles)
     ):
         yield
         return
@@ -95,14 +96,14 @@ def _ndf_cwv_autouse(request) -> Iterator[None]:
     except Exception:
         return
 
-    metrics = cwv_mod.measure_page(page, observe_ms=int(config.cwv.observe_ms))
-    ndf_evidence.cwv_metrics.update(metrics)
-    ndf_evidence.cwv_passed = cwv_mod.passed(ndf_evidence.cwv_metrics)
+    metrics = web_vitals_mod.measure_page(page, observe_ms=int(config.web_vitals.observe_ms))
+    ndf_evidence.web_vitals_metrics.update(metrics)
+    ndf_evidence.web_vitals_passed = web_vitals_mod.passed(ndf_evidence.web_vitals_metrics)
 
     detail = ", ".join(
-        f"{k}={v:.1f}({cwv_mod.judge(k, v)})" for k, v in metrics.items()
+        f"{k}={v:.1f}({web_vitals_mod.judge(k, v)})" for k, v in metrics.items()
     ) or "no metrics collected"
-    ndf_evidence.log_lines.append(f"[cwv autouse] {detail}")
+    ndf_evidence.log_lines.append(f"[web_vitals autouse] {detail}")
 
-    if not ndf_evidence.cwv_passed and config.cwv.fail_on_poor:
-        pytest.fail(f"[cwv] poor metric を検出: {detail}")
+    if not ndf_evidence.web_vitals_passed and config.web_vitals.fail_on_poor:
+        pytest.fail(f"[web_vitals] poor metric を検出: {detail}")

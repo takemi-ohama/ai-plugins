@@ -17,11 +17,11 @@ from scenario_test.body_check import (
     scan_body,
 )
 from scenario_test.config import (
-    A11yConfig,
+    AccessibilityConfig,
     BasicAuth,
     BodyCheckConfig,
     Config,
-    CwvConfig,
+    WebVitalsConfig,
     PlaywrightConfig,
     ReportConfig,
     RunnerConfig,
@@ -261,8 +261,8 @@ def test_config_default_body_check_is_enabled():
         runner=RunnerConfig(),
         report=ReportConfig(),
         config_path=Path("/tmp/scenario.config.yaml"),
-        a11y=A11yConfig(),
-        cwv=CwvConfig(),
+        accessibility=AccessibilityConfig(),
+        web_vitals=WebVitalsConfig(),
     )
     assert cfg.body_check.enabled is True
     assert "Fatal error" in cfg.body_check.fatal_patterns
@@ -291,8 +291,8 @@ def _make_config_with_body_check(**kwargs) -> Config:
         runner=RunnerConfig(),
         report=ReportConfig(),
         config_path=Path("/tmp/scenario.config.yaml"),
-        a11y=A11yConfig(),
-        cwv=CwvConfig(),
+        accessibility=AccessibilityConfig(),
+        web_vitals=WebVitalsConfig(),
         body_check=bc,
     )
 

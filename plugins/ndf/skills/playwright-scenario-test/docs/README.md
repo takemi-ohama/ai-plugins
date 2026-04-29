@@ -42,11 +42,11 @@ AI/人間どちらが計画書を書く場合も、まず該当 page role のチ
 3. pytest テストを書く
    → templates/test_<role>.py.template を起点に test 関数を追加
    → `playwright codegen` で操作録画 → そのまま test に貼ってもよい
-   → `@pytest.mark.page_role(...)` を付ければ a11y / CWV が autouse で走る
+   → `@pytest.mark.page_role(...)` を付ければ accessibility / web_vitals が autouse で走る
 
 4. 実行 → エビデンス収集
    → uv run pytest --ndf-config=./scenario.config.yaml で実行
-   → trace.zip / video / screenshot / HAR / console log / a11y / CWV を自動収集
+   → trace.zip / video / screenshot / HAR / console log / accessibility / web_vitals を自動収集
    → reports/<run-id>/report.md が ``pytest_terminal_summary`` で生成される
 
 5. bug 発見 → docs/05-bug-report.md に従って報告
