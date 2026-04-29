@@ -66,7 +66,13 @@ fi
 # --- 2) 初回のみ uv sync + playwright install ---------------------
 if [[ ! -d "$RUNTIME_DIR/.venv" ]]; then
   echo "[run.sh] 初回セットアップ: uv sync ($RUNTIME_DIR)"
-  (cd "$RUNTIME_DIR" && uv sync)
+  # サブシェル内の `set -euo pipefail` は外側に伝播しないため、
+  # uv sync の終了コードを明示的に拾って失敗時に abort する。
+  (cd "$RUNTIME_DIR" && uv sync) || {
+    echo "[run.sh] ERROR: uv sync に失敗しました。" >&2
+    echo "[run.sh]        ネットワーク / pyproject.toml / uv.lock を確認してください。" >&2
+    exit 1
+  }
   echo "[run.sh] 初回セットアップ: playwright install chromium"
   (cd "$RUNTIME_DIR" && uv run playwright install chromium) || {
     echo "[run.sh] WARN: playwright install chromium に失敗しました。"

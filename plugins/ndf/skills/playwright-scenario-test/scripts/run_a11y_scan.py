@@ -1,4 +1,4 @@
-"""axe-core で a11y 違反を検出する CLI (`playwright_kit.a11y` モジュールの薄いラッパ)。
+"""axe-core で a11y 違反を検出する CLI (`playwright_kit.accessibility` モジュールの薄いラッパ)。
 
 docs/checklists/checklist-common.md C1 (a11y) の自動走査用。runner はテストケース
 内蔵で同 module を呼ぶため、本 CLI は外部 URL の単発スキャン専用。

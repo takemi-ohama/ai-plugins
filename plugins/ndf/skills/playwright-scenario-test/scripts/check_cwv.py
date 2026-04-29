@@ -1,6 +1,6 @@
 """Core Web Vitals (LCP/CLS/TTFB/longest_task) を 1 URL に対して計測する CLI。
 
-`playwright_kit.cwv` モジュールの薄いラッパ。runner は testcase 内蔵で同 module
+`playwright_kit.web_vitals` モジュールの薄いラッパ。runner は testcase 内蔵で同 module
 を呼ぶため、本 CLI は外部 URL の単発計測専用。
 
 Usage:

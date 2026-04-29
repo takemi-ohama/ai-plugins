@@ -11,6 +11,13 @@ rem 動作:
 rem   1) 自身が置かれているディレクトリを RUNTIME_DIR とし、CWD をそこに固定
 rem   2) .venv\ が無ければ `uv sync` + `playwright install chromium` を実行
 rem   3) `uv run pytest --pwk-config=%PWK_CONFIG%` を引数素通しで起動
+rem
+rem 注意:
+rem   cmd.exe ネイティブの %* 展開ではスペースを含む引数 (例: -k "test login") の
+rem   クォートが正しく保持されません。スペース込みの引数を渡したい場合は
+rem   PowerShell から実行するか、引数を quote 不要な形に書き換えてください:
+rem     PowerShell> & .\run.bat -k 'test_login'      (アンダースコア化を推奨)
+rem     PowerShell> & .\run.bat -m 'page_role'
 
 setlocal EnableExtensions EnableDelayedExpansion
 

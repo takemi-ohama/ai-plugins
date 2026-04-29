@@ -42,7 +42,7 @@ pytest_plugins = [
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    group = parser.getgroup("pwk", "playwright-scenario-test (NDF)")
+    group = parser.getgroup("pwk", "playwright-scenario-test (playwright_kit)")
     group.addoption(
         "--pwk-config",
         action="store",
@@ -113,7 +113,7 @@ def pytest_configure(config: pytest.Config) -> None:
     config 読み込みは ``pwk_config`` fixture でも遅延ロードされるが、
     ``pwk_role_<id>`` fixture を *動的登録* するためには
     ``pytest_configure`` で 1 度 Config をロードしておく必要がある。
-    failure は警告にとどめ、利用者が NDF 機能を使わない場合に test 全体を
+    failure は警告にとどめ、利用者が playwright_kit 機能を使わない場合に test 全体を
     潰さないようにする。
     """
     for name, doc in _PWK_MARKERS:

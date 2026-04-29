@@ -57,6 +57,24 @@ if "%PROJECT_ROOT%"=="" (
   exit /b 1
 )
 
+rem --runtime-dir のサニタイズ (path traversal / パス区切り / `.` `..` 単体を拒否)
+if "%RUNTIME_DIR_NAME%"=="." (
+  echo [init] --runtime-dir に '.' は指定できません
+  exit /b 1
+)
+if "%RUNTIME_DIR_NAME%"==".." (
+  echo [init] --runtime-dir に '..' は指定できません
+  exit /b 1
+)
+echo %RUNTIME_DIR_NAME% | findstr /r "[/\\]" >nul && (
+  echo [init] --runtime-dir にパス区切り文字 ^(/ \^) は使用できません
+  exit /b 1
+)
+echo %RUNTIME_DIR_NAME% | findstr /r "\.\." >nul && (
+  echo [init] --runtime-dir に '..' を含むことはできません
+  exit /b 1
+)
+
 rem Skill ディレクトリ (このスクリプトの 1 つ上)
 for %%i in ("%~dp0..") do set "SKILL_DIR=%%~fi"
 

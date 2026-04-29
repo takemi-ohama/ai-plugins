@@ -61,16 +61,25 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$PROJECT_ROOT" ]] || { echo "[init] PROJECT_ROOT は必須です" >&2; exit 1; }
-[[ "$RUNTIME_DIR_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || {
+# `.` / `..` を弾いた上で英数字 + `.` `_` `-` のみ許可。
+# (先頭 `.` は許可するが、`.` 単体・`..` 単体・パス区切りはブロック)
+if [[ "$RUNTIME_DIR_NAME" == "." || "$RUNTIME_DIR_NAME" == ".." ]]; then
+  echo "[init] --runtime-dir に '.' / '..' は指定できません: '$RUNTIME_DIR_NAME'" >&2
+  exit 1
+fi
+if [[ ! "$RUNTIME_DIR_NAME" =~ ^[A-Za-z0-9._-]+$ ]]; then
   echo "[init] --runtime-dir は英数字 / . / _ / - のみ使用可能です: '$RUNTIME_DIR_NAME'" >&2
   exit 1
-}
+fi
 
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)" || {
+# bash 3.2 (macOS default) ではサブシェル失敗時の `||` 右辺が動かないケースがあるため、
+# 明示的な `-d` チェックを先に行う。
+if [[ ! -d "$PROJECT_ROOT" ]]; then
   echo "[init] PROJECT_ROOT が存在しません: $PROJECT_ROOT" >&2
   exit 1
-}
+fi
+PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)"
 RUNTIME_DIR="$PROJECT_ROOT/$RUNTIME_DIR_NAME"
 
 echo "[init] Skill ディレクトリ : $SKILL_DIR"
@@ -116,18 +125,20 @@ fi
 
 # ---------- 1) パッケージ本体 + scripts + uv.lock を rsync ----------
 echo "[init] [1/4] playwright_kit / scripts / uv.lock をコピー"
-RSYNC_OPTS=(-a
-  --exclude='.venv' --exclude='__pycache__' --exclude='.pytest_cache'
-  --exclude='reports' --exclude='*.egg-info'
-)
-[[ $DRY_RUN -eq 1 ]] && RSYNC_OPTS+=(-n -v)
-
-rsync "${RSYNC_OPTS[@]}" "$SKILL_DIR/playwright_kit" "$RUNTIME_DIR/"
-rsync "${RSYNC_OPTS[@]}" "$SKILL_DIR/scripts"        "$RUNTIME_DIR/"
-if [[ $DRY_RUN -eq 0 ]]; then
-  cp "$SKILL_DIR/uv.lock" "$RUNTIME_DIR/uv.lock"
+# dry-run 時は rsync を起動しない (宛先 RUNTIME_DIR が未作成だと
+# rsync -n でも failed to read directory で abort するため)。
+if [[ $DRY_RUN -eq 1 ]]; then
+  echo "    rsync $SKILL_DIR/playwright_kit -> $RUNTIME_DIR/playwright_kit"
+  echo "    rsync $SKILL_DIR/scripts        -> $RUNTIME_DIR/scripts"
+  echo "    cp    $SKILL_DIR/uv.lock        -> $RUNTIME_DIR/uv.lock"
 else
-  echo "    cp $SKILL_DIR/uv.lock -> $RUNTIME_DIR/uv.lock"
+  RSYNC_OPTS=(-a
+    --exclude='.venv' --exclude='__pycache__' --exclude='.pytest_cache'
+    --exclude='reports' --exclude='*.egg-info'
+  )
+  rsync "${RSYNC_OPTS[@]}" "$SKILL_DIR/playwright_kit" "$RUNTIME_DIR/"
+  rsync "${RSYNC_OPTS[@]}" "$SKILL_DIR/scripts"        "$RUNTIME_DIR/"
+  cp "$SKILL_DIR/uv.lock" "$RUNTIME_DIR/uv.lock"
 fi
 
 # ---------- 2) ランタイム用テンプレートをコピー (上書き) ----------
