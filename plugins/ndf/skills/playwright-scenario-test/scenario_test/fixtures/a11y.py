@@ -71,36 +71,46 @@ def _ndf_a11y_autouse(request) -> Iterator[None]:
     無条件に ``page`` を要求すると、pytest-playwright が全 test を browser
     parametrize してしまうため、ここでは ``request.fixturenames`` を見て
     必要な test だけ取得する。
+
+    teardown order 対策 (Issue #61): pytest fixture の teardown は LIFO のため、
+    ``yield`` 後に ``getfixturevalue("ndf_evidence")`` を呼ぶと「既に解放済」
+    AssertionError が発生する。setup phase で ``ev`` / ``page`` を取得して
+    closure に保持し、teardown phase はその参照のみを使う。
     """
-    yield
 
     # ``page`` を要求していない (= browser を使わない) test では何もしない。
     # これにより pure pytest test の挙動に影響を与えない。
     if "page" not in request.fixturenames:
-        return
-    if "ndf_evidence" not in request.fixturenames:
+        yield
         return
 
     config: Config | None = request.getfixturevalue("_ndf_config_optional")
     if config is None or not config.a11y.enabled:
+        yield
         return
     page_roles = _page_roles_from_marker(request.node)
     if not page_roles:
+        yield
         return
     if not a11y_mod.should_auto_scan(
         page_roles, auto_roles=frozenset(config.a11y.auto_roles)
     ):
+        yield
         return
 
+    # setup phase: closure に必要なオブジェクトを束ねる。
     ndf_evidence: NdfEvidence = request.getfixturevalue("ndf_evidence")
+    page = request.getfixturevalue("page")
 
+    yield
+
+    # teardown phase: closure に保持した ev / page のみを参照する。
     if not a11y_mod.is_available():
         ndf_evidence.log_lines.append(
             "[a11y autouse] axe-playwright-python 未インストール — SKIP"
         )
         return
 
-    page = request.getfixturevalue("page")
     try:
         if page.is_closed():
             return

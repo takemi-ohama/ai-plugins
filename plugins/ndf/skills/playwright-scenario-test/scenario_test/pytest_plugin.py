@@ -62,6 +62,19 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="HAR / trace / video の収集を OFF にする",
     )
     group.addoption(
+        "--ndf-har-mode",
+        action="store",
+        default=None,
+        choices=["minimal", "full", "none"],
+        help=(
+            "HAR 録画モード (Issue #62)。"
+            "minimal=メタデータのみ (default; Basic 認証 + redirect race を回避), "
+            "full=Playwright 既定の full HAR, "
+            "none=HAR を出力しない。"
+            "config の playwright.har_mode より優先。"
+        ),
+    )
+    group.addoption(
         "--ndf-hud",
         action="store_true",
         default=False,

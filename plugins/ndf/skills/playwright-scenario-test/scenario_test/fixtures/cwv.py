@@ -54,28 +54,37 @@ def _ndf_cwv_autouse(request) -> Iterator[None]:
     """``page_role`` marker が付いた test の終了直前に CWV 計測を行う。
 
     a11y と同じく ``page`` fixture を要求している test のみ対象。
+
+    teardown order 対策 (Issue #61): ``yield`` 後に ``ndf_evidence`` を fetch
+    しようとすると LIFO 解放済の AssertionError になるため、setup phase で
+    ``ev`` / ``page`` を取得して closure に保持する。
     """
-    yield
 
     if "page" not in request.fixturenames:
-        return
-    if "ndf_evidence" not in request.fixturenames:
+        yield
         return
 
     config: Config | None = request.getfixturevalue("_ndf_config_optional")
     if config is None or not config.cwv.enabled:
+        yield
         return
     page_roles = _page_roles_from_marker(request.node)
     if not page_roles:
+        yield
         return
     if not cwv_mod.should_auto_measure(
         page_roles, auto_roles=frozenset(config.cwv.auto_roles)
     ):
+        yield
         return
 
+    # setup phase: closure に保持。
     ndf_evidence: NdfEvidence = request.getfixturevalue("ndf_evidence")
     page = request.getfixturevalue("page")
 
+    yield
+
+    # teardown phase: closure 経由でアクセス。
     try:
         if page.is_closed():
             return

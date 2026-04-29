@@ -130,19 +130,19 @@ def ndf_body_check_scan(page, ndf_evidence: NdfEvidence, _ndf_config_optional):
 def _ndf_body_check_autouse(request) -> Iterator[None]:
     """``page`` を要求する test に限り、HTML response への body_check を自動実行する。
 
-    a11y autouse と同じガード戦略:
+    ガード戦略:
     - ``page`` を fixturename に持たない test は対象外 (browser を起動させない)
-    - ``ndf_evidence`` を持たない test も対象外
     - config.body_check.enabled が False なら何もしない
     - ``@pytest.mark.no_body_check`` が付いている test は skip
+
+    ``ndf_evidence`` は ``getfixturevalue`` で setup phase に lazy resolve する。
+    test 関数の引数に ``ndf_evidence`` を書いていなくても listener が attach される
+    (Issue #60)。
 
     teardown 時に違反があれば ``case_dir/body_check.jsonl`` に書き出し、
     ``fail_on_match`` が True なら ``pytest.fail`` で test を失敗させる。
     """
-    if (
-        "page" not in request.fixturenames
-        or "ndf_evidence" not in request.fixturenames
-    ):
+    if "page" not in request.fixturenames:
         yield
         return
 
@@ -156,6 +156,8 @@ def _ndf_body_check_autouse(request) -> Iterator[None]:
         return
 
     page = request.getfixturevalue("page")
+    # setup phase で fetch して closure に保持する (Issue #61 と同じ teardown
+    # order 問題を防ぐ)。
     ev: NdfEvidence = request.getfixturevalue("ndf_evidence")
     handler = _build_response_handler(config.body_check, ev)
 

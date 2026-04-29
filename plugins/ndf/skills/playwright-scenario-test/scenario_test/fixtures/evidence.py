@@ -232,9 +232,23 @@ def _ndf_config_optional(pytestconfig) -> Config | None:
     return None
 
 
+def _resolve_har_mode(pytestconfig, ndf_config) -> str:
+    """``--ndf-har-mode`` CLI > ``playwright.har_mode`` config > default("minimal")。
+
+    Issue #62 対策で default は ``minimal``。``--ndf-no-evidence`` が True の場合
+    呼び出し側で HAR を一切 inject しない (本関数の戻り値は使われない)。
+    """
+    cli = pytestconfig.getoption("ndf_har_mode", default=None)
+    if cli:
+        return str(cli).lower()
+    if ndf_config is not None:
+        return str(ndf_config.playwright.har_mode).lower()
+    return "minimal"
+
+
 @pytest.fixture()
 def browser_context_args(
-    browser_context_args, request, pytestconfig, ndf_out_dir
+    browser_context_args, request, pytestconfig, ndf_out_dir, _ndf_config_optional
 ) -> dict[str, Any]:
     """pytest-playwright の ``browser_context_args`` を function scope で override し、
     1 test = 1 HAR を実現する (Codex Major 1)。
@@ -244,13 +258,31 @@ def browser_context_args(
     - session 共通 HAR (``session.har``) は廃止。これにより
       ``NdfEvidence.confirm_har()`` が常に None を返す不整合を解消。
     - ``--ndf-no-evidence`` が True なら HAR 収集を OFF。
+    - HAR mode (Issue #62):
+      - ``--ndf-har-mode none`` (または config ``playwright.har_mode: none``):
+        ``record_har_path`` を inject しない。
+      - ``minimal`` (default): ``record_har_mode="minimal"`` でメタデータのみ
+        記録。Basic 認証 + redirect 連続時の ``ERR_ABORTED`` race を回避する。
+      - ``full``: Playwright 既定の full HAR (body + content) を記録。
     """
     no_evidence = bool(pytestconfig.getoption("ndf_no_evidence", default=False))
     args = dict(browser_context_args or {})
-    if not no_evidence:
-        case_dir = ndf_out_dir / _safe_case_slug(request.node)
-        case_dir.mkdir(parents=True, exist_ok=True)
-        args.setdefault("record_har_path", str(case_dir / "request.har"))
+    if no_evidence:
+        return args
+
+    har_mode = _resolve_har_mode(pytestconfig, _ndf_config_optional)
+    if har_mode == "none":
+        return args
+
+    case_dir = ndf_out_dir / _safe_case_slug(request.node)
+    case_dir.mkdir(parents=True, exist_ok=True)
+    args.setdefault("record_har_path", str(case_dir / "request.har"))
+    if har_mode == "minimal":
+        # Playwright の record_har_mode="minimal" は request/response の
+        # 主要メタデータのみ。content は記録されないので omit 指定は不要。
+        args.setdefault("record_har_mode", "minimal")
+    else:  # "full"
+        # 既存挙動 (body 含む) を維持しつつ content だけは省略する。
         args.setdefault("record_har_content", "omit")
     return args
 
@@ -279,11 +311,16 @@ def ndf_evidence(
     case_dir = ndf_out_dir / _safe_case_slug(request.node)
     case_dir.mkdir(parents=True, exist_ok=True)
 
+    # HAR mode が "none" のときは ``request.har`` を期待しないようにする
+    # (browser_context_args で record_har_path 自体を inject していない: Issue #62)。
+    har_mode = _resolve_har_mode(pytestconfig, _ndf_config_optional)
+    har_enabled = enabled and har_mode != "none"
+
     ev = NdfEvidence(
         case_dir=case_dir,
         config=_ndf_config_optional,
         enabled=enabled,
-        har_path=(case_dir / "request.har") if enabled else None,
+        har_path=(case_dir / "request.har") if har_enabled else None,
         trace_path=(case_dir / "trace.zip") if enabled else None,
     )
     ev.attach_listeners(page)
