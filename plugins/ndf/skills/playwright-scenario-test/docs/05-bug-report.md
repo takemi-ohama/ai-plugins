@@ -157,7 +157,7 @@ trace/HAR を `upload_evidence.py` でアップロードしたあと、生成さ
 ## 再現コマンド
 ```bash
 uv run pytest tests/test_item_permission.py::test_other_owners_edit_blocked \
-  --ndf-config=./scenario.config.yaml --headed
+  --pwk-config=./scenario.config.yaml --headed
 ```
 
 ## 関連

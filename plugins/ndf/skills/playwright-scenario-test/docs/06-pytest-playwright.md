@@ -28,7 +28,7 @@ playwright install chromium                  # ブラウザバイナリ
 | `browser_context_args` | function | `Browser.new_context()` の引数 (override 可能) |
 | `connect_options` | session | 既存ブラウザに WS で接続する場合の dict |
 
-**重要**: `context` / `page` は **function scope** なので test ごとに完全分離される。テスト間で状態漏れが起きない代わりに、認証は毎回 storage_state を inject する必要がある (NDF では `ndf_role_<id>` fixture が担当)。
+**重要**: `context` / `page` は **function scope** なので test ごとに完全分離される。テスト間で状態漏れが起きない代わりに、認証は毎回 storage_state を inject する必要がある (NDF では `pwk_role_<id>` fixture が担当)。
 
 ## 3. CLI options (pytest-playwright)
 
@@ -57,20 +57,20 @@ addopts = "--headed --browser firefox --tracing retain-on-failure"
 
 | 種別 | 名前 | 由来 | scope | 用途 |
 |---|---|---|---|---|
-| fixture | `ndf_config` | NDF | session | `scenario.config.yaml` をロード |
-| fixture | `ndf_role_<id>` (動的生成) | NDF | function | 該当 role で login 済 storage_state を context に inject |
-| fixture | `ndf_evidence` | NDF | function | HAR / trace / console / pageerror の集中管理 |
-| fixture | `ndf_accessibility_scan` | NDF | function | 任意のタイミングで axe-core を 1 回実行 |
-| fixture | `ndf_web_vitals_measure` | NDF | function | 任意のタイミングで CWV を 1 回計測 |
+| fixture | `pwk_config` | NDF | session | `scenario.config.yaml` をロード |
+| fixture | `pwk_role_<id>` (動的生成) | NDF | function | 該当 role で login 済 storage_state を context に inject |
+| fixture | `pwk_evidence` | NDF | function | HAR / trace / console / pageerror の集中管理 |
+| fixture | `pwk_accessibility_scan` | NDF | function | 任意のタイミングで axe-core を 1 回実行 |
+| fixture | `pwk_web_vitals_measure` | NDF | function | 任意のタイミングで CWV を 1 回計測 |
 | fixture | `browser_context_args` (override) | NDF | function | HAR `record_har_path` を inject (上書きしないこと) |
 | marker | `@pytest.mark.page_role(...)` | NDF | — | accessibility / web_vitals autouse の判定 (auto_roles 設定に従う) |
-| marker | `@pytest.mark.role(role_id)` | NDF | — | report.md 集計用 (login は `ndf_role_<id>` 側で行う) |
+| marker | `@pytest.mark.role(role_id)` | NDF | — | report.md 集計用 (login は `pwk_role_<id>` 側で行う) |
 | marker | `@pytest.mark.phase(num)` / `priority(level)` | NDF | — | report.md ソート / フェーズ集計 |
-| CLI | `--ndf-config <path>` | NDF | — | `scenario.config.yaml` パス |
-| CLI | `--ndf-out-dir <path>` | NDF | — | 成果物出力先 (default: `reports/<run-id>/`) |
-| CLI | `--ndf-no-evidence` | NDF | — | HAR / trace / video の収集を OFF |
-| CLI | `--ndf-overlay` | NDF | — | HUD overlay を inject (録画用) |
-| CLI | `--ndf-drive-folder <id>` | NDF | — | session 終了時に Drive へアップ |
+| CLI | `--pwk-config <path>` | NDF | — | `scenario.config.yaml` パス |
+| CLI | `--pwk-out-dir <path>` | NDF | — | 成果物出力先 (default: `reports/<run-id>/`) |
+| CLI | `--pwk-no-evidence` | NDF | — | HAR / trace / video の収集を OFF |
+| CLI | `--pwk-overlay` | NDF | — | overlay (旧名 HUD) を inject (録画用) |
+| CLI | `--pwk-drive-folder <id>` | NDF | — | session 終了時に Drive へアップ |
 
 ## 5. fixture override パターン
 
@@ -105,7 +105,7 @@ def test_german_user(page):
 
 ### 5.3 複数 role を session 内で再利用
 
-NDF では `ndf_role_<id>` fixture が **session 内で login を 1 回だけ実行** し storage_state を cache する。同じ role を使う test は何件あっても再ログインしない。
+NDF では `pwk_role_<id>` fixture が **session 内で login を 1 回だけ実行** し storage_state を cache する。同じ role を使う test は何件あっても再ログインしない。
 利用者プロジェクト側で同様の最適化を自前で書く必要はない。
 
 ## 6. 並列実行 (`pytest-xdist`)
@@ -118,8 +118,8 @@ pytest -n 4 --dist=loadgroup             # @pytest.mark.xdist_group で同じ co
 
 注意点:
 
-- `ndf_role_<id>` の storage_state cache は **worker 内** で共有される。worker をまたぐとログインが N 回走る (ヘビーな環境では `auth.json` を pre-build しておく方法を検討)
-- `ndf_evidence` の出力先 (`reports/<run-id>/<test-id>/`) は test 名から sub-dir を切るため worker 競合は起きない
+- `pwk_role_<id>` の storage_state cache は **worker 内** で共有される。worker をまたぐとログインが N 回走る (ヘビーな環境では `auth.json` を pre-build しておく方法を検討)
+- `pwk_evidence` の出力先 (`reports/<run-id>/<test-id>/`) は test 名から sub-dir を切るため worker 競合は起きない
 - `pytest_terminal_summary` で集約される `report.md` は xdist でも 1 ファイルで出る
 
 ## 7. 複数ブラウザ / parametrize
@@ -150,28 +150,85 @@ expect(page).to_have_screenshot("dashboard.png", max_diff_pixel_ratio=0.01)
 
 NDF では現状 visual regression は autouse 化していない。必要な test に手動で `expect(...).to_have_screenshot()` を書く。
 
-## 9. デバッグ
+## 9. 実行方法 (v0.5.0 自己完結ランタイム)
+
+v0.5.0 から、利用者プロジェクトに `init_project.sh` で埋め込んだ `scenario-test/`
+ディレクトリ単体で実行する形が推奨。Skill ディレクトリの存在に依存しない。
+
+```bash
+# 1) 初期化 (Skill ディレクトリ内で 1 度だけ)
+cd .claude/plugins/ndf/skills/playwright-scenario-test
+./scripts/init_project.sh /path/to/your-app
+# → /path/to/your-app/scenario-test/ 一式が作成される
+#   (--runtime-dir e2e で配置先名カスタマイズ可)
+
+# 2) 通常の実行
+cd /path/to/your-app
+./scenario-test/run.sh                                # 全テスト
+./scenario-test/run.sh -k test_admin                  # nodeid フィルタ
+./scenario-test/run.sh -m "page_role"                 # marker フィルタ
+./scenario-test/run.sh --pwk-overlay                  # 動画に赤丸カーソル + 字幕
+./scenario-test/run.sh --pwk-drive-folder=<ID>        # Drive 自動アップロード
+./scenario-test/run.sh -n 4                           # 並列実行
+```
+
+ランチャ (`run.sh` / `run.bat`) は自身の位置から RUNTIME_DIR を解決し、CWD を
+ランタイム内 (`scenario-test/`) に固定して `uv run pytest` を起動する。利用者
+プロジェクトのどこから呼んでも挙動は同じ。
+
+`scenario-test/` の中身:
+
+```
+scenario-test/
+├── playwright_kit/        ← Python パッケージ本体
+├── scripts/               ← 補助 CLI
+├── tests/                 ← 利用者の pytest テスト
+├── reports/               ← 実行結果 (.gitignore 推奨)
+├── scenario.config.yaml   ← 利用者の設定
+├── pyproject.toml         ← runtime 用 (testpaths=["tests"])
+├── uv.lock                ← 再現性のため commit 推奨
+├── run.sh / run.bat       ← ランチャ
+└── README.md              ← 最低限の使い方
+```
+
+直接 pytest を呼ぶ場合 (CI / IDE 統合):
+
+```bash
+cd /path/to/your-app/scenario-test
+uv sync                                # 初回のみ
+uv run playwright install chromium     # 初回のみ
+uv run pytest --pwk-config=./scenario.config.yaml
+```
+
+### 旧運用との互換性
+
+旧 v0.4.0 までは Skill ディレクトリで `uv sync` する運用だったが、v0.5.0 では
+非推奨。理由は (1) Skill が消えるとテストが動かない (CI / 別マシン破綻)、
+(2) Skill 側の uv プロジェクトが利用者プロジェクトの依存と分離されておらず
+再現性が低い。本 Skill は開発中につき後方互換は重視せず、旧運用は廃止する。
+
+## 10. デバッグ
 
 | 目的 | 方法 |
 |---|---|
 | ヘッドフルで動かす | `pytest --headed` |
 | ステップバイステップ | `pytest --headed --slowmo 500` |
-| trace を必ず採る | `pytest --tracing on` (本 Skill は ndf_evidence でも採取) |
+| trace を必ず採る | `pytest --tracing on` (本 Skill は pwk_evidence でも採取) |
 | trace viewer で再生 | `playwright show-trace test-results/.../trace.zip` |
 | インスペクタで一時停止 | `page.pause()` を test 内に挿入 + `--headed` |
 
 `page.pause()` は **テストを書く時の手探り** に有効。完成したテストには残さない。
 
-## 10. NDF 移行時の注意
+## 11. NDF 移行時の注意
 
 | pytest-playwright 標準 | NDF 上での扱い |
 |---|---|
-| `--video on` | NDF では `ndf_evidence` が webm を採り `video.py` で mp4 化する。`--video` は併用しないこと (重複) |
-| `--tracing on` | 同上。`ndf_evidence` 側で取るので NDF 経由が推奨 |
+| `--video on` | NDF では `pwk_evidence` が webm を採り `video.py` で mp4 化する。`--video` は併用しないこと (重複) |
+| `--tracing on` | 同上。`pwk_evidence` 側で取るので NDF 経由が推奨 |
 | `--screenshot only-on-failure` | NDF 標準では設定していない。利用者プロジェクトで必要なら有効化可 |
 | `browser_context_args` override | NDF 側 override をベースに、利用者は `viewport` 等の追加のみ |
 
-## 11. autouse fixture の落とし穴
+## 12. autouse fixture の落とし穴
 
 NDF の accessibility / web_vitals autouse fixture は **`page` を直接 fixture 引数に取らない**。理由:
 

@@ -45,9 +45,10 @@ AI/人間どちらが計画書を書く場合も、まず該当 page role のチ
    → `@pytest.mark.page_role(...)` を付ければ accessibility / web_vitals が autouse で走る
 
 4. 実行 → エビデンス収集
-   → uv run pytest --ndf-config=./scenario.config.yaml で実行
+   → ./scenario-test/run.sh で実行 (init_project.sh 後の標準パス)
+     ※ 直接 `cd scenario-test && uv run pytest --pwk-config=./scenario.config.yaml` でも可
    → trace.zip / video / screenshot / HAR / console log / accessibility / web_vitals を自動収集
-   → reports/<run-id>/report.md が ``pytest_terminal_summary`` で生成される
+   → scenario-test/reports/<run-id>/report.md が ``pytest_terminal_summary`` で生成される
 
 5. bug 発見 → docs/05-bug-report.md に従って報告
    → 全 bug に oracle (FEW HICCUPPS) と severity を付与
