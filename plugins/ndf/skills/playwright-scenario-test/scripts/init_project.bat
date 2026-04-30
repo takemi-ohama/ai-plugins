@@ -57,23 +57,31 @@ if "%PROJECT_ROOT%"=="" (
   exit /b 1
 )
 
-rem --runtime-dir のサニタイズ (path traversal / パス区切り / `.` `..` 単体を拒否)
-if "%RUNTIME_DIR_NAME%"=="." (
+rem --runtime-dir のサニタイズ。
+rem POSIX 側 (init_project.sh) と同じ whitelist `^[A-Za-z0-9._-]+$` で検証する。
+rem
+rem 注意: cmd.exe の即時展開 (%VAR%) は cmd メタ文字 (`&`, `|`, `<`, `>` 等) を
+rem 命令区切りとして解釈してしまうため、`echo %RUNTIME_DIR_NAME% | findstr ...` 形式は
+rem command injection の余地がある。値を環境変数として PowerShell に渡し、
+rem PowerShell の正規表現で検証することで shell parsing を完全に回避する。
+rem (delayed expansion `!VAR!` も内部値が `&` 等を含むと安全性に依存があるため、
+rem 検証は外部プロセスの env 経由が最も堅牢)
+if "!RUNTIME_DIR_NAME!"=="." (
   echo [init] --runtime-dir に '.' は指定できません
   exit /b 1
 )
-if "%RUNTIME_DIR_NAME%"==".." (
+if "!RUNTIME_DIR_NAME!"==".." (
   echo [init] --runtime-dir に '..' は指定できません
   exit /b 1
 )
-echo %RUNTIME_DIR_NAME% | findstr /r "[/\\]" >nul && (
-  echo [init] --runtime-dir にパス区切り文字 ^(/ \^) は使用できません
+set "_PWK_VALIDATE=!RUNTIME_DIR_NAME!"
+powershell -NoProfile -Command "if ($env:_PWK_VALIDATE -notmatch '^[A-Za-z0-9._-]+$') { exit 1 }"
+if errorlevel 1 (
+  set "_PWK_VALIDATE="
+  echo [init] --runtime-dir は英数字 / . / _ / - のみ使用可能です: !RUNTIME_DIR_NAME!
   exit /b 1
 )
-echo %RUNTIME_DIR_NAME% | findstr /r "\.\." >nul && (
-  echo [init] --runtime-dir に '..' を含むことはできません
-  exit /b 1
-)
+set "_PWK_VALIDATE="
 
 rem Skill ディレクトリ (このスクリプトの 1 つ上)
 for %%i in ("%~dp0..") do set "SKILL_DIR=%%~fi"
@@ -138,7 +146,17 @@ if errorlevel 1 (
 ) else (
   pushd "%RUNTIME_DIR%"
   uv sync
+  if errorlevel 1 (
+    popd
+    echo [init] ERROR: uv sync に失敗しました。
+    echo [init]        ネットワーク / pyproject.toml / uv.lock を確認してください。
+    exit /b 1
+  )
   uv run playwright install chromium
+  if errorlevel 1 (
+    echo [init] WARN: playwright install chromium に失敗しました。
+    echo [init]       オフライン環境では PLAYWRIGHT_BROWSERS_PATH を設定してください。
+  )
   popd
 )
 

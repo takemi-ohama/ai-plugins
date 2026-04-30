@@ -15,6 +15,9 @@ dependencies = [
     "pytest>=8.0",
     "pytest-playwright>=0.5",
     "pytest-xdist>=3.0",
+    # accessibility autouse は scenario.config.yaml で default 有効。
+    # runtime テンプレート (templates/pyproject.toml.runtime) と揃えて main dep に含める。
+    "axe-playwright-python>=0.1.4",
 ]
 
 [project.optional-dependencies]
@@ -23,10 +26,6 @@ drive = [
     "google-api-python-client>=2.0",
     "google-auth>=2.0",
     "google-auth-oauthlib>=1.0",
-]
-# axe-core ベース a11y スキャン: scripts/run_a11y_scan.py が使用
-a11y = [
-    "axe-playwright-python>=0.1.4",
 ]
 # 開発用: pure function の単体テスト (uv run --extra dev pytest)
 # pytest 本体は main deps に移行済 (v0.3.0)。dev には開発時のみの拡張を入れる余地。

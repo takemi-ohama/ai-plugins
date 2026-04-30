@@ -61,7 +61,7 @@ addopts = "--headed --browser firefox --tracing retain-on-failure"
 | fixture | `pwk_role_<id>` (動的生成) | NDF | function | 該当 role で login 済 storage_state を context に inject |
 | fixture | `pwk_evidence` | NDF | function | HAR / trace / console / pageerror の集中管理 |
 | fixture | `pwk_accessibility_scan` | NDF | function | 任意のタイミングで axe-core を 1 回実行 |
-| fixture | `pwk_web_vitals_measure` | NDF | function | 任意のタイミングで CWV を 1 回計測 |
+| fixture | `pwk_web_vitals_measure` | NDF | function | 任意のタイミングで Core Web Vitals を 1 回計測 |
 | fixture | `browser_context_args` (override) | NDF | function | HAR `record_har_path` を inject (上書きしないこと) |
 | marker | `@pytest.mark.page_role(...)` | NDF | — | accessibility / web_vitals autouse の判定 (auto_roles 設定に従う) |
 | marker | `@pytest.mark.role(role_id)` | NDF | — | report.md 集計用 (login は `pwk_role_<id>` 側で行う) |

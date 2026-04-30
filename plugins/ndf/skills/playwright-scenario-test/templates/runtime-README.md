@@ -25,12 +25,12 @@ run.bat
 ```
 scenario-test/
 ├── playwright_kit/         ← Python パッケージ本体
-├── scripts/                ← 補助 CLI (classify_page_role / a11y / cwv / drive 等)
+├── scripts/                ← 補助 CLI (classify_page_role / accessibility / web_vitals / drive 等)
 ├── tests/                  ← 利用者が書く pytest テスト
 │   ├── conftest.py
 │   └── test_*.py
 ├── reports/                ← 実行結果 (gitignore 推奨)
-├── scenario.config.yaml    ← base_url / roles / a11y / web_vitals 等
+├── scenario.config.yaml    ← base_url / roles / accessibility / web_vitals 等
 ├── run.sh                  ← Linux/Mac 用ワンコマンドランチャ
 ├── run.bat                 ← Windows 用ワンコマンドランチャ
 ├── pyproject.toml          ← runtime 用 (testpaths=tests)
@@ -100,7 +100,7 @@ web vitals (LCP/CLS/TTFB) が **autouse で自動実行** されます。
 
 `scripts/` 配下に CLI ヘルパが置かれています。
 
-- `scripts/classify_page_role.py <url>`: a11y tree から page role を推定
+- `scripts/classify_page_role.py <url>`: accessibility tree から page role を推定
 - `scripts/run_a11y_scan.py <url>`: axe-core で違反を検出
 - `scripts/check_cwv.py <url>`: Core Web Vitals を計測
 - `scripts/upload_evidence.py <path>`: trace / HAR / 動画を Drive にアップ

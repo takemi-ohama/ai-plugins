@@ -5,7 +5,7 @@
 
 Usage:
     python check_cwv.py --url https://example.com
-    python check_cwv.py --url-list urls.txt --output cwv.json
+    python check_cwv.py --url-list urls.txt --output web_vitals.json
     python check_cwv.py --url https://example.com --device "Pixel 5"
 """
 
@@ -99,7 +99,7 @@ def main() -> int:
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(text, encoding="utf-8")
-        print(f"OK: cwv → {args.output}", file=sys.stderr)
+        print(f"OK: web_vitals → {args.output}", file=sys.stderr)
     else:
         sys.stdout.write(text + "\n")
 

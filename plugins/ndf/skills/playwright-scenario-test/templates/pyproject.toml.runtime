@@ -18,6 +18,9 @@ dependencies = [
     "pytest>=8.0",
     "pytest-playwright>=0.5",
     "pytest-xdist>=3.0",
+    # accessibility autouse は scenario.config.yaml で default 有効。
+    # self-contained (Skill 非依存) を維持するため main dep に含める。
+    "axe-playwright-python>=0.1.4",
 ]
 
 [project.optional-dependencies]
@@ -26,10 +29,6 @@ drive = [
     "google-api-python-client>=2.0",
     "google-auth>=2.0",
     "google-auth-oauthlib>=1.0",
-]
-# axe-core ベースのアクセシビリティスキャン: scripts/run_a11y_scan.py が使用
-a11y = [
-    "axe-playwright-python>=0.1.4",
 ]
 
 [project.entry-points."pytest11"]
