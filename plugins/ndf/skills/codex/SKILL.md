@@ -116,18 +116,68 @@ codex CLI の出力構造:
 
 | ストリーム | 内容 |
 |---|---|
-| **stdout** | **最終回答のみ**（Markdown本文） |
-| **stderr** | プロンプトのエコー + 実行したコマンドと結果 + codexの思考プロセス |
+| **stdout** | **最終 assistant message のみ**（Markdown本文）。出ないことがある（後述） |
+| **stderr** | プロンプトのエコー + 実行したコマンドと結果 + codexの思考プロセス + `^tokens used$` sentinel |
 
 **実務上の扱い**:
-- 最終成果物が欲しい → `stdout` をそのまま採用
+- 最終成果物が欲しい → `stdout` をそのまま採用…**ただし stdout が空になるケースがあるので必ずファイル出力も併用**（下記 3.5 参照）
 - codexが何を調べたか追跡したい → `stderr` をデバッグ用に保存
 
 ```bash
 codex exec ... > /tmp/codex-output.md 2> /tmp/codex-err.log
-# 成果物 = /tmp/codex-output.md
+# 成果物 = /tmp/codex-output.md（stdout が空でないことを必ず確認）
 # デバッグ = /tmp/codex-err.log（大きめ、数千行になる）
 ```
+
+### 3.5 最終出力をファイル経由で保証する（重要）
+
+**Codex CLI（特に `gpt-5-codex` / 高 reasoning_effort）は、長時間調査の末に**
+**最終 assistant message を返さずにセッションを終えることがある**。
+このとき stdout は空のままになり、stderr のイベントログ（数十万バイト）には
+コードを実際に読んだ痕跡だけが残る。`^tokens used$` は出ているのに stdout が空、という状態。
+
+**根本対策: プロンプトに「最終結果は指定ファイルへ書き出すこと」を必須化する。**
+Codex は最終 message を返さなくても `apply_patch` ツールでファイルを作成できるため、
+ファイル経由なら確実に結果を回収できる。
+
+#### プロンプトに必ず含める指示（テンプレート）
+
+```markdown
+## 出力先（必須）
+
+最終的なレビュー / 調査結果を以下のファイルに **必ず書き出してください**:
+
+`/tmp/codex-output-<task-name>.md`
+
+書き出しは `apply_patch` で新規ファイル作成してください。
+**stdout への出力だけでは不十分です**（セッション終了で失われる場合があるため）。
+書き出し後、念のため stdout にも同じ内容を出力してください（冪等で問題ありません）。
+```
+
+#### 回収側の安全パターン
+
+```bash
+# 1. ファイルが存在するかを最優先で確認（stdout が空でもこちらに本文が残る）
+OUTPUT_FILE=/tmp/codex-output-pr13734-review.md
+if [ -s "$OUTPUT_FILE" ]; then
+    cat "$OUTPUT_FILE"
+elif [ -s /tmp/codex-stdout.md ]; then
+    # 2. ファイルがなければ stdout フォールバック
+    cat /tmp/codex-stdout.md
+else
+    # 3. どちらも空なら stderr の末尾から拾う最後の手段
+    echo "WARN: Codex の最終出力を回収できませんでした。stderr 末尾を確認してください:" >&2
+    tail -200 /tmp/codex-err.log
+fi
+```
+
+#### 補助対策
+
+- **`reasoning_effort` を `medium` に下げる** (`--config reasoning.effort=medium`)
+  `high` だと思考に偏って最終 message を返さなくなる頻度が上がる
+- **`--json` モードでイベント採取** (`codex exec --json`)
+  JSON Lines で `event.type=assistant_message` を grep すれば確実に取れる
+- **強制 summary 指示**: プロンプト末尾に「最後に必ず assistant message として 1 回出力すること、tool 呼び出しのみで終了しないこと」を明記
 
 ### 4. バックグラウンド実行 + 待機パターン
 
@@ -183,7 +233,9 @@ tail -30 /tmp/codex-err.log
 2. **調査観点を具体化**（箇条書きで3〜5項目に絞る）
 3. **出力形式の指定**（Markdownテンプレートを提示）
 4. **スコープ外の明示**（codexが脱線しないため）
-5. **「標準出力に吐く」指示**（ファイル書き込みを防ぎstdoutに集約）
+5. **最終出力先ファイルの指定（必須）**: `/tmp/codex-output-<task>.md` のような明示パスへ
+   **`apply_patch` で必ず書き出させる**。stdout だけに頼ると最終 message が落ちて空になる事故が起きる（3.5 節参照）
+6. **stdout にも同内容を吐く指示**: ファイル書き出し後、念のため stdout にもエコーさせる（冪等）
 
 ### レビュー依頼テンプレート
 
@@ -209,7 +261,9 @@ tail -30 /tmp/codex-err.log
 
 ## 出力形式
 
-以下を Markdown で**標準出力に吐き出してください**（ファイル書き込み不要）:
+以下を Markdown で**`/tmp/codex-output-<task-name>.md` に必ず書き出してください**
+（`apply_patch` で新規ファイル作成）。書き出し後、stdout にも同内容を出力してください。
+**stdout のみへの出力は不可**（セッション終了時に失われる場合があるため）:
 
 # <タイトル>
 
@@ -222,6 +276,7 @@ tail -30 /tmp/codex-err.log
 ## 4. 承認可否
 
 **必須**: 行番号・ファイルパスに紐付けて具体的に指摘してください。400〜500行程度、日本語で出力してください。
+**必須**: tool 呼び出しのみで終了せず、最後に必ず assistant message として 1 回出力してください。
 ```
 
 ### コード生成依頼テンプレート
@@ -249,14 +304,21 @@ tail -30 /tmp/codex-err.log
 - [ ] 型チェック / lint がパスする
 - [ ] <追加の受け入れ条件>
 
-**必須**: ファイル編集は実際に行い、最後に変更ファイル一覧と要点を標準出力にまとめてください。
+**必須**: ファイル編集は実際に行い、最後に変更ファイル一覧と要点を
+`/tmp/codex-output-<task-name>.md` に書き出してください（`apply_patch` で新規作成）。
+書き出し後、stdout にも同内容を出力してください。
+**stdout のみへの出力は不可**（セッション終了時に失われる場合があるため）。
+tool 呼び出しのみで終了せず、最後に必ず assistant message として 1 回出力してください。
 ```
 
 ## 実例: レビュー依頼の完全フロー
 
 ```bash
 # === 1. プロンプト書き出し ===
-cat > /tmp/review-prompt.md <<'EOF'
+# ポイント: 最終出力先ファイルをプロンプト内で明示し、apply_patch で書かせる
+FINAL=/tmp/codex-output-api-v2-review.md
+
+cat > /tmp/review-prompt.md <<EOF
 あなたはシニアバックエンドエンジニアとして、以下をレビューしてください。
 
 ## 対象ファイル（必ず最初に読むこと）
@@ -270,35 +332,62 @@ cat > /tmp/review-prompt.md <<'EOF'
 - src/api/v2/**
 - src/api/v1/** （比較用）
 
+## 出力先（必須）
+
+最終的なレビュー結果を **必ず** 以下のファイルに書き出してください:
+
+\`${FINAL}\`
+
+\`apply_patch\` で新規ファイル作成してください。
+**stdout への出力だけでは不十分です**（セッション終了時に失われる場合があるため）。
+書き出し後、念のため stdout にも同じ内容を出力してください（冪等で問題ありません）。
+
 ## 出力形式
-Markdown で標準出力に吐いてください。400〜500行、日本語。
+Markdown で 400〜500 行、日本語。tool 呼び出しのみで終了せず、最後に必ず assistant message として 1 回出力してください。
 EOF
 
-# === 2. バックグラウンド起動 ===
+# === 2. バックグラウンド起動（reasoning_effort=medium 推奨） ===
 codex exec --dangerously-bypass-approvals-and-sandbox \
+  --config reasoning.effort=medium \
   -C /workspace \
   < /tmp/review-prompt.md \
-  > /tmp/review-output.md \
-  2> /tmp/review-err.log &
+  > /tmp/codex-stdout.md \
+  2> /tmp/codex-err.log &
 
 PID=$!
 echo "codex PID: $PID"
 
-# === 3. 完了確認 ===
-grep -q '^tokens used$' /tmp/review-err.log && echo DONE
+# === 3. 完了確認（^tokens used$ sentinel を待つ） ===
+until grep -q '^tokens used$' /tmp/codex-err.log 2>/dev/null; do
+  sleep 30
+done
+echo DONE
 
-# === 4. 成果物を採用 ===
-cp /tmp/review-output.md ./review-result.md
+# === 4. 成果物を安全に回収（ファイル優先 → stdout fallback） ===
+if [ -s "$FINAL" ]; then
+    cp "$FINAL" ./review-result.md
+    echo "✅ Codex 書き出しファイルから回収"
+elif [ -s /tmp/codex-stdout.md ]; then
+    cp /tmp/codex-stdout.md ./review-result.md
+    echo "⚠ stdout からフォールバック回収（ファイル書き出しなし）"
+else
+    echo "❌ Codex の最終出力を回収できませんでした。stderr 末尾を確認してください:" >&2
+    tail -200 /tmp/codex-err.log
+    exit 1
+fi
 ```
 
 ## トラブルシューティング
 
 ### Q1. stdoutが空でstderrに大量のexecログだけある
-**原因**: codexがまだ最終回答を出す前に停止した、または出力先の指示が不足している。
+**原因**: codex がまだ最終回答を出す前に停止した、または **最終 assistant message を出さずにセッションが終わった**（gpt-5-codex の高 reasoning_effort で発生しやすい既知挙動）。
 
 **対処**:
-- `grep -q '^tokens used$' /tmp/codex-err.log` で終了 sentinel が出ているか確認 (まだなら動作中なので追加待機)
-- 出ているのに stdout が空なら、プロンプトに「**出力は標準出力へ**」を明示してリトライ
+- `grep -q '^tokens used$' /tmp/codex-err.log` で終了 sentinel が出ているか確認（まだなら動作中なので追加待機）
+- 出ているのに stdout が空 → セッション終了で最終 message が失われたケース。**3.5 節「最終出力をファイル経由で保証する」のパターンでリトライ必須**:
+  - プロンプトに `apply_patch` で `/tmp/codex-output-<task>.md` へ必ず書き出させる指示を追加
+  - 回収側は「ファイル → stdout → stderr」の三段フォールバックで取りこぼしを防ぐ
+  - 補助で `--config reasoning.effort=medium` も付けると最終 message を返す傾向が上がる
 
 ### Q2. `bwrap: No permissions to create a new namespace` で exec 失敗
 **原因**: `--dangerously-bypass-approvals-and-sandbox` を付け忘れ、かつ環境が user namespace 非対応。
