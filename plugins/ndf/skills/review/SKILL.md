@@ -168,17 +168,25 @@ gh api -X POST "repos/$OWNER_REPO/pulls/$PR/comments" \
 4. PR タイトル・URL・差分を **対象情報** として明記
 5. **出力は GitHub Reviews API のペイロード形式（JSON）で出させる**（後述「外部AIに必須化する出力形式」参照）
 
-### 外部AIに必須化する出力形式
+### 外部AIに必須化する出力形式と直接投稿
 
-外部AIが Markdown だけを返すと、メインエージェントが行番号を抽出する工数が発生し、誤投稿の元になる。
-**プロンプト末尾に以下の指示を必ず含めて、Reviews API ペイロード（JSON）をファイルへ書き出させる**。
+**外部AIは Reviews API ペイロードを組み立てた後、自分自身で `gh api` を呼んで PR に投稿する**。
+（旧版では生成した JSON をメインに返してメインが投稿していたが、メイン context 消費と往復回数が無駄なので削除）
+
+メインに返すのは「投稿が成功したか」「最終 verdict (event)」「review URL」「件数」の小さな結果サマリのみ。
+
+#### プロンプトに必ず含める指示（テンプレート）
 
 ```markdown
-## 出力形式（必須）
+## 出力形式と投稿手順（必須）
 
-レビュー結果は以下の JSON 構造で
-`/tmp/<agent>-review-pr<番号>-payload.json` に書き出してください
-（codex なら `apply_patch`、gemini なら `write_file` を使用）。
+レビュー結果は以下の手順で **あなた自身が PR に投稿** してください。
+メイン側に返すのは投稿結果サマリだけです。
+
+### 1. ペイロード組み立て
+
+以下の JSON を `/tmp/<agent>-review-pr<番号>-payload.json` に書き出す
+（codex なら `apply_patch`、gemini なら `write_file` を使用）:
 
 \`\`\`json
 {
@@ -200,9 +208,48 @@ gh api -X POST "repos/$OWNER_REPO/pulls/$PR/comments" \
 - 個別指摘は必ず `comments[]` のインラインコメントにすること（行を絞れない場合はファイル代表行）
 - `body` (総評) には設計・横断的な所見のみ書く。個別指摘の繰り返しは禁止
 - 各 `comments[].body` の先頭に `[重要度 / カテゴリ]` を付ける（critical/major/minor/nit）
-- `path` は **PR差分に登場するファイルのみ**。存在しないパスを書かないこと
+- `path` は **PR差分に登場するファイルのみ**（事前に `gh pr diff <PR> --name-only` で取得した一覧から選ぶ）
 - `line` は **差分に含まれる行**（追加行・コンテキスト行）に限る。`side=RIGHT` がデフォルト
-- stdout にも JSON と同じ内容を念のため出力すること
+- `commit_id` は `gh pr view <PR> --json headRefOid -q .headRefOid` の値を使う
+
+### 2. 投稿
+
+\`\`\`bash
+OWNER_REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+gh api -X POST "repos/$OWNER_REPO/pulls/<PR>/reviews" \
+  --input /tmp/<agent>-review-pr<番号>-payload.json \
+  > /tmp/<agent>-review-pr<番号>-response.json
+\`\`\`
+
+### 3. 結果サマリの書き出し（メインが読む）
+
+`/tmp/<agent>-review-pr<番号>-result.json` に投稿結果を書き出す:
+
+\`\`\`json
+{
+  "status": "posted" | "failed",
+  "event": "REQUEST_CHANGES" | "APPROVE" | "COMMENT",
+  "review_url": "https://github.com/.../pull/<PR>#pullrequestreview-...",
+  "comments_count": 5,
+  "by_severity": {"critical": 0, "major": 2, "minor": 2, "nit": 1},
+  "payload_path": "/tmp/<agent>-review-pr<番号>-payload.json",
+  "error": null
+}
+\`\`\`
+
+投稿失敗時は `status: "failed"`、`error` にエラーメッセージ、`payload_path` で payload は残す
+（メイン側のフォールバック投稿で使う）。
+
+### 4. 重要度の運用ガイド（auto-fix 判定に直結）
+
+| 重要度 | 定義 | 後段の扱い |
+|---|---|---|
+| critical | セキュリティ・データ破損・本番障害につながる | **必ず自動修正** |
+| major | 保守性・性能・仕様逸脱の重要問題 | **必ず自動修正** |
+| minor | 改善推奨だがブロッカーではない | **自動修正対象**（明らかな改善のみ。判断要なら nit に格下げ） |
+| nit | 好み・スタイル | **修正しない、最後にユーザ判断にまとめる** |
+
+過剰な nit 量産は避ける。critical/major で対応すべき真の問題に集中すること。
 ```
 
 ### `codex` 指定時
@@ -225,36 +272,43 @@ gh api -X POST "repos/$OWNER_REPO/pulls/$PR/comments" \
 呼び出し手順の詳細は `/ndf:gemini` skill（`plugins/ndf/skills/gemini/SKILL.md`）に従う。要点:
 
 - プロンプトを `/tmp/gemini-review-pr<番号>-prompt.md` に書き出し
-- レビュー用途のため **`--approval-mode plan`**（読み取り専用）+ `--output-format text` で起動
-- `gemini --approval-mode plan --output-format text -p "$(cat prompt.md)" > stdout 2> err &` でバックグラウンド起動
+- **AI 直接投稿フローでは `--yolo` 必須**（`gh api -X POST` がシェル実行のため、`plan` / `auto_edit` だとブロックされる）
+- プロンプト側で **「リポジトリ内ファイルを編集してはならない。`gh api` で投稿するだけ」** を強く明示することで `--yolo` のリスクを抑える
+- `gemini --yolo --output-format text -p "$(cat prompt.md)" > stdout 2> err &` でバックグラウンド起動
 - `kill -0 $PID` ポーリングで完了検知（Codex と異なり sentinel 不要 / プロセス exit を見る）
-- 成果物は stdout 優先で `/tmp/gemini-review-pr<番号>-output.md` から回収
+- 成果物は stdout サマリ + `/tmp/gemini-review-pr<番号>-result.json` で回収
 
-### 委譲結果の投稿
+> ⚠️ **`--yolo` の制約は依然有効**: `/ndf:gemini` skill のセキュリティ警告通り、必ず外部隔離環境内でのみ実行する。プロンプトで「リポジトリ編集禁止」を明示することは必須だが、それは sandbox の代替にはならない。
 
-外部AIが書き出した JSON ペイロードを **メインエージェントが** `gh api` で投稿する。
-外部AI に直接 `gh` を叩かせない（コミットSHA・パス検証・既存コメント重複チェックを集約するため）:
+### メイン側の検証とフォールバック
+
+メインエージェントの責務は **結果サマリ読み込みと検証のみ**:
 
 ```bash
-PAYLOAD=/tmp/codex-review-pr$PR-payload.json   # or gemini-...
-OWNER_REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+AGENT=codex   # or gemini
+RESULT=/tmp/$AGENT-review-pr$PR-result.json
 
-# 1. commit_id が空 or 古い場合は最新 SHA で上書き
-SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
-jq --arg sha "$SHA" '.commit_id = $sha' "$PAYLOAD" > /tmp/review-payload.json
+if [ ! -s "$RESULT" ]; then
+  echo "❌ $AGENT: 結果サマリ未生成。完了検知 or プロンプト指示に問題あり" >&2
+  exit 1
+fi
 
-# 2. パスが PR 差分に存在するか軽くチェック（任意）
-gh pr diff "$PR" --name-only > /tmp/pr-files.txt
-jq -r '.comments[].path' /tmp/review-payload.json | while read -r p; do
-  grep -qxF "$p" /tmp/pr-files.txt || echo "WARN: $p は PR 差分に含まれない" >&2
-done
+STATUS=$(jq -r '.status' "$RESULT")
+EVENT=$(jq -r '.event // empty' "$RESULT")
 
-# 3. Reviews API に POST
-gh api -X POST "repos/$OWNER_REPO/pulls/$PR/reviews" --input /tmp/review-payload.json
+if [ "$STATUS" = "failed" ]; then
+  echo "⚠️ $AGENT: 投稿失敗。payload からメインがフォールバック投稿します" >&2
+  PAYLOAD=$(jq -r '.payload_path' "$RESULT")
+  OWNER_REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+  SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
+  jq --arg sha "$SHA" '.commit_id = $sha' "$PAYLOAD" > /tmp/review-fallback.json
+  gh api -X POST "repos/$OWNER_REPO/pulls/$PR/reviews" --input /tmp/review-fallback.json
+fi
+
+echo "$AGENT: event=$EVENT url=$(jq -r .review_url $RESULT)"
 ```
 
 **Claude 自身による追加判定は行わず**、外部AIの判定（`event`）と指摘内容をそのまま採用する。
-投稿後、外部AIの `body`（総評）と件数サマリをユーザーへ報告する。
 
 ## 作業完了報告（必須）
 

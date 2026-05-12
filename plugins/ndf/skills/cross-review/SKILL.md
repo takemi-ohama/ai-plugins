@@ -1,7 +1,7 @@
 ---
 name: cross-review
-description: "PR を codex / gemini 両方にレビューさせ、両方が APPROVE になるまで `/ndf:review` → `/ndf:fix` を繰り返すクロスレビューループ"
-argument-hint: "[PR番号] [--max-rounds N] [--only codex|gemini]"
+description: "PR を codex / gemini 両方にレビューさせ、両方 APPROVE まで /ndf:review → /ndf:fix を自動ループ。サブエージェント分離・PR ローテーション・nit 集約でメイン context 消費を最小化"
+argument-hint: "[PR番号] [--max-rounds N] [--rotate-after K] [--only codex|gemini]"
 disable-model-invocation: true
 allowed-tools:
   - Bash
@@ -14,376 +14,444 @@ allowed-tools:
 
 # クロスレビュー収束ループ
 
-PR を **codex と gemini 両方** にレビューさせ、両者が `APPROVE` を返すまで
-`/ndf:review` と `/ndf:fix` を自動で回す。レビュー結果は PR 上にインラインコメントとして残り、
-修正対応した指摘は `/ndf:fix` 経由で Resolve Conversation される。
+PR を **codex / gemini 両方** にレビューさせ、両者が `APPROVE` を返すまで
+`/ndf:review` と `/ndf:fix` を自動で回す。
+
+## 設計方針（重要）
+
+長丁場が予想されるため、以下の方針で **メインセッションの context 消費を最小化** する:
+
+| 観点 | 方針 |
+|---|---|
+| レビュー投稿 | **AI 自身が `gh api` で PR に直接投稿**。メインはペイロードを保持しない |
+| 修正 | **必ずサブエージェント (`general-purpose`) で実行**。メイン context に diff は載せない |
+| ユーザ問い合わせ | 自動判断を最大化（`critical`/`major`/`minor` は自動修正、`nit` は最後にまとめて 1 回だけ問い合わせ） |
+| 状態の永続化 | `/tmp/cross-review-pr<番号>-state.json` に集約。中断・再開可能 |
+| 長尺PR対策 | **`--rotate-after` ラウンドで PR をローテーション**（squash + 新ブランチ + 新 PR）。会話が長くなる前に巻き直す |
+| 振動検知 | 同じ指摘が 2 round で 50%以上重複したら中断 |
 
 ## 引数
 
-| 引数 | 意味 | 既定値 |
+| 引数 | 意味 | 既定 |
 |---|---|---|
-| `[PR番号]` | 対象 PR | 直前 PR / 現在のブランチに紐付く PR |
-| `--max-rounds N` | 最大ラウンド数（無限ループ防止） | `5` |
-| `--only codex` / `--only gemini` | 片方のみで回す（デバッグ用） | 両方 |
+| `[PR番号]` | 対象 PR（省略時は直前 PR / 現在ブランチ） | — |
+| `--max-rounds N` | 全体最大ラウンド数（PR ローテーションを含む通算） | `6` |
+| `--rotate-after K` | この round 数で未収束なら PR ローテーション | `2` |
+| `--only codex` / `--only gemini` | 片方だけで回す（デバッグ用） | 両方 |
 
 例:
 
 ```
 /ndf:cross-review 123
-/ndf:cross-review 123 --max-rounds 3
+/ndf:cross-review 123 --max-rounds 4 --rotate-after 2
 /ndf:cross-review 123 --only codex
 ```
 
 ## 前提
 
-- `/ndf:review` skill が「外部AI（codex/gemini）に委譲して Reviews API ペイロードを書き出させ、メインエージェントが投稿する」フローを実装済みであること
-- `/ndf:fix` skill がレビューコメント取得・修正・コミット・push・reply・Resolve Conversation・CI 待ちまで実装済みであること
-- `codex` / `gemini` CLI が動作する環境であること（各 skill の前提条件を参照）
+- `/ndf:review` が **AI 直接投稿**（外部 AI 自身が `gh api` で投稿）に対応していること
+- `/ndf:fix` が **サブエージェント起動 + 重要度ベース自動修正** に対応していること
+- `codex` / `gemini` CLI が動作し、`gh` CLI が認証済みであること
+- `Agent(subagent_type="general-purpose", ...)` でサブエージェントを起動できること
 
 ## 全体フロー
 
 ```
-                +-----------------------------+
-                | Round N start               |
-                +--------------+--------------+
-                               |
-                  並列実行     v
-        +----------------------+----------------------+
-        |                                             |
-+-------+--------+                          +---------+--------+
-| /ndf:review    |                          | /ndf:review      |
-|   <PR#> codex  |                          |   <PR#> gemini   |
-+-------+--------+                          +---------+--------+
-        |                                             |
-        +----------------------+----------------------+
-                               |
-                               v
-                +-----------------------------+
-                | 判定                        |
-                | - 両方 APPROVE → 終了      |
-                | - どちらか REQUEST_CHANGES |
-                |   → /ndf:fix 起動          |
-                +--------------+--------------+
-                               |
-                               v
-                +-----------------------------+
-                | /ndf:fix <PR#>              |
-                | - 修正コミット & push       |
-                | - reply + Resolve Conv.     |
-                | - CI 完了待ち               |
-                +--------------+--------------+
-                               |
-                               v
-                +-----------------------------+
-                | 収束チェック                |
-                | - max-rounds 到達 → 中断    |
-                | - 振動検知 → 中断           |
-                +--------------+--------------+
-                               |
-                               v
-                          Round N+1 へ
+                +---------------------------------------+
+                | Round N start (current_pr = PR#)      |
+                +--------------------+------------------+
+                                     |
+                  並列バックグラウンド  v
+        +----------------------------+----------------------------+
+        |                                                         |
+   /ndf:review <PR#> codex                          /ndf:review <PR#> gemini
+   (codex 自身が gh api で投稿)                     (gemini 自身が gh api で投稿)
+   → /tmp/codex-review-pr<#>-result.json            → /tmp/gemini-review-pr<#>-result.json
+        |                                                         |
+        +----------------------------+----------------------------+
+                                     |
+                                     v
+                +---------------------------------------+
+                | 判定                                  |
+                | - 両方 APPROVE → 終了                |
+                | - どちらか REQUEST_CHANGES → 修正へ  |
+                +--------------------+------------------+
+                                     |
+                                     v
+                +---------------------------------------+
+                | Agent(subagent_type="general-purpose")     |
+                |   prompt="/ndf:fix <PR#> --defer-nit" |
+                | → /tmp/fix-pr<#>-result.json         |
+                +--------------------+------------------+
+                                     |
+                                     v
+                +---------------------------------------+
+                | 収束チェック                         |
+                | - max-rounds 到達 → 中断             |
+                | - 振動検知 → 中断                    |
+                | - round_in_pr >= rotate_after        |
+                |   → PR ローテーション                |
+                +--------------------+------------------+
+                                     |
+                                     v
+                              Round N+1 へ
+                                     |
+            (最後に1回) nit deferred 一覧をユーザに問い合わせ
 ```
 
 ## 状態ファイル
 
-ループ進捗は以下に永続化する（中断 / 再開 / 振動検知のため）:
-
-`/tmp/cross-review-pr<番号>-state.json`
+`/tmp/cross-review-pr<番号>-state.json`:
 
 ```json
 {
-  "pr": 123,
   "started_at": "2026-05-12T...",
-  "max_rounds": 5,
+  "max_rounds": 6,
+  "rotate_after": 2,
   "only": null,
+  "current_pr": 123,
+  "pr_history": [
+    {"pr": 123, "opened_at": "...", "closed_at": null, "rounds": 2}
+  ],
   "rounds": [
     {
       "round": 1,
+      "pr": 123,
       "started_at": "...",
-      "codex": {
-        "event": "REQUEST_CHANGES",
-        "comments": 5,
-        "review_url": "https://github.com/.../pull/123#pullrequestreview-...",
-        "payload_path": "/tmp/codex-review-pr123-payload.json"
-      },
-      "gemini": {
-        "event": "REQUEST_CHANGES",
-        "comments": 3,
-        "review_url": "...",
-        "payload_path": "/tmp/gemini-review-pr123-payload.json"
-      },
-      "fix": {
-        "commit": "abc123",
-        "resolved_threads": 8,
-        "ci_status": "SUCCESS"
-      },
+      "codex":  {"event": "REQUEST_CHANGES", "comments": 5, "review_url": "..."},
+      "gemini": {"event": "REQUEST_CHANGES", "comments": 3, "review_url": "..."},
+      "fix":    {"commit": "abc1234", "fixed": 6, "deferred": 2, "rejected": 0, "ci": "SUCCESS"},
       "ended_at": "..."
     }
+  ],
+  "deferred_nits": [
+    {"pr": 123, "round": 1, "path": "src/foo.py", "line": 42, "severity": "nit",
+     "summary": "...", "comment_url": "..."}
   ],
   "final": null
 }
 ```
 
-`final` は終了時に以下のいずれかを設定:
-- `"approved"` — 両方 APPROVE で正常終了
-- `"max_rounds"` — max-rounds 到達で中断
-- `"oscillation"` — 振動検知で中断
-- `"error"` — AI 呼び出し or fix 失敗で中断
+`final` 値: `approved` / `max_rounds` / `oscillation` / `error`
 
 ## 詳細手順
 
-### Step 0: 準備
+### Step 0: 準備 + 既存 state 引き継ぎ
 
 ```bash
 PR=<引数 or 直前PR>
-MAX_ROUNDS=5  # --max-rounds の引数解析
-ONLY=        # --only の引数解析（"codex" / "gemini" / 空）
+MAX_ROUNDS=6     # 既定
+ROTATE_AFTER=2   # 既定
+ONLY=
 
 STATE=/tmp/cross-review-pr$PR-state.json
 
-# 既存状態の引き継ぎ（中断 → 再実行）
 if [ -f "$STATE" ] && jq -e '.final == null' "$STATE" >/dev/null; then
-  echo "前回中断した状態から再開します（round=$(jq '.rounds | length' "$STATE")）"
+  echo "↻ 前回中断 state から再開（round=$(jq '.rounds | length' "$STATE")）"
+  PR=$(jq -r '.current_pr' "$STATE")
 else
   cat > "$STATE" <<JSON
 {
-  "pr": $PR,
   "started_at": "$(date -Iseconds)",
   "max_rounds": $MAX_ROUNDS,
+  "rotate_after": $ROTATE_AFTER,
   "only": $(test -n "$ONLY" && echo "\"$ONLY\"" || echo "null"),
+  "current_pr": $PR,
+  "pr_history": [{"pr": $PR, "opened_at": "$(date -Iseconds)", "closed_at": null, "rounds": 0}],
   "rounds": [],
+  "deferred_nits": [],
   "final": null
 }
 JSON
 fi
 ```
 
-### Step 1: Round 開始
+### Step 1: Round 開始判定
 
 ```bash
-ROUND=$(jq '.rounds | length' "$STATE")
-ROUND=$((ROUND + 1))
+TOTAL_ROUNDS=$(jq '.rounds | length' "$STATE")
+ROUND=$((TOTAL_ROUNDS + 1))
+PR=$(jq -r '.current_pr' "$STATE")
+ROUND_IN_PR=$(jq --argjson p $PR '[.rounds[] | select(.pr == $p)] | length' "$STATE")
+ROUND_IN_PR=$((ROUND_IN_PR + 1))
 
-if [ "$ROUND" -gt "$MAX_ROUNDS" ]; then
-  jq '.final = "max_rounds"' "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
-  echo "❌ max_rounds 到達。中断。"
+if [ "$TOTAL_ROUNDS" -ge "$MAX_ROUNDS" ]; then
+  jq '.final = "max_rounds" | .ended_at = "'$(date -Iseconds)'"' "$STATE" > "$STATE.tmp"
+  mv "$STATE.tmp" "$STATE"
+  echo "❌ max_rounds=$MAX_ROUNDS 到達。中断。"
+  # → 終了報告へ
   exit 1
 fi
 
-echo "=== Round $ROUND / $MAX_ROUNDS ==="
+echo "=== Round $ROUND / $MAX_ROUNDS (PR #$PR, round_in_pr=$ROUND_IN_PR) ==="
 ```
 
-### Step 2: codex / gemini を並列レビュー
+### Step 2: codex / gemini を並列レビュー（AI 直接投稿）
 
-**重要**: `/ndf:review` は slash command（skill）であり、メインエージェントが手動で読み込んで実行する。
-ここではメインエージェントが以下を **並列バックグラウンド** で実行することを記述する:
+**実装の要点**:
+- メインは `/ndf:review <PR> codex` / `/ndf:review <PR> gemini` 相当のフローを **並列バックグラウンド** で起動するだけ
+- 各 AI が `gh api` で投稿し、`/tmp/<agent>-review-pr<PR>-result.json` にサマリを書き出す
+- メインはそのサマリを読むだけ。**ペイロード本体はメイン context に載せない**
 
 ```bash
-# codex 側
+# round エントリ追加
+jq --arg ts "$(date -Iseconds)" --argjson r $ROUND --argjson p $PR \
+   '.rounds += [{"round": $r, "pr": $p, "started_at": $ts}]' \
+   "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
+
+# codex 並列起動（詳細は /ndf:review + /ndf:codex skill 参照）
 if [ "$ONLY" != "gemini" ]; then
-  # /ndf:review の codex 委譲フロー（plugins/ndf/skills/review/SKILL.md 参照）に従い、
-  # codex を起動して /tmp/codex-review-pr$PR-payload.json を生成
-  # 完了検知: grep -q '^tokens used$' /tmp/codex-review-pr$PR-err.log
-  # 詳細は /ndf:codex skill を参照
-  : "codex review backgrounded"
-fi &
-CODEX_PID=$!
+  ( /tmp/launch-codex-review.sh $PR ) &
+  CODEX_PID=$!
+fi
 
-# gemini 側
+# gemini 並列起動（詳細は /ndf:review + /ndf:gemini skill 参照）
 if [ "$ONLY" != "codex" ]; then
-  # /ndf:review の gemini 委譲フロー（plugins/ndf/skills/review/SKILL.md 参照）に従い、
-  # gemini を起動して /tmp/gemini-review-pr$PR-payload.json を生成
-  # 完了検知: プロセス exit（kill -0）
-  # 詳細は /ndf:gemini skill を参照
-  : "gemini review backgrounded"
-fi &
-GEMINI_PID=$!
+  ( /tmp/launch-gemini-review.sh $PR ) &
+  GEMINI_PID=$!
+fi
 
-# 両方の完了を待つ
-wait $CODEX_PID 2>/dev/null
-wait $GEMINI_PID 2>/dev/null
-```
+# 完了待ち（codex: ^tokens used$ sentinel / gemini: process exit）
+[ "$ONLY" != "gemini" ] && wait $CODEX_PID
+[ "$ONLY" != "codex" ]  && wait $GEMINI_PID
 
-実装の要点:
-- 並列実行することで wall-clock を短縮（codex 5〜10 分 + gemini 1〜5 分が合計 = max(両者)）
-- 片方が失敗しても他方は走り切らせる（fail-fast しない）
-- 完了検知は各 skill の sentinel に従う（codex: `^tokens used$` / gemini: プロセス exit）
-
-### Step 3: ペイロード投稿
-
-各 AI が書き出した JSON ペイロードを `gh api` で PR に投稿する
-（詳細は `/ndf:review` skill の「委譲結果の投稿」セクション参照）:
-
-```bash
-OWNER_REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
-
-post_review() {
+# 各 AI の result.json を読み込んで state に記録
+read_result() {
   local agent=$1
-  local payload=/tmp/$agent-review-pr$PR-payload.json
-  [ ! -s "$payload" ] && { echo "❌ $agent: payload 取得失敗" >&2; return 1; }
+  local file=/tmp/$agent-review-pr$PR-result.json
+  [ ! -s "$file" ] && { echo "❌ $agent: result 未生成" >&2; return 1; }
 
-  jq --arg sha "$SHA" '.commit_id = $sha' "$payload" > /tmp/post-payload.json
-  local result=$(gh api -X POST "repos/$OWNER_REPO/pulls/$PR/reviews" --input /tmp/post-payload.json)
-  local review_url=$(echo "$result" | jq -r '.html_url')
-  local event=$(jq -r '.event' "$payload")
-  local n=$(jq '.comments | length' "$payload")
+  local status=$(jq -r '.status' "$file")
+  if [ "$status" = "failed" ]; then
+    echo "⚠️ $agent: AI 投稿失敗 → メインがフォールバック投稿（/ndf:review 参照）"
+    # フォールバック投稿 ... (省略)
+  fi
 
-  echo "$agent: event=$event comments=$n url=$review_url"
-
-  # state に記録
-  jq --arg agent "$agent" --arg event "$event" --arg url "$review_url" --argjson n $n \
-     --arg path "$payload" \
-    ".rounds[-1].$agent = {event: \$event, comments: \$n, review_url: \$url, payload_path: \$path}" \
+  jq --slurpfile r "$file" --arg agent "$agent" \
+    ".rounds[-1].$agent = {event: \$r[0].event, comments: \$r[0].comments_count, review_url: \$r[0].review_url}" \
     "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
 }
 
-# round エントリを新規追加
-jq --arg ts "$(date -Iseconds)" --argjson r $ROUND \
-   '.rounds += [{"round": $r, "started_at": $ts}]' \
-   "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
-
-[ "$ONLY" != "gemini" ] && post_review codex
-[ "$ONLY" != "codex" ]  && post_review gemini
+[ "$ONLY" != "gemini" ] && read_result codex
+[ "$ONLY" != "codex" ]  && read_result gemini
 ```
 
-### Step 4: 判定
+### Step 3: 判定
 
 ```bash
 CODEX_EVENT=$(jq -r ".rounds[-1].codex.event // \"SKIP\"" "$STATE")
 GEMINI_EVENT=$(jq -r ".rounds[-1].gemini.event // \"SKIP\"" "$STATE")
 
-# 両方 APPROVE（SKIP は ONLY モード時の不在を意味するので合格扱い）
-is_pass() { [ "$1" = "APPROVE" ] || [ "$1" = "SKIP" ]; }
+is_pass() { [ "$1" = "APPROVE" ] || [ "$1" = "SKIP" ] || [ "$1" = "COMMENT" ]; }
 
 if is_pass "$CODEX_EVENT" && is_pass "$GEMINI_EVENT"; then
-  jq '.final = "approved" | .ended_at = "'$(date -Iseconds)'"' \
-    "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
+  jq '.final = "approved" | .ended_at = "'$(date -Iseconds)'"' "$STATE" > "$STATE.tmp"
+  mv "$STATE.tmp" "$STATE"
   echo "✅ 両方 APPROVE。収束。"
-  # 作業完了報告へ
+  # → 終了報告（nit deferred 一覧をユーザ提示）
   exit 0
 fi
 
-echo "→ codex=$CODEX_EVENT gemini=$GEMINI_EVENT。修正へ進む。"
+echo "→ codex=$CODEX_EVENT gemini=$GEMINI_EVENT。修正へ。"
 ```
 
-### Step 5: 振動検知
+### Step 4: 振動検知
 
-同じ指摘が連続 2 ラウンドで出ているかチェック（fix が効いていないサイン）:
+`/tmp/<agent>-review-pr<PR>-payload.json`（前ラウンドのもの含めて）から `path:line` を抽出して比較。
+50%以上重複なら中断:
 
 ```bash
-if [ "$ROUND" -ge 2 ]; then
-  # 直前 round の comments と現 round の comments を path:line で比較
-  prev_keys=$(jq -r ".rounds[-2] | (.codex.payload_path, .gemini.payload_path) | select(.)" "$STATE" \
-              | xargs -I{} jq -r '.comments[] | "\(.path):\(.line)"' {} | sort -u)
-  curr_keys=$(jq -r ".rounds[-1] | (.codex.payload_path, .gemini.payload_path) | select(.)" "$STATE" \
-              | xargs -I{} jq -r '.comments[] | "\(.path):\(.line)"' {} | sort -u)
-  overlap=$(comm -12 <(echo "$prev_keys") <(echo "$curr_keys") | wc -l)
-  total=$(echo "$curr_keys" | wc -l)
-
-  if [ "$total" -gt 0 ] && [ "$overlap" -ge $((total / 2)) ]; then
-    jq '.final = "oscillation"' "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
-    echo "⚠️ 振動検知: 同じ指摘が 50% 以上繰り返されている。中断してユーザ判断を仰ぐ。"
-    exit 2
-  fi
+if [ "$ROUND_IN_PR" -ge 2 ]; then
+  # ... (前ラウンドと現ラウンドの payload.path:line を取って comm -12 で重複検出)
+  # ROUND_IN_PR を使う点に注意（PR ローテーション後はリセット）
+  :
 fi
 ```
 
-### Step 6: `/ndf:fix` を呼ぶ
+（詳細省略。前バージョンと同等）
 
-`/ndf:fix <PR#>` skill を実行する（`plugins/ndf/skills/fix/SKILL.md` 参照）。要点:
-- 両方のレビューコメント（インライン）を fix skill が取得 → 修正 → コミット & push
-- 各コメントに reply + Resolve Conversation
-- CI 完了を待つ（`gh pr checks --watch`）
-- 失敗したら state に記録して中断:
+### Step 5: 修正 — **必ずサブエージェント経由**
+
+**メインセッションでは修正コードを書かない。** `/ndf:fix` を `general-purpose` サブエージェントで起動:
+
+```python
+# 擬似コード（メインエージェントから）
+result = Agent(
+    subagent_type="general-purpose",
+    description=f"Fix PR #{PR} (round {ROUND})",
+    prompt=f"""
+/ndf:fix {PR} --defer-nit を実行してください。
+
+## コンテキスト
+- リポジトリ: {OWNER_REPO}
+- PR: #{PR} (round {ROUND_IN_PR}/{ROTATE_AFTER})
+- 前ラウンドのレビュー結果:
+  - codex review: {CODEX_REVIEW_URL} (event={CODEX_EVENT}, {CODEX_COMMENT_COUNT}件)
+  - gemini review: {GEMINI_REVIEW_URL} (event={GEMINI_EVENT}, {GEMINI_COMMENT_COUNT}件)
+
+## ポリシー
+- critical / major / minor は自動修正
+- nit は deferred として記録のみ（修正しない）
+- bot 指摘が誤読していたら修正せず reply で説明（rejected として記録）
+
+## 戻り値
+- /tmp/fix-pr{PR}-result.json に書き出すこと
+- メインへの戻り値は: 修正件数 / deferred 件数 / rejected 件数 / commit SHA / CI 状態
+""",
+)
+```
+
+サブエージェント完了後、メインは `/tmp/fix-pr$PR-result.json` を読んで state を更新:
 
 ```bash
-# fix の実行（メインエージェントが /ndf:fix の手順を実行）
-# 成果として以下を取得:
-FIX_COMMIT=$(git rev-parse HEAD)
-FIX_CI=$(gh pr checks "$PR" --json state -q '[.[].state] | unique | join(",")')
-# resolved_threads は fix skill 内で resolveReviewThread した件数
+FIX=/tmp/fix-pr$PR-result.json
+[ ! -s "$FIX" ] && { echo "❌ fix サブエージェントが戻り値ファイルを生成しなかった" >&2; exit 3; }
 
-jq --arg sha "$FIX_COMMIT" --arg ci "$FIX_CI" --argjson n "$RESOLVED_COUNT" \
-   '.rounds[-1].fix = {commit: $sha, resolved_threads: $n, ci_status: $ci}
-   | .rounds[-1].ended_at = "'$(date -Iseconds)'"' \
+jq --slurpfile f "$FIX" \
+   '.rounds[-1].fix = {
+      commit: $f[0].fix_commit,
+      fixed: $f[0].fixed_count,
+      deferred: ($f[0].deferred | length),
+      rejected: ($f[0].rejected | length),
+      ci: $f[0].ci_status
+    }
+    | .rounds[-1].ended_at = "'$(date -Iseconds)'"
+    | .deferred_nits += [
+        $f[0].deferred[] | . + {pr: '$PR', round: '$ROUND'}
+      ]' \
    "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
 
-if [[ "$FIX_CI" == *"FAILURE"* ]]; then
+CI=$(jq -r ".rounds[-1].fix.ci" "$STATE")
+if [ "$CI" = "FAILURE" ]; then
   jq '.final = "error"' "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
-  echo "❌ CI が失敗。中断してユーザ判断を仰ぐ。"
+  echo "❌ CI 失敗。中断。"
   exit 3
 fi
+```
+
+### Step 6: PR ローテーション判定
+
+```bash
+ROUND_IN_PR=$(jq --argjson p $PR '[.rounds[] | select(.pr == $p)] | length' "$STATE")
+
+if [ "$ROUND_IN_PR" -ge "$ROTATE_AFTER" ] && [ "$TOTAL_ROUNDS" -lt "$MAX_ROUNDS" ]; then
+  echo "🔄 PR #$PR が $ROUND_IN_PR round 経過。ローテーション実施。"
+  rotate_pr
+fi
+```
+
+#### `rotate_pr` の実装
+
+```bash
+rotate_pr() {
+  local old_pr=$PR
+  local branch=$(git branch --show-current)
+  local base=$(gh pr view "$old_pr" --json baseRefName -q .baseRefName)
+  local title=$(gh pr view "$old_pr" --json title -q .title)
+  local new_branch="${branch}-r$(date +%H%M%S)"
+
+  # 1. 既存ブランチを squash して新ブランチに
+  git checkout -b "$new_branch"
+  git reset --soft "origin/$base"
+  git commit -m "$(cat <<EOF
+$title
+
+(cross-review rotation: PR #$old_pr を squash 統合)
+EOF
+)"
+  git push -u origin "$new_branch"
+
+  # 2. 旧 PR を close（コメント残し）
+  gh pr comment "$old_pr" --body "🔄 cross-review ループ進行中のため、本 PR を close し新規 PR #(後述) に巻き直します。 round_in_pr=$ROUND_IN_PR で長尺化を回避。"
+  gh pr close "$old_pr"
+
+  # 3. 新 PR 作成
+  local new_pr_url=$(gh pr create --base "$base" --title "$title (rotated)" --body "$(cat <<EOF
+## Summary
+旧 PR #$old_pr をベースに、cross-review クロスレビューループの継続。
+旧 PR は round_in_pr=$ROUND_IN_PR で巻き直しのため close 済み。
+
+旧 PR の resolved スレッドは既に修正済み事項。残った指摘はこの PR で再評価する。
+
+<!-- I want to review in Japanese. -->
+EOF
+)")
+  local new_pr=$(echo "$new_pr_url" | grep -oP '/pull/\K\d+')
+
+  # 4. state 更新
+  jq --argjson old "$old_pr" --argjson new "$new_pr" --arg ts "$(date -Iseconds)" \
+    '.pr_history[-1].closed_at = $ts
+     | .pr_history[-1].rounds = (.rounds | map(select(.pr == $old)) | length)
+     | .pr_history += [{"pr": $new, "opened_at": $ts, "closed_at": null, "rounds": 0}]
+     | .current_pr = $new' \
+    "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
+
+  PR=$new_pr
+  echo "✅ 新 PR #$new_pr に移行: $new_pr_url"
+}
 ```
 
 ### Step 7: 次ラウンドへ
 
 Step 1 に戻る。
 
-## 終了条件
+### Step 8: 終了処理 — deferred nit のバッチ問い合わせ
 
-| `final` | 意味 | 終了コード |
-|---|---|---|
-| `approved` | 両方 APPROVE で正常終了 | 0 |
-| `max_rounds` | max-rounds 到達 | 1 |
-| `oscillation` | 同じ指摘が連続して残り続けるため中断（fix が収束しない） | 2 |
-| `error` | AI 呼び出し or fix or CI 失敗 | 3 |
-
-中断時は state ファイルを残し、ユーザに以下を含めて報告:
-- 中断理由
-- 残った指摘の path:line リスト
-- 各 round の review URL
-- 次のアクション提案（手動で対処すべき指摘 / ユーザ判断要の論点）
-
-## 並列実行のヒント
-
-codex と gemini を本当に並列実行するには:
+ループ終了時（`final` 確定後）、`deferred_nits` が残っていれば **1 回だけ** ユーザに問い合わせる:
 
 ```bash
-# 同一プロンプトを両方に渡し、別々の出力ファイルへ
-# （プロンプト生成は共通化、CLI 呼び出しのみ別プロセス）
-( /tmp/codex-launcher.sh ) &
-CODEX_PID=$!
-( /tmp/gemini-launcher.sh ) &
-GEMINI_PID=$!
-
-# 個別 PID で完了待ち
-wait $CODEX_PID; CODEX_EXIT=$?
-wait $GEMINI_PID; GEMINI_EXIT=$?
+DEFERRED_COUNT=$(jq '.deferred_nits | length' "$STATE")
+if [ "$DEFERRED_COUNT" -gt 0 ]; then
+  echo "=== 残った nit 指摘 ($DEFERRED_COUNT 件) ==="
+  jq -r '.deferred_nits[] | "- [\(.severity)] \(.path):\(.line) — \(.summary)"' "$STATE"
+  echo ""
+  echo "これらの nit を一括対応する場合は再度 /ndf:fix <PR#> を起動してください。"
+fi
 ```
 
-エージェントハーネスのシェルタイムアウトに引っかかる場合は、本 skill 自体を
-**バックグラウンド + ポーリング待機** として扱うか、`ScheduleWakeup` で
-ラウンド境界ごとに再開する設計に切り替える。
+UI 上は **AskUserQuestion で 1 回だけ** 「nit 一括対応する / しない / 個別選択」を選ばせるのが望ましい。
 
 ## アンチパターン
 
-- **`gh api` を外部 AI に直接叩かせる** — 外部AI は JSON ペイロード生成までに留め、投稿はメインエージェントが行う（SHA 更新・パス検証を集約するため）
-- **`/ndf:fix` を呼ばずに自力で修正する** — 修正フローは fix skill に集約。重複実装は禁物
-- **max-rounds なしで回す** — 無限ループの温床
-- **振動検知をスキップする** — 同じ指摘が永遠に残り続けるケースがある（仕様判断要件など）
-- **CI 失敗を無視して次ラウンドに進む** — fix の前提が壊れていれば次回も失敗するため、CI 失敗時は即中断
+- ❌ **修正をメインセッション内で行う** — context が一気に膨れる。必ずサブエージェント
+- ❌ **AI に Markdown だけ返させる** — メインがパース・投稿する設計は禁物。AI 直接投稿
+- ❌ **nit を都度ユーザに問う** — 必ずバッチ集約して最後に 1 回
+- ❌ **`max-rounds` なしで回す** — 無限ループの温床
+- ❌ **PR ローテーションを忘れる** — 100+ コメントの巨大 PR になる
+- ❌ **CI 失敗を無視して次ラウンド** — 即中断してユーザ判断
+
+## メイン context 節約の工夫
+
+1. **大きいファイルはメイン context に載せない**: payload / err.log / diff はすべて `/tmp/` に置き、メインは state.json と result.json だけ読む
+2. **サブエージェント分離**: 修正は別 context window で実行
+3. **PR ローテーション**: 1 PR あたりの会話履歴を抑える
+4. **AI 直接投稿**: 中間ペイロードがメインを通らない
+5. **state.json で再開可能**: メインが落ちても次回起動時に続きから
 
 ## 作業完了報告（必須）
 
-ループ終了後、ユーザに以下を報告:
+ループ終了後、メインからユーザへの報告:
 
 - **最終ステータス**: `approved` / `max_rounds` / `oscillation` / `error`
-- **ラウンド数**: 実行した round 数 / max
+- **総ラウンド数 / PR 数**: 例: `5 rounds / 2 PRs (rotated 1 回)`
+- **PR 履歴**: 各 PR 番号 + closed/open 状態 + round 数
 - **各ラウンドのサマリ表**:
-  | round | codex | gemini | fix commit | CI |
-  |---|---|---|---|---|
-  | 1 | REQ (5件) | REQ (3件) | abc123 | ✅ |
-  | 2 | APPROVE | APPROVE | — | — |
-- **残課題**（中断時のみ）: 未解決の指摘 path:line と内容
-- **PR URL** と各 round の review URL
+  | round | PR | codex | gemini | fix | CI |
+  |---|---|---|---|---|---|
+  | 1 | #123 | REQ (5) | REQ (3) | abc123 (5 fixed, 2 deferred) | ✅ |
+  | 2 | #123 | REQ (2) | APP | def456 (2 fixed) | ✅ |
+  | 3 | #145 | APP | APP | — | — |
+- **残 deferred nit リスト**（ユーザ判断要）
+- **rejected 件数**（bot 誤指摘で却下したもの）
+- **最終 PR URL**
 
-詳細な指摘内容は PR 上のインラインコメントに残っているため、ユーザ宛報告では繰り返さない。
+詳細は PR 上のインラインコメントと state.json に残っているため、本報告では繰り返さない。
 
 ## 関連
 
-- `/ndf:review` — 単発レビュー（本 skill が内部で利用）
-- `/ndf:fix` — 修正対応（本 skill が内部で利用）
+- `/ndf:review` — 単発レビュー（AI 直接投稿対応）
+- `/ndf:fix` — 修正対応（サブエージェント起動対応）
 - `/ndf:codex` — codex CLI 呼び出し手順
 - `/ndf:gemini` — gemini CLI 呼び出し手順
 - `/ndf:resolve-pr-comments` — Resolve Conversation の詳細
+- `general-purpose` エージェント — fix 実行用サブエージェント
