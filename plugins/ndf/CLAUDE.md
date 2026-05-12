@@ -39,7 +39,7 @@ plugins/ndf/
 │   ├── debugger.md              # sonnet: 根本原因分析
 │   ├── devops-engineer.md       # sonnet: Docker/CI/K8s
 │   └── code-reviewer.md         # sonnet: diff/PRレビュー
-├── skills/                      # スキル（36個）
+├── skills/                      # スキル（38個）
 │   # PRワークフロー系
 │   ├── pr/                      # commit+push+PR作成/更新
 │   ├── pr-tests/                # Test Plan自動実行
@@ -124,6 +124,15 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v4.3.1 (Fix: cross-review / gemini skill 登録漏れ修正)
+
+- PR #67 で追加された `cross-review` / `gemini` skill が `plugin.json` の
+  `skills` 配列に登録されておらず、`/ndf:cross-review` / `/ndf:gemini` を
+  slash command として呼び出せなかった問題を修正
+- 併せて description と CLAUDE.md / AGENTS.md / README.md の skill 数を
+  36個 → 38個 に更新
+- Skills: 36個 → **38個** (実体は v4.3.0 時点で既に存在、登録のみ追加)
 
 ### v4.3.0 (playwright-scenario-test v0.4.0 — body_check 復活)
 
