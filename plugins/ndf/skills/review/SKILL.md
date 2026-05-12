@@ -77,32 +77,32 @@ SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
 
 # 1. インラインコメントを JSON 配列で組み立て
 #    （path / line / side / body の 4 つが必須。複数行レンジは start_line を併用）
-cat > /tmp/review-payload.json <<JSON
-{
-  "commit_id": "$SHA",
-  "event": "REQUEST_CHANGES",
-  "body": "## 総評\n\n... 全体所見をここに ...",
-  "comments": [
-    {
-      "path": "src/foo.py",
-      "line": 42,
-      "side": "RIGHT",
-      "body": "[major / 可読性] この関数は 70 行ある。〇〇 と △△ に分割を推奨。"
-    },
-    {
-      "path": "src/bar.py",
-      "start_line": 10,
-      "line": 25,
-      "side": "RIGHT",
-      "body": "[minor / 性能] このループは内包表記化できる。"
-    }
-  ]
-}
-JSON
+#
+#    ▼ 推奨: jq -n でシェル変数を安全に流し込む（特殊文字混入時の JSON 破損を防ぐ）
+SUMMARY=$'## 総評\n\n... 全体所見をここに ...'
+jq -n \
+  --arg sha "$SHA" \
+  --arg event "REQUEST_CHANGES" \
+  --arg body "$SUMMARY" \
+  '{
+    commit_id: $sha,
+    event: $event,
+    body: $body,
+    comments: [
+      {path: "src/foo.py", line: 42, side: "RIGHT",
+       body: "[major / 可読性] この関数は 70 行ある。〇〇 と △△ に分割を推奨。"},
+      {path: "src/bar.py", start_line: 10, line: 25, side: "RIGHT",
+       body: "[minor / 性能] このループは内包表記化できる。"}
+    ]
+  }' > /tmp/review-payload.json
 
 # 2. Reviews API に POST
 gh api -X POST "repos/$OWNER_REPO/pulls/$PR/reviews" --input /tmp/review-payload.json
 ```
+
+> 💡 **JSON 組み立てに heredoc (`<<JSON`) は使わない**: 変数展開は必要だが、`$SHA` 等に特殊文字が混入した場合
+> JSON が壊れる（あるいはクオート未エスケープで JSON injection になる）。`jq -n --arg` 経由なら値が自動で
+> JSON エスケープされるため安全。クオート付き heredoc (`<<'JSON'`) は逆に `$SHA` が展開されず使えない。
 
 **`event` の値**:
 - `APPROVE` — 指摘なし
@@ -214,6 +214,11 @@ gh api -X POST "repos/$OWNER_REPO/pulls/$PR/comments" \
 - `codex exec --dangerously-bypass-approvals-and-sandbox --config reasoning.effort=medium -C "$PWD" < prompt > stdout 2> err &` でバックグラウンド起動
 - `grep -q '^tokens used$' err` で完了検知
 - 「ファイル → stdout → stderr」三段フォールバックで成果物を回収
+
+> ⚠️ **`--dangerously-bypass-approvals-and-sandbox` のセキュリティ注意**: このフラグは codex の bwrap サンドボックスを完全に無効化し、
+> 任意のシェル実行・任意のファイル編集を無確認で許可する。**必ず Docker / devcontainer / VM / CI ランナー等の外部隔離環境内** でのみ使用すること。
+> ホスト直接実行や本番リポジトリでは使わない。詳細な背景・代替策（`unprivileged_userns_clone` 有効化など）は `/ndf:codex` skill の
+> 「サンドボックス制約」節を参照。
 
 ### `gemini` 指定時
 

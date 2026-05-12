@@ -84,6 +84,15 @@ gemini --approval-mode plan -p "..."
 **レビュー/調査タスクの推奨**: `--approval-mode plan`（編集事故を防ぐ）
 **コード生成タスクの推奨**: `--yolo`（実ファイル編集が必要）
 
+> ⚠️ **`--yolo` のセキュリティ注意**: 全 tool 自動承認は `rm -rf` / 任意のシェル実行 / 任意のファイル編集を **無確認で許可** する。
+> 必ず以下のいずれかの **外部隔離環境** 内でのみ使用すること:
+> - Docker コンテナ / devcontainer
+> - VM / CI ランナー
+> - 隔離された worktree（ホスト本体のリポジトリでは使わない）
+>
+> ホスト直接実行や本番リポジトリ作業中の `--yolo` は厳禁。コード生成タスクでも、ホスト直接実行なら
+> `--approval-mode auto_edit`（編集系のみ自動承認、シェル実行は都度承認）への降格を検討する。
+
 ### 2. プロンプトは一時ファイル経由で渡す
 
 長いプロンプトをシェル引数に直接渡すとエスケープが破綻するので、ファイル経由で stdin か `$(cat ...)` 経由にする。
@@ -103,12 +112,12 @@ EOF
 
 # Step 2a: stdin 経由（推奨）
 gemini --yolo --output-format text -p "$(cat /tmp/gemini-prompt.md)" \
-  > /tmp/gemini-output.md \
+  > /tmp/gemini-stdout.md \
   2> /tmp/gemini-err.log
 
 # Step 2b: あるいは stdin パイプ
 cat /tmp/gemini-prompt.md | gemini --yolo --output-format text -p "" \
-  > /tmp/gemini-output.md \
+  > /tmp/gemini-stdout.md \
   2> /tmp/gemini-err.log
 ```
 
@@ -150,6 +159,9 @@ Gemini は codex のような「最終 message を返さずに終わる」既知
 回収側は「stdout → ファイル → stderr」の順でフォールバック:
 
 ```bash
+# 命名規約:
+#   STDOUT      = gemini の `> リダイレクト` 先（本 skill では /tmp/gemini-stdout.md で統一）
+#   OUTPUT_FILE = プロンプト指示で `write_file` させた保険ファイル（task ごとに固有名）
 OUTPUT_FILE=/tmp/gemini-output-pr13734-review.md
 STDOUT=/tmp/gemini-stdout.md
 
@@ -173,7 +185,7 @@ Gemini も大規模調査タスクでは数分かかる。エージェントハ�
 
 # 2. gemini をバックグラウンドで起動
 gemini --yolo --output-format text -p "$(cat /tmp/gemini-prompt.md)" \
-  > /tmp/gemini-output.md \
+  > /tmp/gemini-stdout.md \
   2> /tmp/gemini-err.log &
 PID=$!
 echo "PID: $PID"
