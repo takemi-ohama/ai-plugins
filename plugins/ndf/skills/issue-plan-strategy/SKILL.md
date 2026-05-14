@@ -1,6 +1,7 @@
 ---
 name: issue-plan-strategy
-description: "1 つの issue に対する plan(企画書・設計書) 作成、および plan 実行(実装)時のブランチ・worktree・Draft PR・レビュー運用を一括で扱うワークフロー。issue ファイル/URL を引数に取るスラッシュコマンドとしても、issue から plan 作成依頼を受けた時 / 既存 plan の実装依頼を受けた時の自動発動 skill としても利用可能。Triggers: 'issueのplanを作って', 'PLANxxの設計', 'このplanを実装して', 'PLANxxを実装', 'planを実行', 'release branch 作って', 'multi-PR で進めて'"
+description: "1 つの issue に対する plan(企画書・設計書) 作成、および plan 実行(実装)時のブランチ・worktree・Draft PR・レビュー運用を一括で扱うワークフロー。issue ファイル/URL を引数に取るスラッシュコマンドとしても、issue から plan 作成依頼を受けた時 / 既存 plan の実装依頼を受けた時の自動発動 skill としても利用可能。"
+when_to_use: "issue → plan 作成 / 既存 plan の実装 (実行) を依頼されたとき。複数 PR に分割される設計や、release branch + 個別 PR + worktree 運用が必要なときに参照する。Triggers: 'issueのplanを作って', 'PLANxxの設計', '設計書を起こして', 'このplanを実装して', 'PLANxxを実装', 'planを実行', 'release branch 作って実装開始', 'multi-PR で進めて'"
 argument-hint: "[issue-path-or-url] (例: issues/i16.md, https://github.com/org/repo/issues/123)"
 allowed-tools:
   - Bash
@@ -34,11 +35,11 @@ allowed-tools:
 
 ## Step 0: 作成フェーズか実行フェーズか判定
 
-最初に **既に plan ファイルが存在するか** で判定する:
+最初に **既に plan ファイルが存在するか** で判定する。skill 内で `Glob` を使うのが第一選択 (例: `Glob('issues/*PLAN42*')`)。shell で確認する場合は:
 
 ```bash
-# issues/ 配下に該当 plan があるか
-ls issues/ | grep -i "<PLAN-ID>\|<feature-name>"
+# issues/ 配下に該当 plan があるか (PLAN42 / feature-name 部分は実値に置換)
+find issues/ -maxdepth 1 -iname '*PLAN42*' -o -iname '*feature-name*'
 ```
 
 | 状況 | 進むフェーズ |
@@ -162,7 +163,9 @@ release PR を **先に作る理由**: PR 番号が確定し、個別 PR の説�
 git fetch origin release/<PLAN-ID>
 git checkout -b feature/<PLAN-ID>-<scope> origin/release/<PLAN-ID>
 
-# 空コミット (or .gitkeep) で push して Draft PR を作る
+# 空コミットで push して Draft PR を作る (base=release と HEAD が同一だと
+# gh pr create が "No commits between ..." で失敗するため、差分ゼロのまま PR
+# 作成のトリガにする目的で `--allow-empty` を使う)
 git commit --allow-empty -m "chore: <PLAN-ID>-<scope> Draft PR 作成"
 git push -u origin feature/<PLAN-ID>-<scope>
 
@@ -239,22 +242,37 @@ release PR が APPROVE されたら:
 ```bash
 # Draft 解除
 gh pr ready <release-pr-number>
-# merge (運用に合わせて squash / merge / rebase を選択)
-gh pr merge <release-pr-number> --squash --delete-branch
+# merge: 個別 PR が既に squash 済みで release ブランチに並んでいるため、
+# main 側でも個別 PR 単位の commit を追跡できる `--merge` (merge commit 保持)
+# が既定として推奨。プロジェクト規約で線形履歴必須なら `--rebase`、
+# それ以外で commit 数を 1 本にしたい場合のみ `--squash`。
+gh pr merge <release-pr-number> --merge --delete-branch
 ```
 
-merge 後は plan ファイル末尾に「完了サマリ」(マージ済み PR 番号 / 検証結果) を追記して clozed 化する。
+merge 後は plan ファイル末尾に「完了サマリ」(マージ済み PR 番号 / 検証結果) を追記してクローズ化する。
 
 ## Step 9: 検証環境 (qa/staging 等) への適用
 
-QA / staging 検証は **個別 PR 単位** or **release ブランチ単位** のどちらでも OK:
+QA / staging 検証は **個別 PR 単位** or **release ブランチ単位** のどちらでも OK。
+`/ndf:cherry-pick-pr` は Claude Code 内の slash command なので、shell ではなく
+Claude Code セッション上で実行する点に注意。
+
+個別 PR 単位で qa に反映する場合:
+
+```text
+# (Claude Code 内で実行する slash command)
+/ndf:cherry-pick-pr qa/staging
+```
+
+release ブランチごと qa に反映する場合 (まとまった検証が必要な場合):
 
 ```bash
-# 個別 PR を qa にも反映
-/ndf:cherry-pick-pr qa/staging
-
-# release ブランチごと qa にも反映 (まとまった検証が必要な場合)
+# 1. shell で release ブランチに切り替え
 git checkout release/<PLAN-ID>
+```
+
+```text
+# 2. (Claude Code 内で実行する slash command)
 /ndf:cherry-pick-pr qa/staging
 ```
 
