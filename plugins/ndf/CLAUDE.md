@@ -7,7 +7,7 @@
 ## プラグイン情報
 
 - **名前**: ndf
-- **現在バージョン**: 4.3.0
+- **現在バージョン**: 4.4.0
 - **種類**: 統合プラグイン（Skills + Agents + Hooks / v4.0.0 で Codex MCP 廃止）
 - **リポジトリ**: https://github.com/takemi-ohama/ai-plugins
 
@@ -39,7 +39,7 @@ plugins/ndf/
 │   ├── debugger.md              # sonnet: 根本原因分析
 │   ├── devops-engineer.md       # sonnet: Docker/CI/K8s
 │   └── code-reviewer.md         # sonnet: diff/PRレビュー
-├── skills/                      # スキル（38個）
+├── skills/                      # スキル（39個）
 │   # PRワークフロー系
 │   ├── pr/                      # commit+push+PR作成/更新
 │   ├── pr-tests/                # Test Plan自動実行
@@ -56,6 +56,7 @@ plugins/ndf/
 │   # 原則・ガイドライン系
 │   ├── ndf-policies/            # ポリシー常時注入
 │   ├── branch-fix-strategy/     # ブランチ修正適用戦略
+│   ├── issue-plan-strategy/     # issue→plan→multi-PR ワークフロー (release branch + draft PR + worktree)
 │   ├── implementation-plan/     # 実装プラン管理(issues/)
 │   ├── investigation-rules/     # 調査時のエビデンス主義
 │   ├── problem-solving/         # 根本原因分析・多層防御
@@ -124,6 +125,25 @@ plugins/ndf/
 | フックが動作しない | hooks.jsonの構文、スクリプト実行権限を確認 |
 
 ## 開発履歴
+
+### v4.4.0 (issue-plan-strategy skill 追加)
+
+- **新規 Skill `issue-plan-strategy`**:
+  - 1 つの issue から plan を起こし、推奨 PR が複数に分かれる場合の標準ワークフローを規定
+  - スラッシュコマンド (`/ndf:issue-plan-strategy <issue-path-or-url>`) でも、
+    **(a) issue から plan 作成依頼** / **(b) 既存 plan の実装(実行)依頼** の両方で自動発動する
+    (description / Triggers に発動条件を明記)
+  - Step 0 で plan ファイル / release branch / Draft PR の有無を見て **作成フェーズ vs 実行フェーズ**
+    を切り分け、実行フェーズで入った場合は Step 1 をスキップして Step 3 以降の自動化に直行
+  - フロー: issue 取得 → (作成) plan (必要なら plan モード) → 単一/複数 PR 判定 →
+    (実行) release branch + Draft release PR 先行作成 → 個別 PR ブランチ + Draft PR 先行作成 →
+    git worktree で並行開発 → 個別 PR レビュー (`/ndf:review` / `/ndf:cross-review`) →
+    release ブランチで結合テスト相当のレビューのみ → release → default merge
+  - 検証環境 (qa/staging) は個別 PR or release PR 単位で `/ndf:cherry-pick-pr` に委譲
+  - 関連 skill (`implementation-plan` / `branch-fix-strategy` / `pr` / `cherry-pick-pr` /
+    `review` / `cross-review` / `playwright-scenario-test`) との責務分担を明記し、
+    本 skill は **multi-PR 運用のメタ手順**に専念
+- Skills: 38個 → **39個**
 
 ### v4.3.1 (Fix: cross-review / gemini skill 登録漏れ修正)
 

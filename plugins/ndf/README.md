@@ -7,7 +7,7 @@ Claude Code開発環境を**オールインワン**で強化する統合プラ�
 このプラグイン1つで、以下の**すべて**の機能を利用できます：
 
 1. **コアMCP**: なし (v4.0.0 で Codex MCP 廃止 / Serena MCP は `mcp-serena` プラグインに分離)
-2. **Skills**: 38個（PR/コードレビュー系ワークフロー13個 + 原則・ガイドライン7個 + データ分析/品質/環境系13個 + skill-stats + Playwright シナリオテスト + Google Drive/Chat 連携 + AI クロスレビュー (cross-review / gemini)）
+2. **Skills**: 39個（PR/コードレビュー系ワークフロー13個 + 原則・ガイドライン8個 (issue→multi-PR 戦略含む) + データ分析/品質/環境系13個 + skill-stats + Playwright シナリオテスト + Google Drive/Chat 連携 + AI クロスレビュー (cross-review / gemini)）
 3. **専門エージェント**: 8つの特化型AIエージェント（director、data-analyst、corder、researcher、qa、debugger、devops-engineer、code-reviewer）
 4. **自動フック**: Slack通知
 
