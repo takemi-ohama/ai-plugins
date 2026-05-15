@@ -229,6 +229,7 @@ gh api -X POST "repos/$OWNER_REPO/pulls/<PR>/reviews" \
 {
   "status": "posted" | "failed",
   "event": "REQUEST_CHANGES" | "APPROVE" | "COMMENT",
+  "posted_as": "REQUEST_CHANGES" | "APPROVE" | "COMMENT",
   "review_url": "https://github.com/.../pull/<PR>#pullrequestreview-...",
   "comments_count": 5,
   "by_severity": {"critical": 0, "major": 2, "minor": 2, "nit": 1},
@@ -239,6 +240,19 @@ gh api -X POST "repos/$OWNER_REPO/pulls/<PR>/reviews" \
 
 投稿失敗時は `status: "failed"`、`error` にエラーメッセージ、`payload_path` で payload は残す
 （メイン側のフォールバック投稿で使う）。
+
+**`event` と `posted_as` の使い分け**:
+
+- `event` — **AI 本来の判定 (intent)**。ループ収束判定（`/ndf:cross-review`）はこれを見る
+- `posted_as` — **GitHub に実際投稿した event**。`event` と同じ値がデフォルト
+
+GitHub は **自分の PR には `REQUEST_CHANGES` で投稿できない**（`HTTP 422: Can not request changes on your own pull request`）。自分 PR レビューの場合は以下のダウングレードを行う:
+
+- `event = "REQUEST_CHANGES"` のままにしておく（intent 保持）
+- ペイロードの `event` だけ `"COMMENT"` にして投稿
+- `posted_as = "COMMENT"` を結果サマリに記録
+
+これにより、後段のループ判定で「本当は REQ なので継続が必要」と判断できる。判定にあたっては事前に `gh api user --jq .login` と `gh pr view <PR> --json author --jq .author.login` を比較すること。
 
 ### 4. 重要度の運用ガイド（auto-fix 判定に直結）
 

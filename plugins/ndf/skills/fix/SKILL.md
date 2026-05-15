@@ -92,8 +92,11 @@ PR: <PR番号>
 9. 対応したコードコメントに個別に返信
 10. **deferred スレッドには `[deferred / nit]` のラベル付き返信** を投稿（resolve はしない）
 11. reviewerに再レビューを依頼
-12. 対応完了したコードコメントを「Resolve Conversation」にする
+12. 対応完了したコードコメントを「Resolve Conversation」にする（`resolveReviewThread` mutation）
+    - resolve した thread_id / comment_id / path / line を `resolved_threads[]` に記録
+    - `deferred` / `rejected` の thread は Resolve しない（次ラウンドで再評価するため）
 13. **戻り値ファイルを書き出す**: `/tmp/fix-pr<番号>-result.json` （後述「戻り値フォーマット」参照）
+    - `ci_failed_checks` には `gh pr checks <PR> --json name,state` から `state=FAILURE` の name を抽出して列挙
 
 - 4〜6はgit、1〜2/5と8以降はgithub mcpまたはghを利用
 
@@ -227,8 +230,18 @@ gh api graphql -f query='
   "pr": 67,
   "fix_commit": "abc1234",
   "ci_status": "SUCCESS" | "FAILURE" | "PENDING" | "NONE",
+  "ci_failed_checks": [],
+  "ci_note": null,
   "fixed_count": 5,
   "by_severity": {"critical": 1, "major": 2, "minor": 2, "nit": 0},
+  "resolved_threads": [
+    {
+      "thread_id": "PRRT_...",
+      "comment_id": 3222849090,
+      "path": "src/foo.py",
+      "line": 42
+    }
+  ],
   "deferred": [
     {
       "comment_id": 3222849090,
@@ -251,6 +264,12 @@ gh api graphql -f query='
   "summary_comment_url": "https://github.com/.../pull/67#issuecomment-..."
 }
 ```
+
+**フィールド説明**:
+
+- `ci_failed_checks` — `ci_status = FAILURE` のとき、失敗した check 名の配列。`/ndf:cross-review` 側で code-related (`pint/larastan/test/build/lint/type`) と meta-only (`check_pr_requirements/assignees/reviewers/labels`) を分類し、メタチェックのみ失敗ならループ継続する
+- `ci_note` — code-related ではない CI 失敗の補足。例: `"メタチェックのみ失敗: check_pr_requirements — Assignees 未設定"`
+- `resolved_threads` — 手順 12 で `resolveReviewThread` mutation を実行したスレッド一覧。`deferred` / `rejected` の thread は **Resolve しない**（再評価のため）
 
 サブエージェントとして起動された場合は、この JSON をメインに返すサマリの基礎とする。
 
