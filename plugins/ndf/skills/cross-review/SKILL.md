@@ -133,58 +133,37 @@ gh api "repos/$OWNER_REPO/pulls/$PR/comments" --paginate \
 
 ## 全体フロー
 
-```
-   ┌──────────────────────────────────────────────────┐
-   │ 事前確認 (loop 開始前に 1 回だけ)                │
-   │  - 自分の PR か判定 → event ダウングレード設定   │
-   │  - worktree 作成 (/work/worktrees/pr<PR>)        │
-   │  - 既存コメントスナップショット保存              │
-   │  - state.json 初期化                             │
-   └──────────────────────┬───────────────────────────┘
-                          │
-                          v
-   ┌──────────────────────────────────────────────────┐
-   │ Round N start (current_pr = PR#)                 │
-   └──────────────────────┬───────────────────────────┘
-                          │ 並列バックグラウンド
-        ┌─────────────────┴─────────────────┐
-        │                                   │
-   /ndf:review codex                   /ndf:review gemini
-   (--skip-trust 必須)                 (codex の sentinel/pidfile で完了検知)
-   body 先頭 prefix:                   body 先頭 prefix:
-   "## 🤖 cross-review | round N |     "## 🤖 cross-review | round N |
-    codex | <intent>"                   gemini | <intent>"
-   → result.json (intent + posted_as)  → result.json (intent + posted_as)
-        │                                   │
-        └─────────────────┬─────────────────┘
-                          v
-   ┌──────────────────────────────────────────────────┐
-   │ 判定 (intent ベース)                             │
-   │  - 両方 APPROVE/SKIP → 終了                     │
-   │  - 一方でも REQUEST_CHANGES → 修正へ            │
-   └──────────────────────┬───────────────────────────┘
-                          v
-   ┌──────────────────────────────────────────────────┐
-   │ Agent(subagent_type="general-purpose")           │
-   │   /ndf:fix <PR#> --defer-nit (worktree 内で実行) │
-   │   - critical/major/minor 修正 + push             │
-   │   - 修正 thread を reply + resolveReviewThread   │
-   │   - deferred/rejected は reply のみ              │
-   │ → /tmp/fix-pr<#>-result.json                     │
-   └──────────────────────┬───────────────────────────┘
-                          v
-   ┌──────────────────────────────────────────────────┐
-   │ 収束チェック                                     │
-   │  - max-rounds 到達 → 中断                       │
-   │  - 振動検知 (50%重複) → 中断                    │
-   │  - CI failure (code) → 中断                     │
-   │  - CI failure (meta only) → 継続 (Assignees 等) │
-   │  - round_in_pr >= rotate_after → PR rotation    │
-   └──────────────────────┬───────────────────────────┘
-                          v
-                    Round N+1 へ
-                          │
-        (最後に 1 回) deferred nit 一覧をユーザに問い合わせ
+```mermaid
+flowchart TD
+    Start([事前確認 / loop 開始前に 1 回だけ]):::phase --> Init["worktree 作成 + state.json 初期化<br/>・自分の PR 判定 → event downgrade 設定<br/>・/work/worktrees/pr&lt;PR&gt; を用意<br/>・既存コメントスナップショット保存"]
+    Init --> Round["Round N start<br/>current_pr = PR#"]:::phase
+
+    Round -.並列バックグラウンド.-> Codex["/ndf:review &lt;PR&gt; codex<br/>(AI が gh api で直接投稿)<br/>body 先頭: cross-review / round N / codex / intent<br/>→ result.json (intent + posted_as)"]
+    Round -.並列バックグラウンド.-> Gemini["/ndf:review &lt;PR&gt; gemini<br/>--skip-trust 必須<br/>body 先頭: cross-review / round N / gemini / intent<br/>→ result.json (intent + posted_as)"]
+
+    Codex --> Decide{"判定 (intent ベース)"}
+    Gemini --> Decide
+
+    Decide -->|両方 APPROVE / SKIP| Approved([final = approved]):::ok
+    Decide -->|一方でも REQUEST_CHANGES| Fix["Agent (general-purpose)<br/>/ndf:fix &lt;PR&gt; --defer-nit を worktree 内で実行<br/>・critical/major/minor 修正 + push<br/>・reply + resolveReviewThread<br/>・deferred/rejected は reply のみ<br/>→ /tmp/fix-pr&lt;#&gt;-result.json"]
+
+    Fix --> Check{収束チェック}
+    Check -->|max-rounds 到達| MaxR([final = max_rounds]):::stop
+    Check -->|振動検知 50% 重複| Osc([final = oscillation]):::stop
+    Check -->|CI failure code-related| Err([final = error]):::stop
+    Check -->|"CI failure meta-only (Assignees 等)"| Round
+    Check -->|round_in_pr >= rotate-after| Rotate["PR rotation<br/>squash + 新ブランチ + 新 PR"]
+    Check -->|それ以外| Round
+    Rotate --> Round
+
+    Approved --> Nit[最後に 1 回<br/>deferred nit 一覧をユーザに問い合わせ]
+    MaxR --> Nit
+    Osc --> Nit
+    Err --> Nit
+
+    classDef phase fill:#eef,stroke:#557
+    classDef ok fill:#dfd,stroke:#383
+    classDef stop fill:#fdd,stroke:#933
 ```
 
 ## 実行ステップ概要
