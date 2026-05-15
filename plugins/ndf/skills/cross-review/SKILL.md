@@ -136,46 +136,51 @@ flowchart TD
 ```bash
 SCRIPTS="$CLAUDE_PLUGIN_ROOT/skills/cross-review/scripts"
 
+# STATE_PR は state.json のキー (= 最初に init した PR 番号)。
+# rotation 後も state.json のパスは変わらないため、scripts/ への引数には常に
+# STATE_PR を渡す。「現在レビュー中の PR」は state.json の current_pr を内部参照する。
+STATE_PR=$INITIAL_PR
+
 # Step 0: state 初期化 / 再開
-eval "$("$SCRIPTS/state.py" init "$PR" \
+eval "$("$SCRIPTS/state.py" init "$STATE_PR" \
           --max-rounds "$MAX_ROUNDS" --rotate-after "$ROTATE_AFTER" \
           ${ONLY:+--only "$ONLY"})"
 cd "$WORKTREE"
 
 while :; do
   # Step 1: round 開始判定 (max_rounds 到達で exit 1)
-  eval "$("$SCRIPTS/state.py" start-round "$PR")"
+  eval "$("$SCRIPTS/state.py" start-round "$STATE_PR")"
 
   # Step 2: 並列レビュー
-  [ "$ONLY" != "gemini" ] && "$SCRIPTS/launch-codex.sh"  "$PR" "$ROUND"
-  [ "$ONLY" != "codex"  ] && "$SCRIPTS/launch-gemini.sh" "$PR" "$ROUND"
-  # 監視は monitor.py が timeout / stall / early-error / result.json を多軸で判定
-  "$SCRIPTS/monitor.py" "$PR" "${ONLY:-both}" || handle_review_failure $?
+  [ "$ONLY" != "gemini" ] && "$SCRIPTS/launch-codex.sh"  "$STATE_PR" "$ROUND"
+  [ "$ONLY" != "codex"  ] && "$SCRIPTS/launch-gemini.sh" "$STATE_PR" "$ROUND"
+  # 監視: 既定 timeout=7 分 / stall=3 分。失敗時は対象プロセスを kill して返す。
+  "$SCRIPTS/monitor.py" "$STATE_PR" "${ONLY:-both}" || handle_review_failure $?
 
-  [ "$ONLY" != "gemini" ] && "$SCRIPTS/state.py" read-result "$PR" codex
-  [ "$ONLY" != "codex"  ] && "$SCRIPTS/state.py" read-result "$PR" gemini
+  [ "$ONLY" != "gemini" ] && "$SCRIPTS/state.py" read-result "$STATE_PR" codex
+  [ "$ONLY" != "codex"  ] && "$SCRIPTS/state.py" read-result "$STATE_PR" gemini
 
   # Step 3: 判定 (0=approved/2=continue)
-  if "$SCRIPTS/state.py" judge "$PR"; then break; fi
+  if "$SCRIPTS/state.py" judge "$STATE_PR"; then break; fi
 
   # Step 4: 振動検知 (4=oscillation)
-  "$SCRIPTS/state.py" check-oscillation "$PR" || [ $? -eq 2 ] || exit 4
+  "$SCRIPTS/state.py" check-oscillation "$STATE_PR" || [ $? -eq 2 ] || exit 4
 
-  # Step 5: 修正サブエージェント起動 (Agent tool) → /tmp/fix-pr$PR-result.json
+  # Step 5: 修正サブエージェント起動 (Agent tool) → /tmp/fix-pr<current_pr>-result.json
   #   - メインで Agent(subagent_type=general-purpose, ...) を呼ぶ。docs/02 参照
   # Step 5 後段: fix 戻り値マージ + CI 分類 (3=code-fail で中断)
-  "$SCRIPTS/state.py" merge-fix "$PR"
+  "$SCRIPTS/state.py" merge-fix "$STATE_PR"
 
-  # Step 6: PR ローテーション判定 (0=rotate/2=keep)
-  if "$SCRIPTS/state.py" should-rotate "$PR"; then
-    eval "$("$SCRIPTS/rotate-pr.sh" "$PR")"
-    "$SCRIPTS/state.py" set-current-pr "$PR" "$NEW_PR"
-    PR=$NEW_PR
+  # Step 6: PR ローテーション判定 (0=rotate/2=keep)。state.json の current_pr を内部更新。
+  if "$SCRIPTS/state.py" should-rotate "$STATE_PR"; then
+    eval "$("$SCRIPTS/rotate-pr.sh" "$STATE_PR")"   # NEW_PR を eval で取り込む
+    "$SCRIPTS/state.py" set-current-pr "$STATE_PR" "$NEW_PR"
+    # NOTE: STATE_PR は変えない。次ループの scripts も $STATE_PR を渡す。
   fi
 done
 
 # Step 8: 終了処理 (deferred nit + ラウンドサマリ)
-"$SCRIPTS/state.py" report "$PR"
+"$SCRIPTS/state.py" report "$STATE_PR"
 ```
 
 各ステップの内容と契約（state.json / result.json スキーマ等）の詳細は:

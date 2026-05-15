@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
 # PR rotation — squash + 新ブランチ + 新 PR.
 #
-# Usage: rotate-pr.sh <PR>
+# Usage: rotate-pr.sh <STATE_PR>
 #
-# 既存ブランチを squash した新ブランチを作り、旧 PR を close、新 PR を作成する。
+# 引数 STATE_PR は state.json の key (= 最初に init した PR 番号)。
+# 閉じる「現在の PR」は state.json の `current_pr` を読む。
+#
+# 既存ブランチを squash した新ブランチを作り、旧 PR (=current_pr) を close、新 PR を作成する。
 # 新 PR 番号を stdout に "NEW_PR=<番号>" / "NEW_PR_URL=<url>" 形式で出力。
 #
 # state.json の current_pr / pr_history 更新は `state.py set-current-pr` で別途行う。
 
 set -euo pipefail
 
-OLD_PR=${1:?PR required}
+STATE_PR=${1:?STATE_PR required}
 
-STATE=/tmp/cross-review-pr$OLD_PR-state.json
+STATE=/tmp/cross-review-pr$STATE_PR-state.json
 [ -s "$STATE" ] || { echo "state.json not found: $STATE" >&2; exit 1; }
 
 WORKTREE=$(jq -r '.worktree_path' "$STATE")
+OLD_PR=$(jq -r '.current_pr' "$STATE")
 ROUND_IN_PR=$(jq --argjson p "$OLD_PR" '[.rounds[] | select(.pr == $p)] | length' "$STATE")
 
 cd "$WORKTREE"

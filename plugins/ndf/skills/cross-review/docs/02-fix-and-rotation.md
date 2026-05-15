@@ -117,7 +117,7 @@ worktree 外を触ると競合します。
 ### Step 5 後段: fix 戻り値マージ + CI 分類
 
 ```bash
-if "$SCRIPTS/state.py" merge-fix "$PR"; then
+if "$SCRIPTS/state.py" merge-fix "$STATE_PR"; then
   : # exit 0 = continue
 elif [ $? -eq 3 ]; then
   exit 3  # final=error（コード関連 CI 失敗 or fix 戻り値ファイル欠落）
@@ -139,11 +139,10 @@ fi
 ## Step 6: PR ローテーション判定
 
 ```bash
-if "$SCRIPTS/state.py" should-rotate "$PR"; then
-  eval "$("$SCRIPTS/rotate-pr.sh" "$PR")"
-  # 取り込まれる変数: NEW_PR, NEW_PR_URL, NEW_BRANCH
-  "$SCRIPTS/state.py" set-current-pr "$PR" "$NEW_PR"
-  PR=$NEW_PR
+if "$SCRIPTS/state.py" should-rotate "$STATE_PR"; then
+  eval "$("$SCRIPTS/rotate-pr.sh" "$STATE_PR")"   # NEW_PR / NEW_PR_URL / NEW_BRANCH を取り込む
+  "$SCRIPTS/state.py" set-current-pr "$STATE_PR" "$NEW_PR"
+  # NOTE: STATE_PR は **絶対に変えない**。次ループの scripts も $STATE_PR で呼ぶ。
 fi
 ```
 
@@ -152,16 +151,20 @@ exit 0 を返す（rotate 要）。それ以外は exit 2（keep）。
 
 `rotate-pr.sh` が内部で行う処理:
 
-1. 既存ブランチを **squash 統合** した新ブランチ作成
-2. 旧 PR に「ローテーションのため close」コメント + close
-3. 新 PR 作成（タイトル末尾に `(rotated)` 付与）
-4. 新 PR 番号 / URL / ブランチ名を stdout に KEY=VALUE で吐く
+1. state.json から `current_pr` (= 旧 PR) と `worktree_path` を読む
+2. 既存ブランチを **squash 統合** した新ブランチ作成
+3. 旧 PR に「ローテーションのため close」コメント + close
+4. 新 PR 作成（タイトル末尾に `(rotated)` 付与）
+5. 新 PR 番号 / URL / ブランチ名を stdout に KEY=VALUE で吐く
 
 `state.py set-current-pr` が `state.json` の `current_pr` / `pr_history` を更新。
 
-> ⚠ **重要**: state.json のファイル名は **最初に init した PR 番号** がキー。
-> rotation 後も `state.py` の `<PR>` 引数には **最初の PR 番号** を渡し続ける
-> （内部的に `current_pr` を参照する）。
+> ⚠ **重要**: state.json のファイル名は **最初に init した PR 番号** がキー
+> (`$STATE_PR`)。rotation 後も全 scripts の **第 1 引数には常に `$STATE_PR`** を渡す。
+> 内部的に `state.json.current_pr` を読んで「現在の PR」を解決する設計。
+> `PR=$NEW_PR` 等で shell 変数の側を切り替えると、次ループの `state.py start-round`
+> が `/tmp/cross-review-pr<NEW_PR>-state.json` を探して `state.json not found` で
+> 止まる。
 
 ## Step 7: 次ラウンドへ
 
@@ -172,7 +175,7 @@ Step 1 に戻る。
 ループ終了時（`final` 確定後）、ラウンドサマリと残 deferred nit を表示:
 
 ```bash
-"$SCRIPTS/state.py" report "$PR"
+"$SCRIPTS/state.py" report "$STATE_PR"
 ```
 
 `report` は以下を Markdown で吐く:

@@ -26,6 +26,38 @@ SKILL の I/O 契約 (state.json / result.json / payload.json スキーマ) は�
 - SKILL.md / docs/01,02 を「スクリプト呼び出し」形式に置換。state.json と
   result.json のスキーマは docs に残し、実装は scripts/ にカプセル化。
 
+PR #72 の実機テストで得た codex / gemini からの指摘および追加で見つかったバグの
+対応（同 v4.6.1 内で実施）:
+
+- **`monitor.py`**:
+  - cmdline 検証順序を「alive 確認後のみ」に変更。プロセスが既に死んでいる場合は
+    cmdline 不一致でも PIDFILE_BAD にならず、result.json の有無で OK 判定する
+    (旧実装は完了済 launcher を誤って失敗扱いしていた)。
+  - EARLY_ERROR パターンを **行頭限定** + benign フィルタに改修。diff / doc 引用に
+    `401 Unauthorized` などのキーワードが含まれても誤検知しなくなった。
+  - TIMEOUT / STALLED / EARLY_ERROR / PIDFILE_BAD で返るとき、対象プロセスに
+    SIGTERM (3 秒後に SIGKILL) を送信。残存プロセスが後から `gh api` 投稿や
+    result.json 書き込みを行ってメインと競合する問題を解消。
+  - stall 判定を err.log のみから **err.log + stdout.log の合計サイズ** に拡張。
+  - **デフォルト値変更**: hard timeout 30 分 → **7 分**、stall timeout 10 分 → **3 分**。
+  - 未使用 import `field` を削除。
+- **`state.py`**:
+  - `gh api --paginate` の JSON ストリーミング処理を `--jq` ベースに変更
+    (旧: `json.loads(r.stdout)` は複数ページで JSONDecodeError → 空配列 →
+    既存コメントスナップショットが空になり重複指摘禁止が無効化されていた)。
+  - `st["rounds"][-1]` への参照前に空チェックを追加し、初期化失敗時の
+    IndexError を防止 (read-result / judge / merge-fix の 3 箇所)。
+  - 未使用 import `os` を削除。
+- **`launch-codex.sh` / `launch-gemini.sh` / `rotate-pr.sh`**:
+  - 引数を `STATE_PR` (= state.json の key, 初期 PR) に統一。レビュー対象の
+    「現在の PR」は state.json の `current_pr` を内部で読む。
+    旧実装は PR rotation 後にメイン側で `PR=$NEW_PR` に切り替えると state.json
+    パスが見つからなくなる設計矛盾があった。
+- **`SKILL.md` / `docs/01,02`**:
+  - bash テンプレートを `$STATE_PR` 固定で書き直し、rotation 後も同じ変数で
+    全 scripts を呼ぶ手順に統一。
+  - 新デフォルト (timeout=7 分 / stall=3 分) を反映。
+
 ### v4.6.0 (cross-review skill 改訂 + review/fix の result.json 拡張)
 
 実運用で得た失敗パターンの対策を `cross-review` skill に反映し、関連する

@@ -1,24 +1,28 @@
 #!/usr/bin/env bash
 # cross-review gemini launcher (trusted directory 対策込み).
 #
-# Usage: launch-gemini.sh <PR> <ROUND>
+# Usage: launch-gemini.sh <STATE_PR> <ROUND>
+#
+# 引数 STATE_PR は state.json の key (= 最初に init した PR 番号)。
+# レビュー対象の PR は state.json の `current_pr` を読む。
 #
 # 注意:
 #   - worktree のような新規パスは untrusted 判定で --yolo が "default" に降格する。
 #     `--skip-trust` と `GEMINI_CLI_TRUST_WORKSPACE=true` を **両方** 必須とする。
-#   - 完了判定は pidfile + `kill -0` で。`pgrep -fa` は long prompt 引数で誤検知するため不可。
+#   - 完了判定は monitor.py が pidfile + sentinel + result.json で多軸判定する。
 
 set -euo pipefail
 
-PR=${1:?PR required}
+STATE_PR=${1:?STATE_PR required}
 ROUND=${2:?ROUND required}
 
-STATE=/tmp/cross-review-pr$PR-state.json
+STATE=/tmp/cross-review-pr$STATE_PR-state.json
 [ -s "$STATE" ] || { echo "state.json not found: $STATE" >&2; exit 1; }
 
 WORKTREE=$(jq -r '.worktree_path' "$STATE")
 REPO=$(jq -r '.repo' "$STATE")
 EVENT_DOWNGRADE=$(jq -r '.event_downgrade // false' "$STATE")
+PR=$(jq -r '.current_pr' "$STATE")
 SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
 
 PROMPT=/tmp/gemini-review-pr$PR-prompt.md

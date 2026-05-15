@@ -16,9 +16,11 @@ pidfile stale / result.json 不在) を構造化して扱う。
   3. **early-error pattern**: err.log に既知の致命的キーワードが出たら即中断
   4. **result.json**: プロセス終了後に `/tmp/<agent>-review-pr<PR>-result.json` が
      生成されていなければ失敗扱い
-  5. **hard timeout**: 既定 30 分。`--timeout` または `MONITOR_TIMEOUT` で上書き可
-  6. **stall timeout**: err.log のサイズが既定 10 分変化しなければ stalled として中断
-     (`--stall-timeout` または `MONITOR_STALL` で上書き可)
+  5. **hard timeout**: 既定 7 分。`--timeout` または `MONITOR_TIMEOUT` で上書き可
+  6. **stall timeout**: err.log + stdout.log の合計サイズが既定 3 分変化しなければ
+     STALLED として中断 (`--stall-timeout` または `MONITOR_STALL` で上書き可)
+  7. **失敗時 kill**: TIMEOUT / STALLED / EARLY_ERROR / PIDFILE_BAD で返るとき、
+     対象プロセスを SIGTERM (3 秒後に SIGKILL) で停止する
 
 Usage:
   monitor.py <PR> <target>          target ∈ {codex, gemini, both}
@@ -43,39 +45,46 @@ import json
 import os
 import pathlib
 import re
+import signal
 import sys
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 
 # ---------- 設定 ----------
 
-DEFAULT_TIMEOUT = int(os.environ.get("MONITOR_TIMEOUT", "1800"))   # 30 min
-DEFAULT_STALL = int(os.environ.get("MONITOR_STALL", "600"))        # 10 min no progress
-DEFAULT_POLL = int(os.environ.get("MONITOR_POLL", "15"))           # 15 sec
+DEFAULT_TIMEOUT = int(os.environ.get("MONITOR_TIMEOUT", "420"))    # 7 min
+DEFAULT_STALL = int(os.environ.get("MONITOR_STALL", "180"))       # 3 min no progress
+DEFAULT_POLL = int(os.environ.get("MONITOR_POLL", "15"))          # 15 sec
 
-# err.log 内で見つけたら即中断する致命的パターン
+# err.log の行頭に近い形で出る致命的パターン（substring 検索ではない）。
+# `^` (行頭) を必須として、diff のコード本文 / doc の引用 / インラインコメント本文に
+# 同じキーワードが出ても誤検知しないようにする。
 EARLY_ERROR_PATTERNS = [
-    re.compile(r"\bpanic:", re.IGNORECASE),
-    re.compile(r"^Traceback ", re.MULTILINE),
-    re.compile(r"\b(Permission denied|Authentication failed|401 Unauthorized)\b"),
-    re.compile(r"\b(403 Forbidden|429 Too Many Requests)\b"),
-    re.compile(r"\bfatal:", re.IGNORECASE),
-    re.compile(r"\bquota exceeded\b", re.IGNORECASE),
-    re.compile(r"\bConnection refused\b"),
-    # gemini 固有: untrusted directory で YOLO が落ちる
-    re.compile(r"Approval mode overridden to \"default\""),
-    # codex 固有: API キーやサンドボックスエラー
-    re.compile(r"sandbox error", re.IGNORECASE),
-    re.compile(r"API key (not found|missing|invalid)", re.IGNORECASE),
+    # 行頭または `: ` の直後など、典型的な error 出力フォーマット
+    re.compile(r"^(?:Error|FATAL|fatal|panic|PANIC|Traceback)[: ]", re.MULTILINE),
+    # HTTP エラーステータス行 (`HTTP/1.1 401 Unauthorized` 等)
+    re.compile(r"^HTTP/\d\S* (?:401|403|429) ", re.MULTILINE),
+    # gemini 固有: untrusted directory で YOLO が降格される
+    re.compile(r'^Approval mode overridden to "default"', re.MULTILINE),
+    # 認証 / クオータ系（行頭限定）
+    re.compile(r"^(?:Authentication failed|Permission denied)", re.MULTILINE),
+    re.compile(r"^.*\b(?:quota exceeded|rate limit exceeded)\b", re.MULTILINE | re.IGNORECASE),
+    re.compile(r"^.*\bAPI key (?:not found|missing|invalid)", re.MULTILINE | re.IGNORECASE),
+    # codex 固有: sandbox エラー（行頭 + 末尾近辺）
+    re.compile(r"^.*\bsandbox error\b", re.MULTILINE | re.IGNORECASE),
 ]
 
-# False positive 避けのためのホワイトリスト（致命的でないが似た語）
+# 文脈に含まれていたら benign（doc 引用 / コードレビューコメント等）と見なし誤検知扱い
 EARLY_ERROR_BENIGN = [
-    re.compile(r"warning: ", re.IGNORECASE),
-    re.compile(r"\bdeprecat", re.IGNORECASE),
+    # diff のコンテキスト行 (` `, `+`, `-` で始まり、その後 markdown 表記が来る)
+    re.compile(r"^[ +-].*[\|`]", re.MULTILINE),
+    # markdown のリスト / 引用
+    re.compile(r"^\s*[-*>]\s", re.MULTILINE),
+    # warning は致命ではない
+    re.compile(r"^warning: ", re.IGNORECASE | re.MULTILINE),
 ]
 
 CODEX_SENTINEL = re.compile(r"^tokens used$", re.MULTILINE)
@@ -136,6 +145,30 @@ def _pid_alive(pid: int) -> bool:
         return False
     except OSError:
         return False
+
+
+def _kill_pid(pid: int, sigterm_grace: float = 3.0) -> None:
+    """対象プロセスに SIGTERM、`sigterm_grace` 秒後も生きていたら SIGKILL。
+
+    TIMEOUT / STALLED / EARLY_ERROR で監視を打ち切るとき、対象プロセスが残ったまま
+    だと後から `gh api` 投稿や result.json 書き込みを実行してメインフローと
+    競合する。失敗扱いで返るときは必ず停止させる。
+    """
+    if pid <= 0:
+        return
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError:
+        return
+    deadline = time.monotonic() + sigterm_grace
+    while time.monotonic() < deadline:
+        if not _pid_alive(pid):
+            return
+        time.sleep(0.5)
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
 
 
 def _pid_cmdline_matches(pid: int, expected: str) -> Optional[bool]:
@@ -225,43 +258,58 @@ def monitor_agent(
         return status
 
     status.pid = pid
-    # cmdline 検証 (PID 再利用対策)
-    cmdline_ok = _pid_cmdline_matches(pid, agent)
-    if cmdline_ok is False:
-        status.status = "PIDFILE_BAD"
-        status.exit_code = 6
-        status.detail = f"pid {pid} cmdline does not contain '{agent}' (stale pidfile?)"
-        _emit_log(log_prefix, agent, status)
-        return status
+    # cmdline 検証 (PID 再利用対策) は **プロセスが生きていると確認できたときのみ** 行う。
+    # 起動直後に既にプロセスが exit していると /proc/<pid> が消えるか、別プロセスに
+    # 再利用されている可能性があり、ここで PIDFILE_BAD を返すと「完了している（result.json は出ている）」
+    # ケースを誤って失敗にしてしまう。alive=True と確認した瞬間のみ cmdline 一致を検証する。
 
     last_err_size = paths.err_log.stat().st_size if paths.err_log.exists() else 0
     last_progress = time.monotonic()
+    cmdline_validated = False
 
     while True:
         elapsed = time.monotonic() - started
         status.elapsed = elapsed
 
-        # 1. hard timeout
+        # 1. プロセス生存確認 → 死んでいたら最終判定へ (result.json 存在をチェック)
+        alive = _pid_alive(pid)
+        if agent == "codex":
+            status.sentinel_seen = _scan_codex_sentinel(paths.err_log)
+
+        if alive and not cmdline_validated:
+            # cmdline 検証は alive 確認後に 1 回だけ。生きていない瞬間に proc/<pid> を読むと
+            # ファイル不在で None 扱いになり判定不能のため。
+            cmdline_ok = _pid_cmdline_matches(pid, agent)
+            if cmdline_ok is False:
+                _kill_pid(pid)
+                status.status = "PIDFILE_BAD"
+                status.exit_code = 6
+                status.detail = f"pid {pid} cmdline does not contain '{agent}' (stale pidfile?)"
+                _emit_log(log_prefix, agent, status)
+                return status
+            if cmdline_ok is True:
+                cmdline_validated = True
+
+        # 2. hard timeout
         if elapsed >= timeout:
+            if alive:
+                _kill_pid(pid)
             status.status = "TIMEOUT"
             status.exit_code = 2
             status.detail = f"hard timeout {timeout}s reached (pid {pid})"
             _emit_log(log_prefix, agent, status)
             return status
 
-        # 2. early error
+        # 3. early error
         err = _scan_early_errors(paths.err_log)
         if err:
+            if alive:
+                _kill_pid(pid)
             status.status = "EARLY_ERROR"
             status.exit_code = 4
             status.detail = f"early error in err.log: {err[:200]}"
             _emit_log(log_prefix, agent, status)
             return status
-
-        # 3. プロセス生存 + sentinel チェック
-        alive = _pid_alive(pid)
-        if agent == "codex":
-            status.sentinel_seen = _scan_codex_sentinel(paths.err_log)
 
         if not alive:
             # プロセス終了 — result.json を確認
@@ -280,19 +328,25 @@ def monitor_agent(
             _emit_log(log_prefix, agent, status)
             return status
 
-        # 4. stall detection
-        if paths.err_log.exists():
-            cur = paths.err_log.stat().st_size
-            status.err_log_size = cur
-            if cur != last_err_size:
-                last_err_size = cur
-                last_progress = time.monotonic()
+        # 4. stall detection (err.log と stdout.log の **両方** をモニタ。
+        # gemini は stdout 側だけ進捗が出るケースがあるため、片方でも更新があれば
+        # progress として扱う)
+        progress_size = 0
+        for p in (paths.err_log, paths.stdout_log):
+            if p.exists():
+                progress_size += p.stat().st_size
+        status.err_log_size = progress_size
+        if progress_size != last_err_size:
+            last_err_size = progress_size
+            last_progress = time.monotonic()
         if (time.monotonic() - last_progress) >= stall_timeout:
+            if alive:
+                _kill_pid(pid)
             status.status = "STALLED"
             status.exit_code = 5
             status.detail = (
-                f"no err.log progress for {stall_timeout}s "
-                f"(pid {pid} still alive, last size {last_err_size}B)"
+                f"no log progress for {stall_timeout}s "
+                f"(pid {pid}, last size {last_err_size}B)"
             )
             _emit_log(log_prefix, agent, status)
             return status

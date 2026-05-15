@@ -1,25 +1,27 @@
 #!/usr/bin/env bash
 # cross-review codex launcher.
 #
-# Usage: launch-codex.sh <PR> <ROUND>
+# Usage: launch-codex.sh <STATE_PR> <ROUND>
 #
-# state.json から worktree / event_downgrade / repo を読み、headRefOid を gh で
-# 取得した上で、codex に /ndf:review 相当のプロンプトを渡してバックグラウンド実行する。
-# AI が gh api で直接投稿し、/tmp/codex-review-pr<PR>-result.json にサマリを書く契約。
+# 引数 STATE_PR は **state.json の key (= 最初に init した PR 番号)**。
+# rotation 後も state.json の場所は変わらないため、ここに渡すのは常に初期 PR。
+# gh コマンドに使う「現在のレビュー対象 PR」は state.json の `current_pr` を読む。
 #
-# 完了判定は err.log の sentinel "^tokens used$" を wait-review.sh が検知する。
+# 状態ファイル: /tmp/codex-review-pr<CURRENT_PR>-{result,err,stdout,pid}.json
+# (TMP は CURRENT_PR ベース — rotation で PR が変わると新規発行されるため衝突しない)
 
 set -euo pipefail
 
-PR=${1:?PR required}
+STATE_PR=${1:?STATE_PR required}
 ROUND=${2:?ROUND required}
 
-STATE=/tmp/cross-review-pr$PR-state.json
+STATE=/tmp/cross-review-pr$STATE_PR-state.json
 [ -s "$STATE" ] || { echo "state.json not found: $STATE" >&2; exit 1; }
 
 WORKTREE=$(jq -r '.worktree_path' "$STATE")
 REPO=$(jq -r '.repo' "$STATE")
 EVENT_DOWNGRADE=$(jq -r '.event_downgrade // false' "$STATE")
+PR=$(jq -r '.current_pr' "$STATE")
 SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
 
 PROMPT=/tmp/codex-review-pr$PR-prompt.md

@@ -27,7 +27,6 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
-import os
 import pathlib
 import subprocess
 import sys
@@ -119,21 +118,24 @@ def cmd_init(args: argparse.Namespace) -> None:
     else:
         info(f"↻ 既存 worktree 流用: {worktree}")
 
-    # 既存コメントスナップショット（重複指摘防止）
+    # 既存コメントスナップショット（重複指摘防止）。
+    # NOTE: `gh api --paginate` は REST のページごとに **JSON 配列が連続して** stdout に出る
+    # ため、`json.loads(r.stdout)` は複数ページで JSONDecodeError になり、コメントが空に
+    # 落ちる。`--jq '.[] | ...'` で gh CLI 側に整形させ、行単位で素直に書き出す。
     repo = _sh(["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
+    jq_filter = (
+        r'.[] | "\(.path // "?"):\(.line // .original_line // "?") '
+        r'[\(.user.login)] \(.body // "" | split("\n")[0])"'
+    )
     r = subprocess.run(
-        ["gh", "api", f"repos/{repo}/pulls/{pr}/comments", "--paginate"],
+        ["gh", "api", f"repos/{repo}/pulls/{pr}/comments", "--paginate", "--jq", jq_filter],
         capture_output=True, text=True,
     )
     if r.returncode == 0:
-        try:
-            comments = json.loads(r.stdout) if r.stdout.strip() else []
-        except json.JSONDecodeError:
-            comments = []
-        with _existing_comments_path(pr).open("w") as f:
-            for c in comments:
-                head = (c.get("body") or "").splitlines()[0] if c.get("body") else ""
-                f.write(f"{c.get('path')}:{c.get('line')} [{c.get('user', {}).get('login')}] {head}\n")
+        _existing_comments_path(pr).write_text(r.stdout)
+    else:
+        info(f"⚠ 既存コメント取得失敗: {r.stderr.strip()[:200]}")
+        _existing_comments_path(pr).write_text("")
 
     state = {
         "started_at": _now(),
@@ -206,6 +208,8 @@ def cmd_read_result(args: argparse.Namespace) -> None:
 
     r = json.loads(rfile.read_text())
     st = _load(pr)
+    if not st.get("rounds"):
+        die(f"{agent}: state.rounds が空。`state.py start-round` を先に呼んでください")
     st["rounds"][-1][agent] = {
         "intent": r.get("event"),
         "posted_as": r.get("posted_as", r.get("event")),
@@ -225,6 +229,8 @@ def cmd_judge(args: argparse.Namespace) -> None:
     """
     pr = args.pr
     st = _load(pr)
+    if not st.get("rounds"):
+        die("state.rounds が空。`state.py start-round` を先に呼んでください")
     last = st["rounds"][-1]
     only = st.get("only")
 
@@ -322,6 +328,8 @@ def cmd_merge_fix(args: argparse.Namespace) -> None:
 
     fix = json.loads(ffile.read_text())
     st = _load(pr)
+    if not st.get("rounds"):
+        die("state.rounds が空。`state.py start-round` を先に呼んでください", code=3)
     round_no = st["rounds"][-1]["round"]
 
     st["rounds"][-1]["fix"] = {

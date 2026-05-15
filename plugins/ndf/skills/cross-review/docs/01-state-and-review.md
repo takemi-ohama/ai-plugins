@@ -81,7 +81,7 @@
 SCRIPTS="$CLAUDE_PLUGIN_ROOT/skills/cross-review/scripts"  # or 直接の絶対パス
 
 # state 初期化 / 再開（プリチェック・worktree 作成・既存コメントスナップショットを内部実行）
-eval "$("$SCRIPTS/state.py" init "$PR" \
+eval "$("$SCRIPTS/state.py" init "$STATE_PR" \
           --max-rounds "$MAX_ROUNDS" --rotate-after "$ROTATE_AFTER" \
           ${ONLY:+--only "$ONLY"})"
 
@@ -104,7 +104,7 @@ cd "$WORKTREE"
 ## Step 1: Round 開始判定
 
 ```bash
-eval "$("$SCRIPTS/state.py" start-round "$PR")"
+eval "$("$SCRIPTS/state.py" start-round "$STATE_PR")"
 # eval で取り込まれる変数: ROUND, ROUND_IN_PR, PR, MAX_ROUNDS, ROTATE_AFTER
 ```
 
@@ -120,11 +120,11 @@ eval "$("$SCRIPTS/state.py" start-round "$PR")"
 ### 2.1 launcher 起動 + monitor
 
 ```bash
-[ "$ONLY" != "gemini" ] && "$SCRIPTS/launch-codex.sh"  "$PR" "$ROUND"
-[ "$ONLY" != "codex"  ] && "$SCRIPTS/launch-gemini.sh" "$PR" "$ROUND"
+[ "$ONLY" != "gemini" ] && "$SCRIPTS/launch-codex.sh"  "$STATE_PR" "$ROUND"
+[ "$ONLY" != "codex"  ] && "$SCRIPTS/launch-gemini.sh" "$STATE_PR" "$ROUND"
 
 # monitor.py が多軸で完了判定。exit code で失敗種別を分岐。
-if ! "$SCRIPTS/monitor.py" "$PR" "${ONLY:-both}"; then
+if ! "$SCRIPTS/monitor.py" "$STATE_PR" "${ONLY:-both}"; then
   case $? in
     2) echo "❌ timeout"      ;;  # hard timeout 超過
     3) echo "❌ no result"    ;;  # プロセス終了したが result.json 未生成
@@ -140,12 +140,13 @@ fi
 
 | 軸 | 内容 |
 |---|---|
-| pidfile + `kill -0` | プロセス生存。`/proc/<pid>/cmdline` で agent 名一致も検証 (PID 再利用対策) |
+| pidfile + `kill -0` | プロセス生存確認。alive 確認後に `/proc/<pid>/cmdline` で agent 名一致も検証 (PID 再利用対策)。**プロセスが既に死んでいる場合は result.json の有無のみで OK 判定**する (死亡直後 cmdline 不一致で誤検知しないため) |
 | codex sentinel | err.log に `^tokens used$` 出現で正常完了マーク |
-| early-error | err.log に `401 Unauthorized` / `panic:` / `quota exceeded` / `sandbox error` / `Approval mode overridden to "default"` 等を検出したら即中断 |
-| stall timeout | err.log のサイズが既定 10 分変化しなければ STALLED で中断 (`--stall-timeout` or `MONITOR_STALL` env) |
-| hard timeout | 既定 30 分。`--timeout` or `MONITOR_TIMEOUT` env で上書き |
+| early-error | **行頭限定** で `^Error:` / `^FATAL:` / `^panic:` / `^Traceback ` / `^HTTP/1.1 401\|403\|429` / `^Approval mode overridden to "default"` / `^Authentication failed` / 「quota exceeded」「rate limit exceeded」「API key not found/missing/invalid」「sandbox error」を含む行を検出 (diff/doc 引用文中の同語句は誤検知しないよう anchor + benign フィルタ併用) |
+| stall timeout | err.log + stdout.log の合計サイズが既定 **3 分** 変化しなければ STALLED で中断 (`--stall-timeout` or `MONITOR_STALL` env) |
+| hard timeout | 既定 **7 分**。`--timeout` or `MONITOR_TIMEOUT` env で上書き |
 | result.json 存在 | プロセス終了後、result.json が無ければ NO_RESULT (exit 3) |
+| **失敗時 kill** | TIMEOUT / STALLED / EARLY_ERROR / PIDFILE_BAD で返るときは対象プロセスに SIGTERM → 3 秒後 SIGKILL。残存プロセスが後から `gh api` 投稿や result.json 書き込みを行うのを防ぐ |
 
 > ⚠ **罠**: `nohup ... &` でラッパーシェルは即終了し、ハーネスから
 > 「タスク完了」通知が飛んでくる。これに惑わされず、`monitor.py` で
@@ -187,8 +188,8 @@ launcher が生成するプロンプトに以下を強制している:
 ### 2.4 result.json を state にマージ
 
 ```bash
-[ "$ONLY" != "gemini" ] && "$SCRIPTS/state.py" read-result "$PR" codex
-[ "$ONLY" != "codex"  ] && "$SCRIPTS/state.py" read-result "$PR" gemini
+[ "$ONLY" != "gemini" ] && "$SCRIPTS/state.py" read-result "$STATE_PR" codex
+[ "$ONLY" != "codex"  ] && "$SCRIPTS/state.py" read-result "$STATE_PR" gemini
 ```
 
 `state.rounds[-1].<agent>` に `intent / posted_as / comments / review_url / by_severity` を分離保存する。
@@ -196,7 +197,7 @@ launcher が生成するプロンプトに以下を強制している:
 ## Step 3: 判定（intent ベース）
 
 ```bash
-if "$SCRIPTS/state.py" judge "$PR"; then
+if "$SCRIPTS/state.py" judge "$STATE_PR"; then
   : # exit 0 = approved。ループ終了。
 elif [ $? -eq 2 ]; then
   : # exit 2 = continue → Step 5 (fix)
@@ -218,7 +219,7 @@ intent が `REQUEST_CHANGES` なら継続する。
 ## Step 4: 振動検知
 
 ```bash
-if "$SCRIPTS/state.py" check-oscillation "$PR"; then
+if "$SCRIPTS/state.py" check-oscillation "$STATE_PR"; then
   : # ここには来ない（成功は exit 2 = continue）
 elif [ $? -eq 4 ]; then
   exit 4  # final=oscillation で中断
