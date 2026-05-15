@@ -17,10 +17,18 @@ allowed-tools:
 PR を **codex / gemini 両方** にレビューさせ、両者が `APPROVE` を返すまで
 `/ndf:review` と `/ndf:fix` を自動で回す。
 
-詳細手順は `docs/` 配下に分割している（このファイルは概要のみ）:
+詳細手順は `docs/` 配下に、主要コマンドは `scripts/` 配下に分割している:
 
 - [docs/01-state-and-review.md](docs/01-state-and-review.md) — Step 0〜4 (state init / round / 並列レビュー / 判定 / 振動検知)
 - [docs/02-fix-and-rotation.md](docs/02-fix-and-rotation.md) — Step 5〜8 (サブエージェント修正 / PR ローテーション / 終了処理)
+- [scripts/state.py](scripts/state.py) — state.json 操作（uv 自己完結スクリプト、stdlib のみ）
+- [scripts/launch-codex.sh](scripts/launch-codex.sh) / [scripts/launch-gemini.sh](scripts/launch-gemini.sh) — レビューランチャ
+- [scripts/monitor.py](scripts/monitor.py) — codex/gemini プロセス多軸監視 (sentinel / pidfile / 早期エラー / stall / hard timeout / result.json)
+- [scripts/wait-review.sh](scripts/wait-review.sh) — `monitor.py` の薄ラッパ（互換用）
+- [scripts/rotate-pr.sh](scripts/rotate-pr.sh) — PR ローテーション
+
+メインセッションからは `$SCRIPTS/state.py <subcommand>` 形式で呼ぶだけで、
+state.json の読み書きや AI launcher 起動・完了待ちは全て委譲される。
 
 ## 設計方針
 
@@ -59,77 +67,32 @@ PR を **codex / gemini 両方** にレビューさせ、両者が `APPROVE` を
 - `codex` / `gemini` CLI が動作し、`gh` CLI が認証済み
 - `Agent(subagent_type="general-purpose", ...)` でサブエージェントを起動可能
 
-## 事前確認（Step 0 の前に必ず実行）
+## 事前確認（`state.py init` が自動実施）
 
-ループ開始前に **4 つのプリチェック** を行い、失敗パターンを未然に塞ぐ:
+ループ開始前に **4 つのプリチェック** が必要だが、すべて `scripts/state.py init`
+が内部で実施する。メインは結果を KEY=VALUE 形式で受け取るだけで良い。
 
-### 1. 自分の PR かどうか判定（必須）
+| # | 対策 | スクリプト側で何をするか |
+|---|---|---|
+| 1 | 自分の PR 判定（422 回避） | `gh api user` と `gh pr view --json author` を比較し `is_own_pr` / `event_downgrade` を state.json に書く |
+| 2 | worktree 分離 | `git worktree add /work/worktrees/pr<PR> <head>` を冪等実行 |
+| 3 | gemini trusted directory | `launch-gemini.sh` が `GEMINI_CLI_TRUST_WORKSPACE=true` + `--skip-trust` を必ず併用。さらに **tmp dir は `~/.gemini/tmp/<workspace>/`** を採用し、gemini の workspace 制約 (workspace 外の `read_file` / `write_file` がブロックされる) を回避 |
+| 4 | 既存コメント差分 | `gh api .../comments --paginate` を `$TMP_DIR/cross-review-pr<PR>-existing-comments.txt` に保存し、gemini プロンプトには **内容をインライン埋め込み**、codex プロンプトには path を渡す |
 
-GitHub は **自分の PR には `event: REQUEST_CHANGES` でレビューを投稿できない**
-（`HTTP 422: Review Can not request changes on your own pull request`）。
-判定が必要:
+### intent / posted_as の両保持（最重要）
 
-```bash
-PR=<番号>
-ME=$(gh api user --jq .login)
-AUTHOR=$(gh pr view "$PR" --json author --jq .author.login)
-if [ "$ME" = "$AUTHOR" ]; then
-  EVENT_DOWNGRADE=1   # 後段で REQUEST_CHANGES → COMMENT に強制ダウングレード
-  echo "⚠ 自分の PR — event を COMMENT にダウングレードして投稿"
-fi
-```
-
-**重要**: state.json には **intent（元の AI 判定）と posted（実際に投稿した event）の両方を保持** すること。
-ループ判定は intent ベースで行い、GitHub 投稿は posted ベースに従う:
+GitHub は **自分の PR には `REQUEST_CHANGES` でレビューを投稿できない**
+（`HTTP 422`）。state.json には **両方** を保持する:
 
 ```json
 "codex": {
-  "intent": "REQUEST_CHANGES",   // ← AI の本来の判定。ループ収束判定に使う
-  "posted_as": "COMMENT",        // ← 422 回避でダウングレードした結果
+  "intent": "REQUEST_CHANGES",   // AI の本来判定。ループ収束判定に使う
+  "posted_as": "COMMENT",        // 422 回避でダウングレードした結果
   "comments": 5, "review_url": "..."
 }
 ```
 
-`is_pass()` は `intent` を見ること。`posted_as` で `COMMENT` でもループは続く。
-
-### 2. worktree 分離（並行セッション対策）
-
-別セッションが同じリポジトリで作業している場合、main checkout を奪い合わないよう
-**専用 worktree** を作る:
-
-```bash
-mkdir -p /work/worktrees
-HEAD_BRANCH=$(gh pr view "$PR" --json headRefName --jq .headRefName)
-git fetch origin "$HEAD_BRANCH"
-git worktree add "/work/worktrees/pr$PR" "$HEAD_BRANCH"
-# 以降の全ステップで cd /work/worktrees/pr$PR を強制
-```
-
-state.json に `"worktree_path": "/work/worktrees/pr<PR>"` を記録し、サブエージェント
-にも明示すること。
-
-### 3. gemini の trusted directory チェック
-
-worktree のような新規パスは untrusted と判定され、`--yolo` でも
-`Approval mode overridden to "default"` で実質無効化される。**必ず以下を併用**:
-
-```bash
-GEMINI_CLI_TRUST_WORKSPACE=true gemini --yolo --skip-trust --output-format text -p "..."
-```
-
-（`--skip-trust` 単独でも可だが、env var 併用が確実）
-
-### 4. 既存コメント・既存レビューの確認
-
-重複指摘を避けるため、既存レビュー一覧を取得しておく:
-
-```bash
-gh api "repos/$OWNER_REPO/pulls/$PR/comments" --paginate \
-  | jq -r '.[] | "\(.path):\(.line) [\(.user.login)] \(.body | split("\n")[0])"' \
-  > /tmp/cross-review-pr$PR-existing-comments.txt
-```
-
-これを launcher のプロンプトに添付して「重複指摘禁止」を徹底させる。
+`state.py judge` は `intent` を見るので、ダウングレード投稿してもループは続行する。
 
 ## 全体フロー
 
@@ -166,27 +129,67 @@ flowchart TD
     classDef stop fill:#fdd,stroke:#933
 ```
 
-## 実行ステップ概要
+## 実行ステップ概要（メインの bash 骨組み）
 
-各ステップの bash 詳細は `docs/` を参照。
+各ステップの詳細は `docs/` 参照。メインは以下のテンプレートで scripts/ を呼ぶだけ:
 
-1. **Step 0 — 準備 + state 引き継ぎ**: `/tmp/cross-review-pr<PR>-state.json` を
-   初期化 or 再開。詳細: [docs/01](docs/01-state-and-review.md#step-0-準備--既存-state-引き継ぎ)
-2. **Step 1 — Round 開始判定**: `max-rounds` 超過チェック。
-   詳細: [docs/01](docs/01-state-and-review.md#step-1-round-開始判定)
-3. **Step 2 — 並列レビュー**: codex / gemini launcher を並列起動、各 AI が
-   `gh api` で投稿。詳細: [docs/01](docs/01-state-and-review.md#step-2-codex--gemini-並列レビューai-直接投稿)
-4. **Step 3 — 判定**: 両方 `APPROVE` なら終了、片方でも `REQUEST_CHANGES` なら
-   修正へ。詳細: [docs/01](docs/01-state-and-review.md#step-3-判定)
-5. **Step 4 — 振動検知**: 前ラウンドと `path:line` 重複 50% 以上で中断。
-   詳細: [docs/01](docs/01-state-and-review.md#step-4-振動検知)
-6. **Step 5 — サブエージェント修正**: `general-purpose` で `/ndf:fix --defer-nit`
-   を実行。詳細: [docs/02](docs/02-fix-and-rotation.md#step-5-修正--必ずサブエージェント経由)
-7. **Step 6 — PR ローテーション判定**: `round_in_pr >= rotate-after` なら
-   `rotate_pr` 実行。詳細: [docs/02](docs/02-fix-and-rotation.md#step-6-pr-ローテーション判定)
-8. **Step 7 — 次ラウンドへ** → Step 1 に戻る
-9. **Step 8 — 終了処理**: deferred nit をバッチ問い合わせ（1 回だけ）。
-   詳細: [docs/02](docs/02-fix-and-rotation.md#step-8-終了処理--deferred-nit-のバッチ問い合わせ)
+```bash
+SCRIPTS="$CLAUDE_PLUGIN_ROOT/skills/cross-review/scripts"
+
+# STATE_PR は state.json のキー (= 最初に init した PR 番号)。
+# rotation 後も state.json のパスは変わらないため、scripts/ への引数には常に
+# STATE_PR を渡す。「現在レビュー中の PR」は state.json の current_pr を内部参照する。
+STATE_PR=$INITIAL_PR
+
+# Step 0: state 初期化 / 再開
+eval "$("$SCRIPTS/state.py" init "$STATE_PR" \
+          --max-rounds "$MAX_ROUNDS" --rotate-after "$ROTATE_AFTER" \
+          ${ONLY:+--only "$ONLY"})"
+# eval で TMP_DIR がセットされる。後続スクリプトに env として伝播させる。
+export CROSS_REVIEW_TMP_DIR="$TMP_DIR"
+cd "$WORKTREE"
+
+while :; do
+  # Step 1: round 開始判定 (max_rounds 到達で exit 1)
+  eval "$("$SCRIPTS/state.py" start-round "$STATE_PR")"
+
+  # Step 2: 並列レビュー
+  [ "$ONLY" != "gemini" ] && "$SCRIPTS/launch-codex.sh"  "$STATE_PR" "$ROUND"
+  [ "$ONLY" != "codex"  ] && "$SCRIPTS/launch-gemini.sh" "$STATE_PR" "$ROUND"
+  # 監視: 既定 timeout=7 分 / stall=3 分。失敗時は対象プロセスを kill して返す。
+  "$SCRIPTS/monitor.py" "$STATE_PR" "${ONLY:-both}" || handle_review_failure $?
+
+  [ "$ONLY" != "gemini" ] && "$SCRIPTS/state.py" read-result "$STATE_PR" codex
+  [ "$ONLY" != "codex"  ] && "$SCRIPTS/state.py" read-result "$STATE_PR" gemini
+
+  # Step 3: 判定 (0=approved/2=continue)
+  if "$SCRIPTS/state.py" judge "$STATE_PR"; then break; fi
+
+  # Step 4: 振動検知 (4=oscillation)
+  "$SCRIPTS/state.py" check-oscillation "$STATE_PR" || [ $? -eq 2 ] || exit 4
+
+  # Step 5: 修正サブエージェント起動 (Agent tool) → /tmp/fix-pr<STATE_PR>-result.json
+  #   - メインで Agent(subagent_type=general-purpose, ...) を呼ぶ。docs/02 参照
+  #   - tmp パスは launcher / monitor.py と同じく **STATE_PR ベース** で統一
+  # Step 5 後段: fix 戻り値マージ + CI 分類 (3=code-fail で中断)
+  "$SCRIPTS/state.py" merge-fix "$STATE_PR"
+
+  # Step 6: PR ローテーション判定 (0=rotate/2=keep)。state.json の current_pr を内部更新。
+  if "$SCRIPTS/state.py" should-rotate "$STATE_PR"; then
+    eval "$("$SCRIPTS/rotate-pr.sh" "$STATE_PR")"   # NEW_PR を eval で取り込む
+    "$SCRIPTS/state.py" set-current-pr "$STATE_PR" "$NEW_PR"
+    # NOTE: STATE_PR は変えない。次ループの scripts も $STATE_PR を渡す。
+  fi
+done
+
+# Step 8: 終了処理 (deferred nit + ラウンドサマリ)
+"$SCRIPTS/state.py" report "$STATE_PR"
+```
+
+各ステップの内容と契約（state.json / result.json スキーマ等）の詳細は:
+
+- Step 0〜4 — [docs/01-state-and-review.md](docs/01-state-and-review.md)
+- Step 5〜8 — [docs/02-fix-and-rotation.md](docs/02-fix-and-rotation.md)
 
 ## レビュー body の必須 identifier prefix
 
@@ -210,33 +213,15 @@ flowchart TD
 
 ## CI failure の分類（誤中断防止）
 
-「CI 失敗 → 即 `final=error`」は乱暴。**コード関連 / コード無関係に分類**:
+「CI 失敗 → 即 `final=error`」は乱暴。`scripts/state.py merge-fix` が
+fix 戻り値ファイル (`/tmp/fix-pr<PR>-result.json`) を受け取った際に
+`ci_failed_checks` を以下で分類する:
 
-```bash
-FAILED=$(gh pr checks "$PR" --json name,state \
-  --jq '.[] | select(.state == "FAILURE") | .name')
-
-CODE_FAIL=0
-META_FAIL=0
-for name in $FAILED; do
-  case "$name" in
-    *pint*|*larastan*|*phpstan*|*test*|*lint*|*type*|*build*|*ruff*|*eslint*)
-      CODE_FAIL=1 ;;
-    check_pr_requirements|*assignees*|*reviewers*|*labels*|*meta*)
-      META_FAIL=1 ;;
-    *)
-      CODE_FAIL=1 ;;  # 不明は code-fail 扱い（保守的）
-  esac
-done
-
-if [ "$CODE_FAIL" -eq 1 ]; then
-  jq '.final = "error"' "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
-  echo "❌ コード関連 CI 失敗。中断: $FAILED"; exit 3
-elif [ "$META_FAIL" -eq 1 ]; then
-  echo "⚠ コード無関係 CI 失敗（Assignees 等）。継続: $FAILED"
-  # state.rounds[-1].fix.ci_note に記録するが、ループは続行
-fi
-```
+| 分類 | パターン | 振る舞い |
+|---|---|---|
+| code-fail | `pint` / `larastan` / `phpstan` / `test` / `lint` / `type` / `build` / `ruff` / `eslint` / `tsc` / `mypy` | `final=error` で中断 (exit 3) |
+| meta-only | `check_pr_requirements` / `assignees` / `reviewers` / `labels` / `meta` | `ci_note` に記録して継続 |
+| 不明 | 上記以外 | 保守的に **code-fail 扱い** |
 
 PR メタデータ系の check（Assignees / Reviewers / Labels）は **継続**、
 pint / larastan / test / build などは **中断** を原則とする。
@@ -252,6 +237,8 @@ pint / larastan / test / build などは **中断** を原則とする。
 - ❌ **自分の PR に `REQUEST_CHANGES` で投稿** — 必ず 422。事前判定 + COMMENT ダウングレード
 - ❌ **`gemini --yolo` だけで起動** — trusted directory で YOLO 無効化。`--skip-trust` 併用
 - ❌ **`pgrep -fa <prompt>` で完了判定** — gemini は long prompt が引数に乗り検知失敗。pidfile 必須
+- ❌ **sentinel 単独で完了判定** — codex がクラッシュすると永遠に出ない。`monitor.py` の多軸判定 (pidfile / sentinel / 早期エラー / stall / hard timeout / result.json) を使うこと
+- ❌ **タイムアウトなしで wait** — ハング検知不能。`monitor.py` の hard timeout (30 分既定) + stall timeout (10 分既定) を必ず効かせる
 - ❌ **fix サブエージェントが Resolve をスキップ** — reply だけでは未対応扱い。Resolve まで実行
 - ❌ **review body に identifier prefix を付け忘れる** — GitHub UI 上で誰のレビューか不明になる
 

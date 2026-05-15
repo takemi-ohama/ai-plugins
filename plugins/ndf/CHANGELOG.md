@@ -1,5 +1,76 @@
 # NDF Plugin CHANGELOG
 
+### v4.6.1 (cross-review skill 主要処理のスクリプト化)
+
+`cross-review` skill の主要 bash 処理を `scripts/` 配下に外出し、SKILL.md /
+docs/01,02 から冗長なインライン bash を排除する PATCH リリース。
+SKILL の I/O 契約 (state.json / result.json / payload.json スキーマ) は不変。
+
+- 新規追加:
+  - `scripts/state.py` — state.json 操作 CLI (uv 自己完結 / stdlib のみ)
+    サブコマンド: `init` / `start-round` / `read-result` / `judge` /
+    `check-oscillation` / `merge-fix` / `should-rotate` / `set-current-pr` /
+    `report`
+  - `scripts/launch-codex.sh` / `scripts/launch-gemini.sh` — レビューランチャ
+    (pidfile + sentinel ベース、trusted directory 対策込み)
+  - `scripts/monitor.py` — codex/gemini プロセス多軸監視 CLI
+    (uv 自己完結 / stdlib のみ)。pidfile + `/proc` cmdline 検証 / codex sentinel /
+    早期エラーパターン検出 / err.log stall timeout / hard timeout / result.json
+    存在確認の 6 軸を並列スレッドで判定。exit code で失敗種別を区別
+    (OK=0 / TIMEOUT=2 / NO_RESULT=3 / EARLY_ERROR=4 / STALLED=5 / PIDFILE_BAD=6)。
+    sentinel 単独で完了判定する旧 `wait-review.sh` の取りこぼし
+    (codex クラッシュ時の無限ハング、gemini の untrusted directory 静かな失敗、
+    pidfile stale 等) を解消。
+  - `scripts/wait-review.sh` — `monitor.py` の薄ラッパ（旧 CLI 互換のため残置）
+  - `scripts/rotate-pr.sh` — PR ローテーション (squash + 新ブランチ + 新 PR)
+- SKILL.md / docs/01,02 を「スクリプト呼び出し」形式に置換。state.json と
+  result.json のスキーマは docs に残し、実装は scripts/ にカプセル化。
+
+PR #72 の実機テストで得た codex / gemini からの指摘および追加で見つかったバグの
+対応（同 v4.6.1 内で実施）:
+
+- **`monitor.py`**:
+  - cmdline 検証順序を「alive 確認後のみ」に変更。プロセスが既に死んでいる場合は
+    cmdline 不一致でも PIDFILE_BAD にならず、result.json の有無で OK 判定する
+    (旧実装は完了済 launcher を誤って失敗扱いしていた)。
+  - EARLY_ERROR パターンを **行頭限定** + benign フィルタに改修。diff / doc 引用に
+    `401 Unauthorized` などのキーワードが含まれても誤検知しなくなった。
+  - TIMEOUT / STALLED / EARLY_ERROR / PIDFILE_BAD で返るとき、対象プロセスに
+    SIGTERM (3 秒後に SIGKILL) を送信。残存プロセスが後から `gh api` 投稿や
+    result.json 書き込みを行ってメインと競合する問題を解消。
+  - stall 判定を err.log のみから **err.log + stdout.log の合計サイズ** に拡張。
+  - **デフォルト値変更**: hard timeout 30 分 → **7 分**、stall timeout 10 分 → **3 分**。
+  - 未使用 import `field` を削除。
+- **`state.py`**:
+  - `gh api --paginate` の JSON ストリーミング処理を `--jq` ベースに変更
+    (旧: `json.loads(r.stdout)` は複数ページで JSONDecodeError → 空配列 →
+    既存コメントスナップショットが空になり重複指摘禁止が無効化されていた)。
+  - `st["rounds"][-1]` への参照前に空チェックを追加し、初期化失敗時の
+    IndexError を防止 (read-result / judge / merge-fix の 3 箇所)。
+  - 未使用 import `os` を削除。
+- **`launch-codex.sh` / `launch-gemini.sh` / `rotate-pr.sh`**:
+  - 引数を `STATE_PR` (= state.json の key, 初期 PR) に統一。レビュー対象の
+    「現在の PR」は state.json の `current_pr` を内部で読む。
+    旧実装は PR rotation 後にメイン側で `PR=$NEW_PR` に切り替えると state.json
+    パスが見つからなくなる設計矛盾があった。
+- **tmp ディレクトリの gemini workspace 制約対応**:
+  - 全 scripts の tmp パスを `/tmp/` 直書きから `$CROSS_REVIEW_TMP_DIR` 経由に変更。
+    未設定なら `~/.gemini/tmp/<workspace-basename>/` を自動採用、最終フォールバックは `/tmp/`。
+    gemini CLI は `--yolo --skip-trust` でも workspace 外の `read_file` /
+    `write_file` がブロックされる (`Path not in workspace`) ため、gemini 公式の
+    project temp directory に揃えることで result.json / payload.json の書き出しを
+    成立させる。
+  - 共通ヘルパ `scripts/_tmpdir.sh` を追加 (bash) / `state.py` と `monitor.py` に
+    `_tmp_dir()` 関数を追加 (Python)。`state.py init` は採用した `TMP_DIR` を
+    state.json に記録し、stdout の `TMP_DIR=` で呼び出し側に通知。
+  - SKILL.md のテンプレートで `eval "$(state.py init ...)"` 後に
+    `export CROSS_REVIEW_TMP_DIR="$TMP_DIR"` を行い、後続スクリプトに env として
+    伝播させる手順を追加。
+- **`SKILL.md` / `docs/01,02`**:
+  - bash テンプレートを `$STATE_PR` 固定で書き直し、rotation 後も同じ変数で
+    全 scripts を呼ぶ手順に統一。
+  - 新デフォルト (timeout=7 分 / stall=3 分) を反映。
+
 ### v4.6.0 (cross-review skill 改訂 + review/fix の result.json 拡張)
 
 実運用で得た失敗パターンの対策を `cross-review` skill に反映し、関連する
