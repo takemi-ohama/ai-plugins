@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# cross-review gemini launcher (trusted directory 対策込み).
+#
+# Usage: launch-gemini.sh <PR> <ROUND>
+#
+# 注意:
+#   - worktree のような新規パスは untrusted 判定で --yolo が "default" に降格する。
+#     `--skip-trust` と `GEMINI_CLI_TRUST_WORKSPACE=true` を **両方** 必須とする。
+#   - 完了判定は pidfile + `kill -0` で。`pgrep -fa` は long prompt 引数で誤検知するため不可。
+
+set -euo pipefail
+
+PR=${1:?PR required}
+ROUND=${2:?ROUND required}
+
+STATE=/tmp/cross-review-pr$PR-state.json
+[ -s "$STATE" ] || { echo "state.json not found: $STATE" >&2; exit 1; }
+
+WORKTREE=$(jq -r '.worktree_path' "$STATE")
+REPO=$(jq -r '.repo' "$STATE")
+EVENT_DOWNGRADE=$(jq -r '.event_downgrade // false' "$STATE")
+SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
+
+PROMPT=/tmp/gemini-review-pr$PR-prompt.md
+EXISTING=/tmp/cross-review-pr$PR-existing-comments.txt
+
+cat > "$PROMPT" <<EOF
+# /ndf:review 実行 (cross-review gemini / round $ROUND)
+
+PR #$PR を **gemini の観点でレビューし、gh api で直接 PR に投稿** してください。
+
+## 必須コンテキスト
+- repo: $REPO
+- PR: #$PR
+- commit_id (headRefOid): $SHA
+- worktree: $WORKTREE （**ファイル読み取りは必ず此処の絶対パスを使う**）
+- event_downgrade: $EVENT_DOWNGRADE
+  - true の場合: payload の \`event\` は \`COMMENT\` にすること。
+    body 先頭 prefix の \`<event>\` は本来の intent を書く。
+- 既存コメントスナップショット: $EXISTING （重複指摘禁止）
+
+## 出力契約
+- review body の **先頭行** に必ず以下を入れる:
+  \`\`\`
+  ## 🤖 cross-review | round $ROUND | gemini | <event(intent)>
+  \`\`\`
+- インラインコメントは \`[重要度 / カテゴリ]\` プレフィックス
+- 投稿後、サマリを **/tmp/gemini-review-pr$PR-result.json** に書く（フォーマットは launch-codex.sh と同じ）
+- payload は **/tmp/gemini-review-pr$PR-round$ROUND-payload.json** に保存
+
+## 守るべきこと
+- **リポジトリ編集禁止**。gh api での投稿のみ許可
+- worktree 外のパスは触らない
+- gh api 失敗時は err.log にエラー詳細を残して即時終了
+EOF
+
+cd "$WORKTREE"
+# ⚠ --skip-trust と GEMINI_CLI_TRUST_WORKSPACE=true は両方必須
+GEMINI_CLI_TRUST_WORKSPACE=true nohup gemini --yolo --skip-trust --output-format text \
+  -p "$(cat "$PROMPT")" \
+  > /tmp/gemini-review-pr$PR-stdout.log \
+  2> /tmp/gemini-review-pr$PR-err.log &
+echo $! > /tmp/gemini-review-pr$PR.pid
+disown
+echo "🚀 gemini launched (pid=$(cat /tmp/gemini-review-pr$PR.pid))" >&2

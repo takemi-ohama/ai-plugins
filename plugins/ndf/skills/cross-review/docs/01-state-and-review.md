@@ -3,6 +3,22 @@
 `SKILL.md` 本体から呼び出される **状態ファイル初期化 / ラウンド開始 /
 並列レビュー / 判定 / 振動検知** までの詳細手順。
 
+主要処理は `scripts/` 配下のコマンドに切り出し済み:
+
+| script | 役割 |
+|---|---|
+| `scripts/state.py init` | Step 0 — state 初期化 / 再開 + プリチェック |
+| `scripts/state.py start-round` | Step 1 — round 開始判定 |
+| `scripts/launch-codex.sh` / `scripts/launch-gemini.sh` | Step 2 — review launcher |
+| `scripts/monitor.py` | Step 2 — codex/gemini プロセス多軸監視 |
+| `scripts/wait-review.sh` | Step 2 — `monitor.py` の薄ラッパ（互換用） |
+| `scripts/state.py read-result` | Step 2.5 — result.json マージ |
+| `scripts/state.py judge` | Step 3 — intent ベース pass 判定 |
+| `scripts/state.py check-oscillation` | Step 4 — 振動検知 |
+
+このドキュメントは **state.json スキーマと AI への入出力契約** を一次資料として残す。
+スクリプト側の挙動はソースを直接参照のこと。
+
 ## 状態ファイル
 
 `/tmp/cross-review-pr<番号>-state.json`:
@@ -15,6 +31,9 @@
   "only": null,
   "current_pr": 123,
   "worktree_path": "/work/worktrees/pr123",
+  "repo": "owner/name",
+  "head_branch": "feature/foo",
+  "base_branch": "main",
   "pr_author": "someone",
   "is_own_pr": false,
   "event_downgrade": false,
@@ -59,87 +78,38 @@
 ## Step 0: 準備 + 既存 state 引き継ぎ
 
 ```bash
-PR=<引数 or 直前PR>
-MAX_ROUNDS=6
-ROTATE_AFTER=5
-ONLY=
-STATE=/tmp/cross-review-pr$PR-state.json
+SCRIPTS="$CLAUDE_PLUGIN_ROOT/skills/cross-review/scripts"  # or 直接の絶対パス
 
-if [ -f "$STATE" ] && jq -e '.final == null' "$STATE" >/dev/null; then
-  echo "↻ 前回中断 state から再開（round=$(jq '.rounds | length' "$STATE")）"
-  PR=$(jq -r '.current_pr' "$STATE")
-  WORKTREE=$(jq -r '.worktree_path // ""' "$STATE")
-  [ -n "$WORKTREE" ] && cd "$WORKTREE"
-else
-  # === プリチェック (SKILL.md「事前確認」参照) ===
+# state 初期化 / 再開（プリチェック・worktree 作成・既存コメントスナップショットを内部実行）
+eval "$("$SCRIPTS/state.py" init "$PR" \
+          --max-rounds "$MAX_ROUNDS" --rotate-after "$ROTATE_AFTER" \
+          ${ONLY:+--only "$ONLY"})"
 
-  # 1. 自分の PR 判定 → event ダウングレード設定
-  ME=$(gh api user --jq .login)
-  AUTHOR=$(gh pr view "$PR" --json author --jq .author.login)
-  IS_OWN=false
-  EVENT_DOWNGRADE=false
-  if [ "$ME" = "$AUTHOR" ]; then
-    IS_OWN=true
-    EVENT_DOWNGRADE=true
-    echo "⚠ 自分の PR (author=$ME) — REQUEST_CHANGES → COMMENT に強制ダウングレード"
-  fi
-
-  # 2. worktree 分離
-  HEAD_BRANCH=$(gh pr view "$PR" --json headRefName --jq .headRefName)
-  WORKTREE=/work/worktrees/pr$PR
-  if [ ! -d "$WORKTREE" ]; then
-    git fetch origin "$HEAD_BRANCH"
-    git worktree add "$WORKTREE" "$HEAD_BRANCH"
-  fi
-  cd "$WORKTREE"
-
-  # 3. 既存コメントスナップショット（重複指摘防止）
-  gh api "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)/pulls/$PR/comments" \
-    --paginate | jq -r '.[] | "\(.path):\(.line) [\(.user.login)] \(.body | split("\n")[0])"' \
-    > /tmp/cross-review-pr$PR-existing-comments.txt
-
-  # 4. state 初期化
-  cat > "$STATE" <<JSON
-{
-  "started_at": "$(date -Iseconds)",
-  "max_rounds": $MAX_ROUNDS,
-  "rotate_after": $ROTATE_AFTER,
-  "only": $(test -n "$ONLY" && echo "\"$ONLY\"" || echo "null"),
-  "current_pr": $PR,
-  "worktree_path": "$WORKTREE",
-  "pr_author": "$AUTHOR",
-  "is_own_pr": $IS_OWN,
-  "event_downgrade": $EVENT_DOWNGRADE,
-  "pr_history": [{"pr": $PR, "opened_at": "$(date -Iseconds)", "closed_at": null, "rounds": 0}],
-  "rounds": [],
-  "deferred_nits": [],
-  "final": null
-}
-JSON
-fi
+# eval で取り込まれる変数: PR, WORKTREE, REPO, HEAD_BRANCH, BASE_BRANCH,
+#                        IS_OWN_PR, EVENT_DOWNGRADE, RESUMED
+cd "$WORKTREE"
 ```
 
-**重要**: 以降の全ステップで `cd $WORKTREE` を強制すること。
-特にサブエージェント（fix）を起動するときも、prompt 内で worktree path を明示する。
+`state.py init` が内部で行う処理:
+
+1. 既存 state.json があり `final == null` なら再開
+2. 自分の PR 判定（`gh api user` と `gh pr view --json author` を比較）
+3. worktree 作成（`/work/worktrees/pr<PR>`）
+4. 既存コメントスナップショット → `/tmp/cross-review-pr<PR>-existing-comments.txt`
+5. state.json 書き出し
+
+**重要**: 以降の全ステップで `cd $WORKTREE` を強制。
+サブエージェント（fix）を起動するときも、prompt 内で worktree path を明示する。
 
 ## Step 1: Round 開始判定
 
 ```bash
-TOTAL_ROUNDS=$(jq '.rounds | length' "$STATE")
-ROUND=$((TOTAL_ROUNDS + 1))
-PR=$(jq -r '.current_pr' "$STATE")
-ROUND_IN_PR=$(jq --argjson p $PR '[.rounds[] | select(.pr == $p)] | length' "$STATE")
-ROUND_IN_PR=$((ROUND_IN_PR + 1))
-
-if [ "$TOTAL_ROUNDS" -ge "$MAX_ROUNDS" ]; then
-  jq '.final = "max_rounds" | .ended_at = "'$(date -Iseconds)'"' "$STATE" > "$STATE.tmp"
-  mv "$STATE.tmp" "$STATE"
-  echo "❌ max_rounds=$MAX_ROUNDS 到達。中断。"
-  exit 1
-fi
-
-echo "=== Round $ROUND / $MAX_ROUNDS (PR #$PR, round_in_pr=$ROUND_IN_PR) ==="
+eval "$("$SCRIPTS/state.py" start-round "$PR")"
+# eval で取り込まれる変数: ROUND, ROUND_IN_PR, PR, MAX_ROUNDS, ROTATE_AFTER
 ```
+
+`state.py start-round` は `max_rounds` 超過なら `final=max_rounds` を書いて exit 1。
+それ以外は新しい round エントリを state.rounds に push して KEY=VALUE を吐く。
 
 ## Step 2: codex / gemini 並列レビュー（AI 直接投稿）
 
@@ -147,177 +117,115 @@ echo "=== Round $ROUND / $MAX_ROUNDS (PR #$PR, round_in_pr=$ROUND_IN_PR) ==="
 各 AI が `gh api` で投稿し `/tmp/<agent>-review-pr<PR>-result.json` に
 サマリを書く。**ペイロード本体はメイン context に載せない**。
 
-### 2.1 プロンプト共通要件（両 AI 必須）
-
-両 launcher のプロンプトに以下を必ず含める:
-
-- **headRefOid (commit_id) を明示**: `gh pr view <PR> --json headRefOid` の値。AI が
-  自前で取得すると headRefOid を誤って `baseRefOid` などにする事故が多発する
-- **作業 worktree の絶対パス**: 「**ファイル読み取りは必ず `/work/worktrees/pr<PR>/` 配下の絶対パスを使うこと**」
-- **review body 先頭 prefix の必須化**:
-  ```
-  body の先頭に必ず以下の 1 行を入れてください（fence 不要、そのまま Markdown 見出しとして書く）:
-
-  ## 🤖 cross-review | round <N> | <agent> | <event(intent)>
-
-  例: ## 🤖 cross-review | round 1 | codex | REQUEST_CHANGES
-
-  - <agent>: codex または gemini
-  - <event>: あなたの本来の判定 (REQUEST_CHANGES / APPROVE / COMMENT)
-  ```
-- **event ダウングレード警告**: `is_own_pr=true` のときは `event: COMMENT` で投稿させる
-  （ペイロード上は `event=COMMENT` だが、body 先頭 prefix の `<event>` には本来の intent を書く）
-- **既存コメント差分**: `/tmp/cross-review-pr<PR>-existing-comments.txt` を読み、重複指摘禁止
-
-### 2.2 codex launcher の中身
+### 2.1 launcher 起動 + monitor
 
 ```bash
-# /tmp/launch-codex-review-<PR>.sh
-PR=$1
-WORKTREE=/work/worktrees/pr$PR
-SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
-EVENT_DOWNGRADE=$(jq -r '.event_downgrade // false' /tmp/cross-review-pr$PR-state.json)
+[ "$ONLY" != "gemini" ] && "$SCRIPTS/launch-codex.sh"  "$PR" "$ROUND"
+[ "$ONLY" != "codex"  ] && "$SCRIPTS/launch-gemini.sh" "$PR" "$ROUND"
 
-cat > /tmp/codex-review-pr$PR-prompt.md <<EOF
-（上記 2.1 の要件 + /ndf:review の出力フォーマット）
-- commit_id: $SHA
-- worktree: $WORKTREE
-- event_downgrade: $EVENT_DOWNGRADE
-  → true の場合、ペイロードの "event" は "COMMENT" にすること。
-    ただし body 先頭の prefix には本来の intent を書く。
-EOF
-
-# pidfile + 完了 sentinel で堅牢に
-cd "$WORKTREE"
-nohup codex exec --dangerously-bypass-approvals-and-sandbox \
-  --config reasoning.effort=medium -C "$WORKTREE" \
-  < /tmp/codex-review-pr$PR-prompt.md \
-  > /tmp/codex-review-pr$PR-stdout.log \
-  2> /tmp/codex-review-pr$PR-err.log &
-echo $! > /tmp/codex-review-pr$PR.pid
-disown
+# monitor.py が多軸で完了判定。exit code で失敗種別を分岐。
+if ! "$SCRIPTS/monitor.py" "$PR" "${ONLY:-both}"; then
+  case $? in
+    2) echo "❌ timeout"      ;;  # hard timeout 超過
+    3) echo "❌ no result"    ;;  # プロセス終了したが result.json 未生成
+    4) echo "💥 early error"  ;;  # err.log に致命的パターン
+    5) echo "🛑 stalled"      ;;  # 進捗ログ更新なし
+    6) echo "❓ pidfile bad"  ;;  # 起動失敗 / 不正
+  esac
+  # ラウンドを失敗マークしてリトライ or 中断（state.py side で判断）
+fi
 ```
 
-### 2.3 gemini launcher の中身（trusted directory 対策込み）
+#### `monitor.py` の多軸監視
 
-```bash
-# /tmp/launch-gemini-review-<PR>.sh
-PR=$1
-WORKTREE=/work/worktrees/pr$PR
-SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
-
-cat > /tmp/gemini-review-pr$PR-prompt.md <<EOF
-（上記 2.1 と同じ要件。gemini 向けに「リポジトリ編集禁止、gh api 投稿のみ許可」を強調）
-EOF
-
-cd "$WORKTREE"
-# ⚠ --skip-trust と GEMINI_CLI_TRUST_WORKSPACE=true は両方必須
-# （worktree のような新規パスは untrusted 判定 → YOLO が "default" に降格される）
-GEMINI_CLI_TRUST_WORKSPACE=true nohup gemini --yolo --skip-trust --output-format text \
-  -p "$(cat /tmp/gemini-review-pr$PR-prompt.md)" \
-  > /tmp/gemini-review-pr$PR-stdout.log \
-  2> /tmp/gemini-review-pr$PR-err.log &
-echo $! > /tmp/gemini-review-pr$PR.pid
-disown
-```
-
-### 2.4 launcher 起動 + waiter（pidfile + sentinel ベース）
-
-```bash
-jq --arg ts "$(date -Iseconds)" --argjson r $ROUND --argjson p $PR \
-   '.rounds += [{"round": $r, "pr": $p, "started_at": $ts}]' \
-   "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
-
-[ "$ONLY" != "gemini" ] && bash /tmp/launch-codex-review-$PR.sh $PR
-[ "$ONLY" != "codex" ]  && bash /tmp/launch-gemini-review-$PR.sh $PR
-
-# === waiter ===
-# codex は ^tokens used$ sentinel / gemini は pidfile + kill -0
-wait_codex() {
-  until grep -q '^tokens used$' /tmp/codex-review-pr$PR-err.log 2>/dev/null; do
-    sleep 30
-  done
-}
-wait_gemini() {
-  local pid=$(cat /tmp/gemini-review-pr$PR.pid)
-  until ! kill -0 "$pid" 2>/dev/null; do
-    sleep 30
-  done
-}
-[ "$ONLY" != "gemini" ] && wait_codex
-[ "$ONLY" != "codex" ]  && wait_gemini
-```
+| 軸 | 内容 |
+|---|---|
+| pidfile + `kill -0` | プロセス生存。`/proc/<pid>/cmdline` で agent 名一致も検証 (PID 再利用対策) |
+| codex sentinel | err.log に `^tokens used$` 出現で正常完了マーク |
+| early-error | err.log に `401 Unauthorized` / `panic:` / `quota exceeded` / `sandbox error` / `Approval mode overridden to "default"` 等を検出したら即中断 |
+| stall timeout | err.log のサイズが既定 10 分変化しなければ STALLED で中断 (`--stall-timeout` or `MONITOR_STALL` env) |
+| hard timeout | 既定 30 分。`--timeout` or `MONITOR_TIMEOUT` env で上書き |
+| result.json 存在 | プロセス終了後、result.json が無ければ NO_RESULT (exit 3) |
 
 > ⚠ **罠**: `nohup ... &` でラッパーシェルは即終了し、ハーネスから
-> 「タスク完了」通知が飛んでくる。これに惑わされず、上記 waiter で
+> 「タスク完了」通知が飛んでくる。これに惑わされず、`monitor.py` で
 > 実プロセスの完了を pidfile / sentinel で確認すること。
 >
 > ⚠ **`pgrep -fa <prompt>` で完了判定しない**: gemini は long `-p` プロンプトを
 > 引数に持つため、`grep` のキーワード選定で誤検知する。**pidfile 必須**。
+>
+> ⚠ **sentinel 単独で完了判定しない**: codex がクラッシュすると `tokens used` が
+> 永遠に出ない。`monitor.py` は sentinel と pidfile/result.json/err.log を併用する。
 
-### 2.5 result.json 読み込み（intent / posted_as / by_severity を分離保存）
+### 2.2 AI への入出力契約（両 launcher 共通）
+
+launcher が生成するプロンプトに以下を強制している:
+
+- **headRefOid (commit_id) を明示**: AI が自前で取得すると baseRefOid を誤って入れる事故が多発
+- **作業 worktree の絶対パス**: 「ファイル読み取りは必ず `/work/worktrees/pr<PR>/` 配下の絶対パスを使う」
+- **event ダウングレード警告**: `event_downgrade=true` のときは payload の `event` を `COMMENT` に
+- **既存コメント差分**: `/tmp/cross-review-pr<PR>-existing-comments.txt` を読んで重複指摘禁止
+- **review body 先頭 prefix**:
+  ```
+  ## 🤖 cross-review | round <N> | <agent> | <event(intent)>
+  ```
+  `<event>` は **本来の intent**（`posted_as` ではない）。
+  例: 自分PR で REQUEST_CHANGES を COMMENT にダウングロードしても、prefix は `REQUEST_CHANGES` のまま。
+
+### 2.3 AI が書き出すファイル契約
+
+各 launcher は AI に以下 2 ファイルの書き出しを指示する:
+
+| ファイル | 内容 |
+|---|---|
+| `/tmp/<agent>-review-pr<PR>-result.json` | `{event, posted_as, comments_count, review_url, by_severity}` のサマリ |
+| `/tmp/<agent>-review-pr<PR>-round<R>-payload.json` | `{comments: [{path, line, body, severity}, ...]}` 振動検知用 |
+
+`/ndf:review` の result.json 出力規約に `posted_as` フィールドを含むこと
+（自分PR ダウングレード時に GitHub に実際送った event。デフォルトは `event` と同値）。
+
+### 2.4 result.json を state にマージ
 
 ```bash
-read_result() {
-  local agent=$1
-  local file=/tmp/$agent-review-pr$PR-result.json
-  [ ! -s "$file" ] && { echo "❌ $agent: result 未生成" >&2; return 1; }
-  jq --slurpfile r "$file" --arg agent "$agent" \
-    '.rounds[-1][$agent] = {
-      intent:    $r[0].event,
-      posted_as: ($r[0].posted_as // $r[0].event),
-      comments:  $r[0].comments_count,
-      review_url: $r[0].review_url,
-      by_severity: ($r[0].by_severity // {})
-    }' \
-    "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
-}
-[ "$ONLY" != "gemini" ] && read_result codex
-[ "$ONLY" != "codex" ]  && read_result gemini
+[ "$ONLY" != "gemini" ] && "$SCRIPTS/state.py" read-result "$PR" codex
+[ "$ONLY" != "codex"  ] && "$SCRIPTS/state.py" read-result "$PR" gemini
 ```
 
-`/ndf:review` の result.json 出力規約に `posted_as` フィールドを追加すること
-（自分PR ダウングレード時に GitHub に実際送った event を残す。デフォルトは `event` と同値）。
+`state.rounds[-1].<agent>` に `intent / posted_as / comments / review_url / by_severity` を分離保存する。
 
 ## Step 3: 判定（intent ベース）
 
-**重要**: ループ収束判定は `posted_as` ではなく `intent` を見る。
-自分の PR で `REQUEST_CHANGES → COMMENT` にダウングレードしていても、
-intent が `REQUEST_CHANGES` ならループは継続する。
-
 ```bash
-CODEX_INTENT=$(jq -r ".rounds[-1].codex.intent // \"SKIP\"" "$STATE")
-GEMINI_INTENT=$(jq -r ".rounds[-1].gemini.intent // \"SKIP\"" "$STATE")
-# is_pass: APPROVE / SKIP のみ pass。COMMENT は「軽微な指摘あり」として 1 度は次ラウンドで再評価
-is_pass() { [ "$1" = "APPROVE" ] || [ "$1" = "SKIP" ]; }
-
-if is_pass "$CODEX_INTENT" && is_pass "$GEMINI_INTENT"; then
-  jq '.final = "approved" | .ended_at = "'$(date -Iseconds)'"' "$STATE" > "$STATE.tmp"
-  mv "$STATE.tmp" "$STATE"
-  echo "✅ 両方 APPROVE。収束。"
-  exit 0
-fi
-echo "→ codex=$CODEX_INTENT gemini=$GEMINI_INTENT。修正へ。"
-```
-
-**`COMMENT` の扱い**: 旧設計では `COMMENT` も pass 扱いだったが、自分の PR で
-ダウングレード投稿した場合 intent が REQUEST_CHANGES のままになるため、
-intent が APPROVE か SKIP のときのみ pass とする。AI が本当に COMMENT 判定したら
-`intent="COMMENT"` で来るが、その場合は **指摘内容に critical/major があれば修正へ、
-無ければ pass** とする 2 段判定でもよい:
-
-```bash
-# COMMENT を厳密に評価したい場合の拡張
-if [ "$CODEX_INTENT" = "COMMENT" ]; then
-  CRIT=$(jq -r '.rounds[-1].codex.by_severity.critical // 0' "$STATE")
-  MAJ=$(jq -r '.rounds[-1].codex.by_severity.major // 0' "$STATE")
-  [ "$CRIT" -eq 0 ] && [ "$MAJ" -eq 0 ] && CODEX_INTENT=APPROVE_SOFT
+if "$SCRIPTS/state.py" judge "$PR"; then
+  : # exit 0 = approved。ループ終了。
+elif [ $? -eq 2 ]; then
+  : # exit 2 = continue → Step 5 (fix)
+else
+  exit 1
 fi
 ```
+
+**判定ロジック**:
+
+- `APPROVE` / `SKIP` は pass
+- `COMMENT` は `by_severity.critical == 0 && major == 0` のみ pass（軽微な指摘のみなら通す）
+- `--only` 指定時は反対側を SKIP 扱い
+- ループ収束判定は **必ず `intent`** を見る（`posted_as` ではない）
+
+自分の PR で `REQUEST_CHANGES → COMMENT` にダウングレード投稿していても、
+intent が `REQUEST_CHANGES` なら継続する。
 
 ## Step 4: 振動検知
 
-`/tmp/<agent>-review-pr<PR>-payload.json` から `path:line` を抽出し、
-前ラウンドと現ラウンドを `comm -12` で重複検出。50% 以上重複なら
-`final = "oscillation"` で中断（PR ローテーション後はリセットなので
-`ROUND_IN_PR >= 2` のみで判定）。
+```bash
+if "$SCRIPTS/state.py" check-oscillation "$PR"; then
+  : # ここには来ない（成功は exit 2 = continue）
+elif [ $? -eq 4 ]; then
+  exit 4  # final=oscillation で中断
+fi
+```
+
+各ラウンドの `/tmp/<agent>-review-pr<PR>-round<R>-payload.json` から
+`path:line` を抽出し、前ラウンドとの重複率を計算。**50% 以上重複で中断**。
+
+PR ローテーション直後 (`round_in_pr < 2`) はスキップ。

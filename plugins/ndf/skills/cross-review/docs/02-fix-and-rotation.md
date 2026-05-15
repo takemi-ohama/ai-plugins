@@ -1,4 +1,15 @@
-# 02: 修正 (Step 5) + PR ローテーション (Step 6)
+# 02: 修正 (Step 5) + PR ローテーション (Step 6) + 終了処理 (Step 8)
+
+主要処理は `scripts/` 配下に切り出し済み:
+
+| script | 役割 |
+|---|---|
+| (Agent) | Step 5 — 修正サブエージェント起動（メインからの責務） |
+| `scripts/state.py merge-fix` | Step 5 後段 — fix 戻り値マージ + CI 分類 |
+| `scripts/state.py should-rotate` | Step 6 — rotate 要否判定 |
+| `scripts/rotate-pr.sh` | Step 6 — PR rotation 実行 |
+| `scripts/state.py set-current-pr` | Step 6 — rotation 後の state 更新 |
+| `scripts/state.py report` | Step 8 — deferred nit + ラウンドサマリ |
 
 ## Step 5: 修正 — **必ずサブエージェント経由**
 
@@ -103,64 +114,24 @@ worktree 外を触ると競合します。
 )
 ```
 
-サブエージェント完了後、メインは `/tmp/fix-pr$PR-result.json` を読んで
-state を更新:
+### Step 5 後段: fix 戻り値マージ + CI 分類
 
 ```bash
-FIX=/tmp/fix-pr$PR-result.json
-[ ! -s "$FIX" ] && { echo "❌ fix サブエージェントが戻り値ファイルを生成しなかった" >&2; exit 3; }
-
-jq --slurpfile f "$FIX" \
-   '.rounds[-1].fix = {
-      commit:           $f[0].fix_commit,
-      fixed:            $f[0].fixed_count,
-      deferred:         ($f[0].deferred | length),
-      rejected:         ($f[0].rejected | length),
-      resolved_threads: ($f[0].resolved_threads | length),
-      ci:               $f[0].ci_status,
-      ci_failed_checks: ($f[0].ci_failed_checks // []),
-      ci_note:          ($f[0].ci_note // null)
-    }
-    | .rounds[-1].ended_at = "'$(date -Iseconds)'"
-    | .deferred_nits += [
-        $f[0].deferred[] | . + {pr: '$PR', round: '$ROUND'}
-      ]' \
-   "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
-```
-
-### CI failure の分類（誤中断防止）
-
-`ci_status = FAILURE` のとき、**code-related か meta-only かを判定** してから中断する:
-
-```bash
-CI=$(jq -r ".rounds[-1].fix.ci" "$STATE")
-if [ "$CI" = "FAILURE" ]; then
-  FAILED=$(jq -r '.rounds[-1].fix.ci_failed_checks[]' "$STATE")
-  CODE_FAIL=0; META_FAIL=0
-  for name in $FAILED; do
-    case "$name" in
-      *pint*|*larastan*|*phpstan*|*test*|*lint*|*type*|*build*|*ruff*|*eslint*|*tsc*|*mypy*)
-        CODE_FAIL=1 ;;
-      check_pr_requirements|*assignees*|*reviewers*|*labels*|*meta*)
-        META_FAIL=1 ;;
-      *)
-        CODE_FAIL=1 ;;  # 不明は code-fail（保守的）
-    esac
-  done
-
-  if [ "$CODE_FAIL" -eq 1 ]; then
-    jq '.final = "error"' "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
-    echo "❌ コード関連 CI 失敗。中断: $FAILED"
-    exit 3
-  else
-    # meta-only: ci_note に記録して継続
-    jq --arg failed "$FAILED" \
-      '.rounds[-1].fix.ci_note = "メタチェックのみ失敗: " + $failed + " — コードと無関係のため継続"' \
-      "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
-    echo "⚠ メタチェックのみ失敗 ($FAILED) — 継続"
-  fi
+if "$SCRIPTS/state.py" merge-fix "$PR"; then
+  : # exit 0 = continue
+elif [ $? -eq 3 ]; then
+  exit 3  # final=error（コード関連 CI 失敗 or fix 戻り値ファイル欠落）
 fi
 ```
+
+`state.py merge-fix` が内部で行う処理:
+
+1. `/tmp/fix-pr<PR>-result.json` を読んで `state.rounds[-1].fix` にマージ
+2. `deferred` を `state.deferred_nits` に追記
+3. **CI 失敗の分類**:
+   - code-fail (`pint` / `larastan` / `phpstan` / `test` / `lint` / `type` / `build` / `ruff` / `eslint` / `tsc` / `mypy`): `final=error` で中断 (exit 3)
+   - meta-only (`check_pr_requirements` / `assignees` / `reviewers` / `labels` / `meta`): `ci_note` に記録して継続
+   - 不明: 保守的に code-fail 扱い
 
 **例**: `check_pr_requirements`（Assignees 未設定）はループ継続、
 `laravel/pint` や `phpstan` の失敗は即中断してユーザ判断。
@@ -168,63 +139,29 @@ fi
 ## Step 6: PR ローテーション判定
 
 ```bash
-ROUND_IN_PR=$(jq --argjson p $PR '[.rounds[] | select(.pr == $p)] | length' "$STATE")
-
-if [ "$ROUND_IN_PR" -ge "$ROTATE_AFTER" ] && [ "$TOTAL_ROUNDS" -lt "$MAX_ROUNDS" ]; then
-  echo "🔄 PR #$PR が $ROUND_IN_PR round 経過。ローテーション実施。"
-  rotate_pr
+if "$SCRIPTS/state.py" should-rotate "$PR"; then
+  eval "$("$SCRIPTS/rotate-pr.sh" "$PR")"
+  # 取り込まれる変数: NEW_PR, NEW_PR_URL, NEW_BRANCH
+  "$SCRIPTS/state.py" set-current-pr "$PR" "$NEW_PR"
+  PR=$NEW_PR
 fi
 ```
 
-### `rotate_pr` の実装
+`should-rotate` は `round_in_pr >= rotate_after && total_rounds < max_rounds` で
+exit 0 を返す（rotate 要）。それ以外は exit 2（keep）。
 
-```bash
-rotate_pr() {
-  local old_pr=$PR
-  local branch=$(git branch --show-current)
-  local base=$(gh pr view "$old_pr" --json baseRefName -q .baseRefName)
-  local title=$(gh pr view "$old_pr" --json title -q .title)
-  local new_branch="${branch}-r$(date +%H%M%S)"
+`rotate-pr.sh` が内部で行う処理:
 
-  # 1. 既存ブランチを squash して新ブランチに
-  git checkout -b "$new_branch"
-  git reset --soft "origin/$base"
-  git commit -m "$(cat <<EOF
-$title
+1. 既存ブランチを **squash 統合** した新ブランチ作成
+2. 旧 PR に「ローテーションのため close」コメント + close
+3. 新 PR 作成（タイトル末尾に `(rotated)` 付与）
+4. 新 PR 番号 / URL / ブランチ名を stdout に KEY=VALUE で吐く
 
-(cross-review rotation: PR #$old_pr を squash 統合)
-EOF
-)"
-  git push -u origin "$new_branch"
+`state.py set-current-pr` が `state.json` の `current_pr` / `pr_history` を更新。
 
-  # 2. 旧 PR を close（コメント残し）
-  gh pr comment "$old_pr" --body "🔄 cross-review ループ進行中のため、本 PR を close し新規 PR に巻き直します。 round_in_pr=$ROUND_IN_PR で長尺化を回避。"
-  gh pr close "$old_pr"
-
-  # 3. 新 PR 作成
-  local new_pr_url=$(gh pr create --base "$base" --title "$title (rotated)" --body "$(cat <<EOF
-## Summary
-旧 PR #$old_pr をベースに、cross-review クロスレビューループの継続。
-旧 PR は round_in_pr=$ROUND_IN_PR で巻き直しのため close 済み。
-旧 PR の resolved スレッドは既に修正済み事項。残った指摘はこの PR で再評価する。
-
-<!-- I want to review in Japanese. -->
-EOF
-)")
-  local new_pr=$(echo "$new_pr_url" | grep -oP '/pull/\K\d+')
-
-  # 4. state 更新
-  jq --argjson old "$old_pr" --argjson new "$new_pr" --arg ts "$(date -Iseconds)" \
-    '.pr_history[-1].closed_at = $ts
-     | .pr_history[-1].rounds = (.rounds | map(select(.pr == $old)) | length)
-     | .pr_history += [{"pr": $new, "opened_at": $ts, "closed_at": null, "rounds": 0}]
-     | .current_pr = $new' \
-    "$STATE" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
-
-  PR=$new_pr
-  echo "✅ 新 PR #$new_pr に移行: $new_pr_url"
-}
-```
+> ⚠ **重要**: state.json のファイル名は **最初に init した PR 番号** がキー。
+> rotation 後も `state.py` の `<PR>` 引数には **最初の PR 番号** を渡し続ける
+> （内部的に `current_pr` を参照する）。
 
 ## Step 7: 次ラウンドへ
 
@@ -232,18 +169,18 @@ Step 1 に戻る。
 
 ## Step 8: 終了処理 — deferred nit のバッチ問い合わせ
 
-ループ終了時（`final` 確定後）、`deferred_nits` が残っていれば
-**1 回だけ** ユーザに問い合わせる:
+ループ終了時（`final` 確定後）、ラウンドサマリと残 deferred nit を表示:
 
 ```bash
-DEFERRED_COUNT=$(jq '.deferred_nits | length' "$STATE")
-if [ "$DEFERRED_COUNT" -gt 0 ]; then
-  echo "=== 残った nit 指摘 ($DEFERRED_COUNT 件) ==="
-  jq -r '.deferred_nits[] | "- [\(.severity)] \(.path):\(.line) — \(.summary)"' "$STATE"
-  echo ""
-  echo "これらの nit を一括対応する場合は再度 /ndf:fix <PR#> を起動してください。"
-fi
+"$SCRIPTS/state.py" report "$PR"
 ```
+
+`report` は以下を Markdown で吐く:
+
+- 最終ステータス（`approved` / `max_rounds` / `oscillation` / `error`）
+- PR 履歴
+- ラウンドサマリ表
+- 残 deferred nit 一覧
 
 UI 上は **AskUserQuestion で 1 回だけ** 「nit 一括対応する / しない /
 個別選択」を選ばせるのが望ましい。

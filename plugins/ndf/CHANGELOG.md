@@ -1,5 +1,31 @@
 # NDF Plugin CHANGELOG
 
+### v4.6.1 (cross-review skill 主要処理のスクリプト化)
+
+`cross-review` skill の主要 bash 処理を `scripts/` 配下に外出し、SKILL.md /
+docs/01,02 から冗長なインライン bash を排除する PATCH リリース。
+SKILL の I/O 契約 (state.json / result.json / payload.json スキーマ) は不変。
+
+- 新規追加:
+  - `scripts/state.py` — state.json 操作 CLI (uv 自己完結 / stdlib のみ)
+    サブコマンド: `init` / `start-round` / `read-result` / `judge` /
+    `check-oscillation` / `merge-fix` / `should-rotate` / `set-current-pr` /
+    `report`
+  - `scripts/launch-codex.sh` / `scripts/launch-gemini.sh` — レビューランチャ
+    (pidfile + sentinel ベース、trusted directory 対策込み)
+  - `scripts/monitor.py` — codex/gemini プロセス多軸監視 CLI
+    (uv 自己完結 / stdlib のみ)。pidfile + `/proc` cmdline 検証 / codex sentinel /
+    早期エラーパターン検出 / err.log stall timeout / hard timeout / result.json
+    存在確認の 6 軸を並列スレッドで判定。exit code で失敗種別を区別
+    (OK=0 / TIMEOUT=2 / NO_RESULT=3 / EARLY_ERROR=4 / STALLED=5 / PIDFILE_BAD=6)。
+    sentinel 単独で完了判定する旧 `wait-review.sh` の取りこぼし
+    (codex クラッシュ時の無限ハング、gemini の untrusted directory 静かな失敗、
+    pidfile stale 等) を解消。
+  - `scripts/wait-review.sh` — `monitor.py` の薄ラッパ（旧 CLI 互換のため残置）
+  - `scripts/rotate-pr.sh` — PR ローテーション (squash + 新ブランチ + 新 PR)
+- SKILL.md / docs/01,02 を「スクリプト呼び出し」形式に置換。state.json と
+  result.json のスキーマは docs に残し、実装は scripts/ にカプセル化。
+
 ### v4.6.0 (cross-review skill 改訂 + review/fix の result.json 拡張)
 
 実運用で得た失敗パターンの対策を `cross-review` skill に反映し、関連する
