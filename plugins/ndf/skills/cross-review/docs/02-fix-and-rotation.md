@@ -16,13 +16,19 @@
 **メインセッションでは修正コードを書かない。** `/ndf:fix` を
 `general-purpose` サブエージェントで起動する。
 
-**サブエージェントの責務（必須 5 点）**:
+**サブエージェントの責務（必須 6 点）**:
 
 1. critical / major / minor の修正コミット
 2. 修正テストの追加・実行
 3. 修正対象の thread に **reply 投稿** + **`resolveReviewThread` で Resolve**
 4. nit / 判断が割れる minor は **修正せず deferred 記録**（reply は `[deferred / nit]` ラベル付き、Resolve しない）
-5. 戻り値ファイル `$TMP_DIR/fix-pr<PR>-result.json` を必ず書き出す
+5. **PR レベルの Summary コメントを `gh pr comment` で投稿**（対応件数 / 重要度別 / deferred 件数 / rejected 件数 / commit SHA を含む）
+6. 戻り値ファイル `$TMP_DIR/fix-pr<PR>-result.json` を必ず書き出す
+
+> ⚠ inline thread への reply + Resolve **だけでは不十分**。PR ページの
+> conversation タブに表示される **PR レベルコメント** がレビュアーへの
+> サマリ通知として必須（`/ndf:fix` SKILL.md の手順 8 で規定）。
+> サブエージェント起動プロンプトでも明示的に指示すること。
 
 ### サブエージェント起動例
 
@@ -86,7 +92,25 @@ worktree 外を触ると競合します。
      }}' -f id="$THREAD_ID"
    ```
    - deferred / rejected の thread は **Resolve しない**
-10. 戻り値ファイル書き出し（下記フォーマット）
+10. **PR レベル Summary コメントを投稿**（必須・inline reply とは別物）:
+    ```bash
+    gh pr comment {PR} --body "$(cat <<'EOMD'
+    ## 🔧 /ndf:fix サマリ (round N)
+
+    対応件数: critical=X / major=Y / minor=Z (合計 N 件)
+    deferred: D 件 / rejected: R 件
+    commit: <SHA>
+    CI: SUCCESS | FAILURE | NONE
+
+    ### 詳細
+    - 各 thread の対応概要（行リンク付き）
+    EOMD
+    )"
+    ```
+    - inline reply + Resolve だけでは「PR ページの Conversation タブ」に
+      まとめが出ず、レビュアー視点で見落とされる。**必ず投稿する**
+11. 戻り値ファイル書き出し（下記フォーマット）。`summary_comment_url` には
+    手順 10 の URL を入れる
 
 ## 戻り値ファイル $TMP_DIR/fix-pr{PR}-result.json
 
