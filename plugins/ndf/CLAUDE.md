@@ -126,6 +126,62 @@ plugins/ndf/
 
 ## 開発履歴
 
+### v4.6.0 (cross-review skill 改訂 + review/fix の result.json 拡張)
+
+実運用で得た失敗パターンの対策を `cross-review` skill に反映し、関連する
+`/ndf:review` と `/ndf:fix` の result.json schema を拡張する MINOR リリース。
+
+- **`cross-review` skill 改訂**:
+  - **「事前確認」セクション新設**: ループ開始前の 4 プリチェック
+    1. 自分の PR 判定 → `event` ダウングレード設定 (GitHub の
+       `HTTP 422: Can not request changes on your own pull request` を回避)
+    2. **worktree 分離** (`/work/worktrees/pr<PR>`) で並行セッション競合回避
+    3. **gemini の trusted directory 対策**:
+       `GEMINI_CLI_TRUST_WORKSPACE=true` + `--skip-trust` 両方併用必須
+       (worktree のような新規パスは untrusted 判定 → YOLO が "default" に降格される)
+    4. 既存コメントスナップショット保存 → launcher プロンプトに添付して重複指摘禁止
+  - **state.json schema 拡張**:
+    - `worktree_path` / `pr_author` / `is_own_pr` / `event_downgrade` を追加
+    - 各 round の `codex` / `gemini` を **`intent` + `posted_as` の二重保持** に変更
+      (ループ収束判定は `intent`、GitHub 投稿実体は `posted_as`)
+    - 各 round に `by_severity` (`{critical, major, minor, nit}` 件数) を追加
+    - 各 round の `fix` に `resolved_threads` / `ci_note` を追加
+  - **レビュー body 必須 identifier prefix**:
+    `## 🤖 cross-review | round <N> | <agent> | <event(intent)>` を先頭固定化
+    (人間アカウントから AI が投稿するため、GitHub UI で発信元を可視化)
+  - **CI failure の分類**: `pint/larastan/test/build/lint/type/tsc/mypy` 等は
+    code-fail として中断、`check_pr_requirements/assignees/reviewers/labels`
+    等のメタチェックのみ失敗ならループ継続
+  - **waiter を pidfile + sentinel ベースに**:
+    - codex は `^tokens used$` sentinel
+    - gemini は long `-p` プロンプトが引数に乗るため `pgrep -fa` 不可、
+      `pidfile + kill -0` ポーリング必須
+  - **`Step 5` サブエージェント責務を 5 点明示**:
+    修正コミット / テスト / **reply + `resolveReviewThread` で Resolve** /
+    deferred は記録のみ・Resolve しない / 戻り値ファイル書き出し
+- **`/ndf:review` SKILL.md 更新**:
+  - 結果サマリ (`/tmp/<agent>-review-pr<番号>-result.json`) に `posted_as`
+    フィールドを追加
+  - `event` (intent / 本来の判定) と `posted_as` (実投稿) の使い分けを文書化
+  - 自分 PR ダウングレードフローを `intent="REQUEST_CHANGES"` /
+    `posted_as="COMMENT"` で記録する手順を明記
+- **`/ndf:fix` SKILL.md 更新**:
+  - 戻り値ファイル `/tmp/fix-pr<番号>-result.json` に
+    `resolved_threads` (配列) / `ci_failed_checks` (配列) / `ci_note` (string)
+    を追加
+  - 手順 12 に「resolve した thread_id / comment_id / path / line を
+    `resolved_threads[]` に記録」「`deferred` / `rejected` の thread は
+    Resolve しない」を明記
+  - 手順 13 に `ci_failed_checks` の収集元 (`gh pr checks <PR> --json name,state`)
+    を補記
+- **アンチパターン 5 件追加**:
+  - 自分の PR に `REQUEST_CHANGES` で投稿
+  - `gemini --yolo` 単独起動 (`--skip-trust` 併用必須)
+  - `pgrep -fa <prompt>` で完了判定
+  - fix サブエージェントが Resolve をスキップ
+  - review body に identifier prefix を付け忘れる
+- Skills: 39個 (変化なし、`cross-review` / `review` / `fix` の中身を更新)
+
 ### v4.5.0 (playwright-scenario-test v0.5.0 — Skill 非依存 self-contained 構成 / 名前空間 rename)
 
 > **注意**: 互換性破壊リリース。Python パッケージ名・fixture 名・CLI option・
