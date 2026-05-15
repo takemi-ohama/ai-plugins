@@ -16,7 +16,7 @@ AI/人間どちらが計画書を書く場合も、まず該当 page role のチ
 | `04-playwright-mapping.md` | Playwright API → page role / 観点 マッピング | 自動化実装者 |
 | `05-bug-report.md` | bug report 仕様 (ISO/IEC/IEEE 29119-3 ベース) + エビデンス自動収集 | テスト実行者 / 報告者 |
 | `06-pytest-playwright.md` | pytest-playwright fixture / CLI option / NDF 拡張との対応関係 | 自動化実装者 / 利用者 |
-| `checklists/checklist-common.md` | 全 role 共通: a11y / Core Web Vitals / セキュリティ / i18n | 全テスト |
+| `checklists/checklist-common.md` | 全 role 共通: accessibility (axe-core) / Core Web Vitals / セキュリティ / i18n | 全テスト |
 | `checklists/checklist-lp.md` | Landing Page (外部到達ページ) | LP 担当 |
 | `checklists/checklist-list.md` | 一覧ページ | 一覧担当 |
 | `checklists/checklist-item.md` | 詳細ページ | 詳細担当 |
@@ -42,12 +42,13 @@ AI/人間どちらが計画書を書く場合も、まず該当 page role のチ
 3. pytest テストを書く
    → templates/test_<role>.py.template を起点に test 関数を追加
    → `playwright codegen` で操作録画 → そのまま test に貼ってもよい
-   → `@pytest.mark.page_role(...)` を付ければ a11y / CWV が autouse で走る
+   → `@pytest.mark.page_role(...)` を付ければ accessibility / web_vitals が autouse で走る
 
 4. 実行 → エビデンス収集
-   → uv run pytest --ndf-config=./scenario.config.yaml で実行
-   → trace.zip / video / screenshot / HAR / console log / a11y / CWV を自動収集
-   → reports/<run-id>/report.md が ``pytest_terminal_summary`` で生成される
+   → ./scenario-test/run.sh で実行 (init_project.sh 後の標準パス)
+     ※ 直接 `cd scenario-test && uv run pytest --pwk-config=./scenario.config.yaml` でも可
+   → trace.zip / video / screenshot / HAR / console log / accessibility / web_vitals を自動収集
+   → scenario-test/reports/<run-id>/report.md が ``pytest_terminal_summary`` で生成される
 
 5. bug 発見 → docs/05-bug-report.md に従って報告
    → 全 bug に oracle (FEW HICCUPPS) と severity を付与

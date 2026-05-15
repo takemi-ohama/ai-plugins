@@ -1,11 +1,11 @@
 """Core Web Vitals (LCP/CLS/TTFB/longest_task) を 1 URL に対して計測する CLI。
 
-`scenario_test.cwv` モジュールの薄いラッパ。runner は testcase 内蔵で同 module
+`playwright_kit.web_vitals` モジュールの薄いラッパ。runner は testcase 内蔵で同 module
 を呼ぶため、本 CLI は外部 URL の単発計測専用。
 
 Usage:
     python check_cwv.py --url https://example.com
-    python check_cwv.py --url-list urls.txt --output cwv.json
+    python check_cwv.py --url-list urls.txt --output web_vitals.json
     python check_cwv.py --url https://example.com --device "Pixel 5"
 """
 
@@ -23,7 +23,7 @@ _SKILL_ROOT = Path(__file__).resolve().parent.parent
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from scenario_test.cwv import THRESHOLDS, judge, measure_page  # noqa: E402
+from playwright_kit.web_vitals import THRESHOLDS, judge, measure_page  # noqa: E402
 
 
 def measure(
@@ -99,7 +99,7 @@ def main() -> int:
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(text, encoding="utf-8")
-        print(f"OK: cwv → {args.output}", file=sys.stderr)
+        print(f"OK: web_vitals → {args.output}", file=sys.stderr)
     else:
         sys.stdout.write(text + "\n")
 

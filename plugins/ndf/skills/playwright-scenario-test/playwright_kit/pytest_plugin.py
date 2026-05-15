@@ -1,15 +1,15 @@
 """playwright-scenario-test の pytest plugin。
 
 CLI options:
-- ``--ndf-config <path>``: scenario.config.yaml を指定
-- ``--ndf-out-dir <path>``: 成果物 (HAR / trace / 動画 / report) の出力先
-- ``--ndf-no-evidence``: evidence 収集を OFF
-- ``--ndf-hud``: HUD overlay を ON
-- ``--ndf-drive-folder <id>``: Drive 連携
+- ``--pwk-config <path>``: scenario.config.yaml を指定
+- ``--pwk-out-dir <path>``: 成果物 (HAR / trace / 動画 / report) の出力先
+- ``--pwk-no-evidence``: evidence 収集を OFF
+- ``--pwk-overlay``: overlay (赤丸カーソル + 字幕、旧名 HUD) を ON
+- ``--pwk-drive-folder <id>``: Drive 連携
 
 markers:
-- ``page_role(*roles)``: a11y / CWV autouse の判定材料
-- ``role(role_id)``: login する role を明示 (`ndf_role_<id>` fixture と並用可)
+- ``page_role(*roles)``: accessibility / web vitals autouse の判定材料
+- ``role(role_id)``: login する role を明示 (`pwk_role_<id>` fixture と並用可)
 - ``phase(num)``: report.md のフェーズ集計用
 - ``priority(level)``: report.md のソート用
 """
@@ -22,17 +22,17 @@ from typing import Any
 
 import pytest
 
-from scenario_test.pytest_report import NdfTestEntry, write_report
+from playwright_kit.pytest_report import PwkTestEntry, write_report
 
 # 配下の fixture モジュールを pytest_plugins として読み込む
 # (こうすると entry-point 経由で plugin がロードされた瞬間に fixture が
 #  全 test に対して discover される)。
 pytest_plugins = [
-    "scenario_test.fixtures.auth",
-    "scenario_test.fixtures.evidence",
-    "scenario_test.fixtures.a11y",
-    "scenario_test.fixtures.cwv",
-    "scenario_test.fixtures.body_check",
+    "playwright_kit.fixtures.auth",
+    "playwright_kit.fixtures.evidence",
+    "playwright_kit.fixtures.accessibility",
+    "playwright_kit.fixtures.web_vitals",
+    "playwright_kit.fixtures.body_check",
 ]
 
 
@@ -42,27 +42,27 @@ pytest_plugins = [
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    group = parser.getgroup("ndf", "playwright-scenario-test (NDF)")
+    group = parser.getgroup("pwk", "playwright-scenario-test (playwright_kit)")
     group.addoption(
-        "--ndf-config",
+        "--pwk-config",
         action="store",
         default=None,
-        help="scenario.config.yaml へのパス (env NDF_CONFIG, または ./scenario.config.yaml も可)",
+        help="scenario.config.yaml へのパス (env PWK_CONFIG, または ./scenario.config.yaml も可)",
     )
     group.addoption(
-        "--ndf-out-dir",
+        "--pwk-out-dir",
         action="store",
         default=None,
         help="成果物出力先ディレクトリ (default: ./reports/<run-id>/)",
     )
     group.addoption(
-        "--ndf-no-evidence",
+        "--pwk-no-evidence",
         action="store_true",
         default=False,
         help="HAR / trace / video の収集を OFF にする",
     )
     group.addoption(
-        "--ndf-har-mode",
+        "--pwk-har-mode",
         action="store",
         default=None,
         choices=["minimal", "full", "none"],
@@ -75,13 +75,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         ),
     )
     group.addoption(
-        "--ndf-hud",
+        "--pwk-overlay",
         action="store_true",
         default=False,
-        help="HUD overlay (字幕 + カーソル) を全 page に inject する",
+        help="overlay (赤丸カーソル + 字幕、旧名 HUD) を全 page に inject する",
     )
     group.addoption(
-        "--ndf-drive-folder",
+        "--pwk-drive-folder",
         action="store",
         default=None,
         help=(
@@ -98,9 +98,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 # ---------------------------------------------------------------------------
 
 
-_NDF_MARKERS: list[tuple[str, str]] = [
-    ("page_role", "page_role(*roles): a11y / CWV autouse の判定 (例: form, list, dashboard)"),
-    ("role", "role(role_id): test がどの login role を要求するか (`ndf_role_<id>` 経由でも可)"),
+_PWK_MARKERS: list[tuple[str, str]] = [
+    ("page_role", "page_role(*roles): accessibility / web vitals autouse の判定 (例: form, list, dashboard)"),
+    ("role", "role(role_id): test がどの login role を要求するか (`pwk_role_<id>` 経由でも可)"),
     ("phase", "phase(num): report.md のフェーズ集計用 (1〜N の整数)"),
     ("priority", "priority(level): report.md のソート用 (high/mid/low など任意文字列)"),
     ("no_body_check", "no_body_check: body_check autouse をこの test では skip する"),
@@ -110,31 +110,31 @@ _NDF_MARKERS: list[tuple[str, str]] = [
 def pytest_configure(config: pytest.Config) -> None:
     """marker 登録 + config の早期 load を試みる。
 
-    config 読み込みは ``ndf_config`` fixture でも遅延ロードされるが、
-    ``ndf_role_<id>`` fixture を *動的登録* するためには
+    config 読み込みは ``pwk_config`` fixture でも遅延ロードされるが、
+    ``pwk_role_<id>`` fixture を *動的登録* するためには
     ``pytest_configure`` で 1 度 Config をロードしておく必要がある。
-    failure は警告にとどめ、利用者が NDF 機能を使わない場合に test 全体を
+    failure は警告にとどめ、利用者が playwright_kit 機能を使わない場合に test 全体を
     潰さないようにする。
     """
-    for name, doc in _NDF_MARKERS:
+    for name, doc in _PWK_MARKERS:
         config.addinivalue_line("markers", f"{name}: {doc}")
 
     # 動的 fixture 登録のため、可能なら Config を early load する。
     cfg = _try_load_config_silently(config)
     if cfg is not None:
-        from scenario_test.fixtures import auth as auth_module
+        from playwright_kit.fixtures import auth as auth_module
 
         registered = auth_module.register_role_fixtures(auth_module, cfg)
         if registered:
             # plugin 自体にも公開しておく (ユーザが import 元を調整しなくて良いように)。
-            import scenario_test.pytest_plugin as plugin_self
+            import playwright_kit.pytest_plugin as plugin_self
 
             for name in registered:
                 fn = getattr(auth_module, name, None)
                 if fn is not None:
                     setattr(plugin_self, name, fn)
         # session 中で再利用するためにキャッシュする。
-        config._ndf_config = cfg  # type: ignore[attr-defined]
+        config._pwk_config = cfg  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """test の各 phase 終了時に ``ndf_evidence`` の状態をレポートに紐付ける。
+    """test の各 phase 終了時に ``pwk_evidence`` の状態をレポートに紐付ける。
 
     FAIL 時には evidence の trace/HAR path を log に追記し、
     成果物 path / marker を rep.user_properties に保存して
@@ -152,19 +152,19 @@ def pytest_runtest_makereport(item, call):
 
     HAR lifecycle 修正 (Codex Major-1 完遂 / 3回目):
     Playwright は HAR を ``context.close()`` 時に flush する。
-    ``ndf_evidence`` の finalizer は ``context`` の finalizer より先に動くため、
+    ``pwk_evidence`` の finalizer は ``context`` の finalizer より先に動くため、
     call phase の時点では ``har_relpath`` / ``trace_relpath`` がまだ未確定の場合がある。
 
     teardown phase の makereport は pytest-playwright の ``context`` finalizer が
     teardown 中に完了した後に走るため、ここで再度 ``confirm_har()`` を呼んで
     HAR の存在を確認し直し、確定した path を teardown report の user_properties に
-    積む。``_collect_entries()`` が teardown report の ndf_har/ndf_trace を call
+    積む。``_collect_entries()`` が teardown report の pwk_har/pwk_trace を call
     entry に merge することで、report.md に artifact path が反映される。
     """
     outcome = yield
     rep = outcome.get_result()
 
-    ev = getattr(item, "_ndf_evidence", None)
+    ev = getattr(item, "_pwk_evidence", None)
 
     # teardown phase: context.close() 後に HAR が flush されるため confirm_har() 再呼び出し。
     # 確定した har_relpath / trace_relpath を teardown report の user_properties に積む。
@@ -174,33 +174,33 @@ def pytest_runtest_makereport(item, call):
     if rep.when == "teardown" and ev is not None:
         ev.confirm_har()
         if ev.har_relpath:
-            rep.user_properties.append(("ndf_har", str(ev.case_dir / ev.har_relpath)))
+            rep.user_properties.append(("pwk_har", str(ev.case_dir / ev.har_relpath)))
         if ev.trace_relpath:
             rep.user_properties.append(
-                ("ndf_trace", str(ev.case_dir / ev.trace_relpath))
+                ("pwk_trace", str(ev.case_dir / ev.trace_relpath))
             )
         rep.user_properties.append(
-            ("ndf_body_check_violations", len(ev.body_check_violations))
+            ("pwk_body_check_violations", len(ev.body_check_violations))
         )
         if ev.body_check_violations:
             rep.user_properties.append(
-                ("ndf_body_check_detail", list(ev.body_check_violations))
+                ("pwk_body_check_detail", list(ev.body_check_violations))
             )
         return
 
     if rep.when != "call":
         return
 
-    # ndf_evidence fixture が attach した状態を直接参照
+    # pwk_evidence fixture が attach した状態を直接参照
     if ev is not None:
         if ev.har_relpath:
-            rep.user_properties.append(("ndf_har", str(ev.case_dir / ev.har_relpath)))
+            rep.user_properties.append(("pwk_har", str(ev.case_dir / ev.har_relpath)))
         if ev.trace_relpath:
             rep.user_properties.append(
-                ("ndf_trace", str(ev.case_dir / ev.trace_relpath))
+                ("pwk_trace", str(ev.case_dir / ev.trace_relpath))
             )
-        rep.user_properties.append(("ndf_console_errors", len(ev.console_errors)))
-        rep.user_properties.append(("ndf_page_errors", len(ev.page_errors)))
+        rep.user_properties.append(("pwk_console_errors", len(ev.console_errors)))
+        rep.user_properties.append(("pwk_page_errors", len(ev.page_errors)))
 
     # markers を user_properties に転写
     page_roles: list[str] = []
@@ -211,22 +211,22 @@ def pytest_runtest_makereport(item, call):
             elif isinstance(arg, (list, tuple)):
                 page_roles.extend(str(a) for a in arg)
     if page_roles:
-        rep.user_properties.append(("ndf_page_role", page_roles))
+        rep.user_properties.append(("pwk_page_role", page_roles))
 
     role_marker = item.get_closest_marker("role")
     if role_marker is not None and role_marker.args:
-        rep.user_properties.append(("ndf_role", str(role_marker.args[0])))
+        rep.user_properties.append(("pwk_role", str(role_marker.args[0])))
 
     phase_marker = item.get_closest_marker("phase")
     if phase_marker is not None and phase_marker.args:
         try:
-            rep.user_properties.append(("ndf_phase", int(phase_marker.args[0])))
+            rep.user_properties.append(("pwk_phase", int(phase_marker.args[0])))
         except (TypeError, ValueError):
             pass
 
     priority_marker = item.get_closest_marker("priority")
     if priority_marker is not None and priority_marker.args:
-        rep.user_properties.append(("ndf_priority", str(priority_marker.args[0])))
+        rep.user_properties.append(("pwk_priority", str(priority_marker.args[0])))
 
 
 # ---------------------------------------------------------------------------
@@ -234,8 +234,8 @@ def pytest_runtest_makereport(item, call):
 # ---------------------------------------------------------------------------
 
 
-def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
-    """terminalreporter から ``NdfTestEntry`` のリストを構築する。
+def _collect_entries(terminalreporter) -> list[PwkTestEntry]:
+    """terminalreporter から ``PwkTestEntry`` のリストを構築する。
 
     xfailed / xpassed も集約する (Codex Major 3)。
     pytest 内部では xfailed の rep は stats["xfailed"] に直接入るため、
@@ -244,30 +244,30 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
     artifact 伝搬 (Codex Major-1 / 3回目):
     HAR は context.close() 時に flush されるため、call phase 時点では
     har_relpath / trace_relpath が未確定の場合がある。
-    teardown phase の makereport で確定した ndf_har / ndf_trace を
+    teardown phase の makereport で確定した pwk_har / pwk_trace を
     call entry に merge することで、report.md に artifact path を反映する。
     """
     # Step 1: call/setup phase の entry を nodeid でインデックス化
-    call_entries: dict[str, NdfTestEntry] = {}
+    call_entries: dict[str, PwkTestEntry] = {}
     for outcome_key in ("passed", "failed", "skipped", "error", "xfailed", "xpassed"):
         for rep in terminalreporter.stats.get(outcome_key, []):
             if getattr(rep, "when", "call") not in ("call", "setup"):
                 continue
             props = dict(rep.user_properties or [])
             nodeid = getattr(rep, "nodeid", "?")
-            entry = NdfTestEntry(
+            entry = PwkTestEntry(
                 nodeid=nodeid,
                 name=getattr(rep, "head_line", nodeid),
                 outcome=outcome_key,
                 duration_s=float(getattr(rep, "duration", 0.0) or 0.0),
-                page_role=list(props.get("ndf_page_role") or []),
-                role=props.get("ndf_role"),
-                phase=int(props.get("ndf_phase") or 0),
-                priority=props.get("ndf_priority"),
-                har_path=props.get("ndf_har"),
-                trace_path=props.get("ndf_trace"),
-                console_errors=int(props.get("ndf_console_errors") or 0),
-                page_errors=int(props.get("ndf_page_errors") or 0),
+                page_role=list(props.get("pwk_page_role") or []),
+                role=props.get("pwk_role"),
+                phase=int(props.get("pwk_phase") or 0),
+                priority=props.get("pwk_priority"),
+                har_path=props.get("pwk_har"),
+                trace_path=props.get("pwk_trace"),
+                console_errors=int(props.get("pwk_console_errors") or 0),
+                page_errors=int(props.get("pwk_page_errors") or 0),
                 # Amazon Q Critical-3: skipped 時の longrepr は tuple 形式のため
                 # failed / error のときのみ str() 化する。他 outcome は None のまま。
                 error_message=(
@@ -278,7 +278,7 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
             )
             call_entries[nodeid] = entry
 
-    # Step 2: teardown report の ndf_har / ndf_trace / body_check を call entry に merge する。
+    # Step 2: teardown report の pwk_har / pwk_trace / body_check を call entry に merge する。
     # teardown 時点で context.close() 後の確定値や body_check の violation 集計が
     # 積まれているため、call phase で未確定だった値をここで埋める。
     # pytest は setup/teardown の rep を stats[""] (空文字キー) に格納するため、
@@ -292,15 +292,15 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
                 continue
             entry = call_entries[nodeid]
             props = dict(rep.user_properties or [])
-            if not entry.har_path and props.get("ndf_har"):
-                entry.har_path = props["ndf_har"]
-            if not entry.trace_path and props.get("ndf_trace"):
-                entry.trace_path = props["ndf_trace"]
-            if "ndf_body_check_violations" in props:
+            if not entry.har_path and props.get("pwk_har"):
+                entry.har_path = props["pwk_har"]
+            if not entry.trace_path and props.get("pwk_trace"):
+                entry.trace_path = props["pwk_trace"]
+            if "pwk_body_check_violations" in props:
                 entry.body_check_violations = int(
-                    props.get("ndf_body_check_violations") or 0
+                    props.get("pwk_body_check_violations") or 0
                 )
-            detail = props.get("ndf_body_check_detail")
+            detail = props.get("pwk_body_check_detail")
             if detail:
                 entry.body_check_detail = list(detail)
             # body_check が teardown で pytest.fail を起こした場合、call phase
@@ -325,9 +325,9 @@ def _collect_entries(terminalreporter) -> list[NdfTestEntry]:
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
     """``reports/<run-id>/report.md`` を生成する。
 
-    ``--ndf-out-dir`` 指定があればそこに、なければ ``ndf_out_dir`` fixture と
-    同一の ``pytestconfig._ndf_out_dir`` キャッシュを参照する。
-    キャッシュが無い場合 (ndf_out_dir fixture が一度も呼ばれていない) は
+    ``--pwk-out-dir`` 指定があればそこに、なければ ``pwk_out_dir`` fixture と
+    同一の ``pytestconfig._pwk_out_dir`` キャッシュを参照する。
+    キャッシュが無い場合 (pwk_out_dir fixture が一度も呼ばれていない) は
     ``_resolve_out_dir`` 経由でセットする。これにより evidence と report.md の
     出力先が秒またぎでズレる問題を防ぐ (新規 Major 対応)。
     """
@@ -338,7 +338,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     if not entries:
         return
 
-    cached_cfg = getattr(config, "_ndf_config", None)
+    cached_cfg = getattr(config, "_pwk_config", None)
     base_url = cached_cfg.base_url if cached_cfg is not None else None
     title = (
         cached_cfg.report.title
@@ -346,9 +346,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         else "シナリオ E2E テスト 実施報告書"
     )
 
-    # evidence.py の _resolve_out_dir と同一キャッシュ (_ndf_out_dir) を参照する。
+    # evidence.py の _resolve_out_dir と同一キャッシュ (_pwk_out_dir) を参照する。
     # これにより両者が独立に datetime.now() を呼んで別ディレクトリを作る問題を解消。
-    from scenario_test.fixtures.evidence import _resolve_out_dir
+    from playwright_kit.fixtures.evidence import _resolve_out_dir
 
     out_dir = _resolve_out_dir(config)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -372,35 +372,35 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         title=title,
         base_url=base_url,
     )
-    terminalreporter.write_sep("-", "ndf report")
+    terminalreporter.write_sep("-", "pwk report")
     terminalreporter.write_line(f"report.md generated: {path}")
 
     # session 後の Drive アップロードに使うため pickle 不要な情報を保存
-    config._ndf_report_path = path  # type: ignore[attr-defined]
-    config._ndf_out_dir = out_dir  # type: ignore[attr-defined]
+    config._pwk_report_path = path  # type: ignore[attr-defined]
+    config._pwk_out_dir = out_dir  # type: ignore[attr-defined]
 
 
 def pytest_sessionfinish(session, exitstatus):
-    """``--ndf-drive-folder`` 指定時、生成済 report.md と evidence を Drive アップ。
+    """``--pwk-drive-folder`` 指定時、生成済 report.md と evidence を Drive アップ。
 
     ``upload_evidence.upload`` を直接呼ぶ。失敗時は警告のみで test 結果には影響しない。
     """
     folder_id: str | None = session.config.getoption(
-        "ndf_drive_folder", default=None
+        "pwk_drive_folder", default=None
     )
     if not folder_id:
         return
 
-    report_path: Path | None = getattr(session.config, "_ndf_report_path", None)
-    out_dir: Path | None = getattr(session.config, "_ndf_out_dir", None)
+    report_path: Path | None = getattr(session.config, "_pwk_report_path", None)
+    out_dir: Path | None = getattr(session.config, "_pwk_out_dir", None)
     if report_path is None or out_dir is None:
         return
 
     try:
         # Amazon Q Critical-5: sys.path への動的 inject を廃止し、
-        # scenario_test.uploaders パッケージ経由で安全に import する。
+        # playwright_kit.uploaders パッケージ経由で安全に import する。
         # scripts/upload_evidence.py は CLI スタンドアロン用途として残す。
-        from scenario_test.uploaders import upload, detect_kind
+        from playwright_kit.uploaders import upload, detect_kind
 
         # report.md は kind=any でアップ
         if report_path.exists():
@@ -426,19 +426,19 @@ def pytest_sessionfinish(session, exitstatus):
         import warnings
 
         warnings.warn(
-            f"[ndf] Drive upload 失敗 (session continues): {exc}",
+            f"[pwk] Drive upload 失敗 (session continues): {exc}",
             stacklevel=1,
         )
 
 
 def _try_load_config_silently(config: pytest.Config) -> Any | None:
-    """``--ndf-config`` 等から Config を試行ロードする。失敗時は None。"""
+    """``--pwk-config`` 等から Config を試行ロードする。失敗時は None。"""
     import os
     from pathlib import Path
 
-    raw_path: str | None = config.getoption("ndf_config", default=None)
+    raw_path: str | None = config.getoption("pwk_config", default=None)
     if not raw_path:
-        env = os.environ.get("NDF_CONFIG")
+        env = os.environ.get("PWK_CONFIG")
         if env:
             raw_path = env
     if not raw_path:
@@ -449,15 +449,15 @@ def _try_load_config_silently(config: pytest.Config) -> Any | None:
         return None
 
     try:
-        from scenario_test.config import Config
+        from playwright_kit.config import Config
 
         return Config.load(Path(raw_path).resolve())
     except Exception as exc:  # pragma: no cover - depends on user config
         import warnings
 
         warnings.warn(
-            f"[ndf] config load 失敗 ({raw_path}): {exc}. "
-            "ndf_role_<id> fixture は動的登録されません。",
+            f"[pwk] config load 失敗 ({raw_path}): {exc}. "
+            "pwk_role_<id> fixture は動的登録されません。",
             stacklevel=2,
         )
         return None

@@ -193,7 +193,7 @@
 
 ```python
 @pytest.mark.page_role("search", "list")
-def test_search_result(page, ndf_role_user):
+def test_search_result(page, pwk_role_user):
     ...
 ```
 

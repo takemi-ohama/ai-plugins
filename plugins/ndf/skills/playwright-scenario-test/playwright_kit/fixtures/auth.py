@@ -1,12 +1,12 @@
-"""認証 fixture: ``ndf_config`` と動的に生成する ``ndf_role_<id>``。
+"""認証 fixture: ``pwk_config`` と動的に生成する ``pwk_role_<id>``。
 
 pytest-playwright が提供する ``page`` / ``context`` / ``browser_context_args``
 fixture と協調して動作する。
 
 設計方針:
-- ``ndf_config`` は session scope。``--ndf-config`` で指定された YAML を
+- ``pwk_config`` は session scope。``--pwk-config`` で指定された YAML を
   1 度だけ読み込む。利用者プロジェクトの ``conftest.py`` から override 可能。
-- 各 role に対し ``ndf_role_<id>`` fixture を *動的* に生成する。
+- 各 role に対し ``pwk_role_<id>`` fixture を *動的* に生成する。
   実体は ``_login_and_get_storage_state`` で session 内 1 回だけ login し、
   storage_state を session-scoped cache (`_StorageStateCache`) に保管。
   以降の test では同じ role の cache を ``context.add_cookies`` 等で再利用する
@@ -28,7 +28,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from scenario_test.config import Config, Login, Role
+from playwright_kit.config import Config, Login, Role
 
 
 def _same_origin(origin_url: str, base_url: str) -> bool:
@@ -148,7 +148,7 @@ def _login_and_get_storage_state(
                 page.goto(url, wait_until="domcontentloaded", timeout=nav_timeout_ms)
             except Exception as exc:  # pragma: no cover - depends on remote target
                 pytest.fail(
-                    f"[ndf_role_{role.id}] login page open failed: {url} ({exc})"
+                    f"[pwk_role_{role.id}] login page open failed: {url} ({exc})"
                 )
 
             for name, value in role.login.fields.items():
@@ -158,7 +158,7 @@ def _login_and_get_storage_state(
                     )
                 except Exception as exc:  # pragma: no cover
                     pytest.fail(
-                        f"[ndf_role_{role.id}] fill {name!r} failed: {exc}"
+                        f"[pwk_role_{role.id}] fill {name!r} failed: {exc}"
                     )
 
             try:
@@ -168,7 +168,7 @@ def _login_and_get_storage_state(
                     _submit_login_form(page, role.login)
             except Exception as exc:  # pragma: no cover
                 pytest.fail(
-                    f"[ndf_role_{role.id}] navigation 失敗: "
+                    f"[pwk_role_{role.id}] navigation 失敗: "
                     f"{type(exc).__name__}: {exc}"
                 )
 
@@ -178,7 +178,7 @@ def _login_and_get_storage_state(
             # 空文字列 (= 未設定) の場合はチェックをスキップする。
             if role.login.fail_if_url_contains and role.login.fail_if_url_contains in final_url:
                 pytest.fail(
-                    f"[ndf_role_{role.id}] login 失敗: "
+                    f"[pwk_role_{role.id}] login 失敗: "
                     f"final_url={final_url} に '{role.login.fail_if_url_contains}' を含む"
                 )
 
@@ -202,15 +202,15 @@ def _login_and_get_storage_state(
 
 
 @pytest.fixture(scope="session")
-def ndf_config(pytestconfig) -> Config:
-    """``--ndf-config`` で指定された YAML をロードして ``Config`` を返す。
+def pwk_config(pytestconfig) -> Config:
+    """``--pwk-config`` で指定された YAML をロードして ``Config`` を返す。
 
     指定が無い場合は CWD 直下の ``scenario.config.yaml`` を試し、
     それも無ければ ``pytest.skip`` する (NDF 機能が要らない test と共存可能にする)。
     """
-    raw_path: str | None = pytestconfig.getoption("ndf_config", default=None)
+    raw_path: str | None = pytestconfig.getoption("pwk_config", default=None)
     if not raw_path:
-        env = os.environ.get("NDF_CONFIG")
+        env = os.environ.get("PWK_CONFIG")
         if env:
             raw_path = env
     if not raw_path:
@@ -219,7 +219,7 @@ def ndf_config(pytestconfig) -> Config:
             raw_path = str(candidate)
     if not raw_path:
         pytest.skip(
-            "ndf_config 未指定: --ndf-config <path> もしくは NDF_CONFIG env、"
+            "pwk_config 未指定: --pwk-config <path> もしくは PWK_CONFIG env、"
             "または ./scenario.config.yaml を用意してください。"
         )
 
@@ -228,38 +228,38 @@ def ndf_config(pytestconfig) -> Config:
 
 
 @pytest.fixture(scope="session")
-def _ndf_storage_state_cache() -> _StorageStateCache:
+def _pwk_storage_state_cache() -> _StorageStateCache:
     return _StorageStateCache.empty()
 
 
 def _make_role_fixture(role_id: str) -> Callable:
-    """role_id ごとに ``ndf_role_<id>`` fixture の実装関数を生成する。"""
+    """role_id ごとに ``pwk_role_<id>`` fixture の実装関数を生成する。"""
 
     def _fixture(
-        ndf_config: Config,
+        pwk_config: Config,
         playwright,
         context,
-        _ndf_storage_state_cache: _StorageStateCache,
+        _pwk_storage_state_cache: _StorageStateCache,
     ) -> Role:
         """login 済の storage_state を ``context`` に注入し、Role を返す。
 
         - ``playwright`` / ``context`` は ``pytest-playwright`` 提供
         - 既に同 role の storage_state が cache 済なら login をスキップ
         """
-        role = ndf_config.role(role_id)
+        role = pwk_config.role(role_id)
 
-        state = _ndf_storage_state_cache.get(role_id)
+        state = _pwk_storage_state_cache.get(role_id)
         if state is None:
             state = _login_and_get_storage_state(
                 playwright=playwright,
-                base_url=ndf_config.base_url,
+                base_url=pwk_config.base_url,
                 role=role,
-                basic_auth_user=ndf_config.basic_auth.user,
-                basic_auth_password=ndf_config.basic_auth.password,
-                verify_tls=ndf_config.verify_tls,
-                nav_timeout_ms=ndf_config.playwright.navigation_timeout_ms,
+                basic_auth_user=pwk_config.basic_auth.user,
+                basic_auth_password=pwk_config.basic_auth.password,
+                verify_tls=pwk_config.verify_tls,
+                nav_timeout_ms=pwk_config.playwright.navigation_timeout_ms,
             )
-            _ndf_storage_state_cache.put(role_id, state)
+            _pwk_storage_state_cache.put(role_id, state)
 
         # cookies / origins (localStorage 等) を新しい context に注入する。
         cookies = state.get("cookies") or []
@@ -272,7 +272,7 @@ def _make_role_fixture(role_id: str) -> Callable:
             items = origin.get("localStorage") or []
             if not url or not items:
                 continue
-            if not _same_origin(url, ndf_config.base_url):
+            if not _same_origin(url, pwk_config.base_url):
                 continue
             try:
                 page = context.new_page()
@@ -289,7 +289,7 @@ def _make_role_fixture(role_id: str) -> Callable:
 
         return role
 
-    _fixture.__name__ = f"ndf_role_{role_id}"
+    _fixture.__name__ = f"pwk_role_{role_id}"
     _fixture.__doc__ = (
         f"role={role_id!r} で login 済の storage_state を context に注入する。"
     )
@@ -297,7 +297,7 @@ def _make_role_fixture(role_id: str) -> Callable:
 
 
 def register_role_fixtures(plugin_module, config: Config) -> list[str]:
-    """plugin module に ``ndf_role_<id>`` fixture を動的登録する。
+    """plugin module に ``pwk_role_<id>`` fixture を動的登録する。
 
     ``pytest_configure`` から呼ばれる。pytest は modules の attribute を
     fixture として discover するため、setattr で十分。
@@ -307,7 +307,7 @@ def register_role_fixtures(plugin_module, config: Config) -> list[str]:
     """
     registered: list[str] = []
     for role_id in config.roles:
-        name = f"ndf_role_{role_id}"
+        name = f"pwk_role_{role_id}"
         if hasattr(plugin_module, name):
             continue
         impl = _make_role_fixture(role_id)

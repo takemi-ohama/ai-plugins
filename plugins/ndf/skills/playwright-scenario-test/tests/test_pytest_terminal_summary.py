@@ -12,12 +12,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from scenario_test.pytest_plugin import (
+from playwright_kit.pytest_plugin import (
     _collect_entries,
     pytest_sessionfinish,
     pytest_terminal_summary,
 )
-from scenario_test.pytest_report import NdfTestEntry
+from playwright_kit.pytest_report import PwkTestEntry
 
 
 def _make_rep(
@@ -96,7 +96,7 @@ def test_collect_entries_promotes_teardown_failure_on_passed_call():
                 nodeid="t::bc",
                 outcome="failed",
                 when="teardown",
-                user_properties=[("ndf_body_check_violations", 2)],
+                user_properties=[("pwk_body_check_violations", 2)],
                 longrepr="body_check teardown failure",
             )
         ],
@@ -121,7 +121,7 @@ def test_collect_entries_promotes_teardown_failure_on_xfailed_call():
                 nodeid="t::xf",
                 outcome="failed",
                 when="teardown",
-                user_properties=[("ndf_body_check_violations", 1)],
+                user_properties=[("pwk_body_check_violations", 1)],
                 longrepr="body_check teardown failure on xfail",
             )
         ],
@@ -140,7 +140,7 @@ def test_collect_entries_promotes_teardown_error_with_error_outcome():
                 nodeid="t::e",
                 outcome="error",
                 when="teardown",
-                user_properties=[("ndf_body_check_violations", 0)],
+                user_properties=[("pwk_body_check_violations", 0)],
                 longrepr="teardown error",
             )
         ],
@@ -158,7 +158,7 @@ def test_collect_entries_promotes_teardown_failure_on_xpassed_call():
                 nodeid="t::xp",
                 outcome="failed",
                 when="teardown",
-                user_properties=[("ndf_body_check_violations", 1)],
+                user_properties=[("pwk_body_check_violations", 1)],
                 longrepr="body_check teardown failure on xpass",
             )
         ],
@@ -177,7 +177,7 @@ def test_collect_entries_promotes_teardown_failure_on_skipped_call():
                 nodeid="t::sk",
                 outcome="failed",
                 when="teardown",
-                user_properties=[("ndf_body_check_violations", 3)],
+                user_properties=[("pwk_body_check_violations", 3)],
                 longrepr="body_check teardown failure on skip",
             )
         ],
@@ -245,7 +245,7 @@ def test_terminal_summary_generates_report_md(tmp_path: Path):
 
     config = MagicMock()
     config.getoption.return_value = str(tmp_path)
-    config._ndf_config = None
+    config._pwk_config = None
 
     pytest_terminal_summary(tr, exitstatus=1, config=config)
 
@@ -263,7 +263,7 @@ def test_terminal_summary_skips_when_no_tests(tmp_path: Path):
     tr = _make_terminalreporter({})
     config = MagicMock()
     config.getoption.return_value = str(tmp_path)
-    config._ndf_config = None
+    config._pwk_config = None
 
     pytest_terminal_summary(tr, exitstatus=0, config=config)
 
@@ -279,10 +279,10 @@ def _make_session(*, drive_folder: str | None, report_path: Path, out_dir: Path)
     """``pytest_sessionfinish`` 用の薄い session mock を作る。"""
     config = MagicMock()
     config.getoption = lambda name, default=None: (
-        drive_folder if name == "ndf_drive_folder" else default
+        drive_folder if name == "pwk_drive_folder" else default
     )
-    config._ndf_report_path = report_path
-    config._ndf_out_dir = out_dir
+    config._pwk_report_path = report_path
+    config._pwk_out_dir = out_dir
     session = MagicMock()
     session.config = config
     return session
@@ -321,7 +321,7 @@ def test_sessionfinish_uploads_body_check_jsonl_with_any_kind(tmp_path: Path):
     with patch.dict(
         "sys.modules",
         {
-            "scenario_test.uploaders": SimpleNamespace(
+            "playwright_kit.uploaders": SimpleNamespace(
                 upload=fake_upload, detect_kind=fake_detect_kind
             )
         },
@@ -345,7 +345,7 @@ def test_sessionfinish_uploads_body_check_jsonl_with_any_kind(tmp_path: Path):
 
 
 def test_sessionfinish_skips_when_no_drive_folder(tmp_path: Path):
-    """``--ndf-drive-folder`` 未指定なら upload は走らない。"""
+    """``--pwk-drive-folder`` 未指定なら upload は走らない。"""
     out_dir = tmp_path / "out"
     out_dir.mkdir()
     report = out_dir / "report.md"
@@ -359,7 +359,7 @@ def test_sessionfinish_skips_when_no_drive_folder(tmp_path: Path):
     with patch.dict(
         "sys.modules",
         {
-            "scenario_test.uploaders": SimpleNamespace(
+            "playwright_kit.uploaders": SimpleNamespace(
                 upload=fake_upload, detect_kind=lambda f: "any"
             )
         },

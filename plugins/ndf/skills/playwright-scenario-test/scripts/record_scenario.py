@@ -96,7 +96,7 @@ def main() -> int:
         print("  2. CSS セレクタ (page.locator('#foo')) は a11y 名へ書き換える", file=sys.stderr)
         print("  3. templates/test_<role>.py.template に貼り付け、page_role / role marker を",
               file=sys.stderr)
-        print("     付与して `uv run pytest --ndf-config=...` で実行する", file=sys.stderr)
+        print("     付与して `uv run pytest --pwk-config=...` で実行する", file=sys.stderr)
     return result.returncode
 
 

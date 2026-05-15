@@ -126,6 +126,74 @@ plugins/ndf/
 
 ## 開発履歴
 
+### v4.5.0 (playwright-scenario-test v0.5.0 — Skill 非依存 self-contained 構成 / 名前空間 rename)
+
+> **注意**: 互換性破壊リリース。Python パッケージ名・fixture 名・CLI option・
+> 環境変数・内部クラス名がすべて変わる。既存利用者は manual に書き換え必要。
+> 詳細は [PLAN19](../../issues/PLAN19.md) を参照。
+
+- **`playwright-scenario-test` v0.5.0** (Skill 非依存化 + 名前空間整理):
+  - **目的**: 旧 v0.4.0 までは Skill ディレクトリで `uv sync` する必要があり、
+    Skill が消えるとテストが動かない / CI 別マシンで再現性が低い問題があった。
+    v0.5.0 では `scripts/init_project.sh` で **利用者プロジェクト直下に
+    `scenario-test/` (all-in-one ランタイム)** を埋め込み、Skill 非依存で動作させる。
+  - **新規 init / launcher**:
+    - `scripts/init_project.sh` / `scripts/init_project.bat`:
+      `<PROJECT_ROOT>/<runtime-dir>/` に playwright_kit / scripts / uv.lock /
+      runtime templates を rsync ベースでコピーし、初回 uv sync +
+      playwright install chromium まで実行。`--runtime-dir <name>` で配置先名
+      カスタマイズ可、`--dry-run` で予定差分のみ表示、`scenario.config.yaml` /
+      `tests/test_*.py` は既存があれば上書きしない (利用者編集物保護)
+    - `templates/run.sh` / `templates/run.bat`:
+      `$(dirname BASH_SOURCE)` / `%~dp0` で自身の位置を解決し CWD をランタイム
+      内に固定。初回のみ `uv sync` + `playwright install chromium`。
+      `--help` / `$@` で pytest 引数素通し
+    - `templates/pyproject.toml.runtime` / `templates/runtime-gitignore` /
+      `templates/runtime-README.md`: 利用者プロジェクト埋め込み用テンプレート
+  - **破壊的 rename** (Phase 0 / 0a):
+    - **Python パッケージ**: `scenario_test` → `playwright_kit`
+    - **pytest entry-point**: `ndf-scenario-test` → `playwright-kit`
+    - **fixture**: `ndf_config` → `pwk_config`, `ndf_role_<id>` →
+      `pwk_role_<id>`, `ndf_evidence` → `pwk_evidence`,
+      `ndf_a11y_scan` → `pwk_accessibility_scan`,
+      `ndf_cwv_measure` → `pwk_web_vitals_measure`,
+      `ndf_body_check_scan` → `pwk_body_check_scan`,
+      `ndf_out_dir` → `pwk_out_dir`
+    - **CLI option**: `--ndf-config` → `--pwk-config`, `--ndf-out-dir` →
+      `--pwk-out-dir`, `--ndf-no-evidence` → `--pwk-no-evidence`,
+      `--ndf-har-mode` → `--pwk-har-mode`, `--ndf-hud` → `--pwk-overlay`,
+      `--ndf-drive-folder` → `--pwk-drive-folder`
+    - **env var**: `NDF_CONFIG` → `PWK_CONFIG`
+    - **内部クラス**: `NdfTestEntry` → `PwkTestEntry`, `NdfEvidence` → `PwkEvidence`
+    - **モジュール rename** (Phase 0a, ドメイン用語の整理):
+      - `scenario_test/a11y.py` → `playwright_kit/accessibility.py`
+        (a11y は WCAG ドメイン用語のため平易な英語に)
+      - `scenario_test/cwv.py` → `playwright_kit/web_vitals.py`
+        (CWV → Core Web Vitals)
+      - `scenario_test/hud.py` → `playwright_kit/overlay.py`
+        (HUD = Heads-Up Display は造語的、overlay の方が直観的)
+    - **config schema**: `accessibility:` / `web_vitals:` キーに統一
+      (旧 `a11y:` / `cwv:` は廃止)
+    - **EvidenceCollectors fields**: `cwv_metrics` → `web_vitals_metrics`,
+      `cwv_passed` → `web_vitals_passed`
+  - **保持するもの** (W3C / 業界標準):
+    - `LCP` / `CLS` / `TTFB` / `longest_task` / `HAR` / `axe-core` —
+      データフィールド名・外部仕様名としてそのまま使用 (各 docstring と
+      SKILL.md の用語集セクションで正式名称を併記)
+  - **SKILL.md / docs**: クイックスタートを `init_project.sh → run.sh` フローに
+    全面書き換え、用語集セクションを SKILL.md 上部に新設、ディレクトリ図を
+    rename 後 + init 後構造に更新、開発者向け「Skill 単体で uv sync する旧運用」
+    節を別出し
+  - **検証**:
+    - 159 件 pure 関数テスト pass (config / fixtures / pytest plugin / report 全般)
+    - 擬似環境 (`/tmp/...`) に init 後、Skill ディレクトリを `mv` で隠した
+      状態で `./scenario-test/run.sh --collect-only` が完走 (8 件 collect, exit 0)
+    - `--runtime-dir e2e` 配置で複数ランタイム共存 (`scenario-test/` + `e2e/`)
+      が独立に動作
+    - 再 init で `tests/test_*.py` の利用者編集が保護される (skip)
+    - `--dry-run` で実際にはコピーされない
+- Skills: 39個 (変化なし、playwright-scenario-test の中身が刷新)
+
 ### v4.4.0 (issue-plan-strategy skill 追加)
 
 - **新規 Skill `issue-plan-strategy`**:

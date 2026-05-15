@@ -213,7 +213,7 @@ context.set_geolocation({"latitude": 35.68, "longitude": 139.69})
 
 ### 必須リスナー (本 Skill 標準)
 
-``ndf_evidence`` fixture が次のリスナーを自動付与する (autouse 相当):
+``pwk_evidence`` fixture が次のリスナーを自動付与する (autouse 相当):
 
 ```python
 console_msgs = []
@@ -233,9 +233,9 @@ page.on("pageerror", lambda exc: errors.append(str(exc)))
 | retry | `pytest --reruns N` | `retries: 2` | Python |
 | 並列 | `pytest -n auto` | builtin worker | Python |
 | trace | `--tracing retain-on-failure` | 同等 | Python |
-| merge-reports | `pytest_terminal_summary` で集計 | builtin | Python (`scenario_test/pytest_report.py`) |
+| merge-reports | `pytest_terminal_summary` で集計 | builtin | Python (`playwright_kit/pytest_report.py`) |
 
-**結論**: Python `pytest-playwright` を採用。理由は (1) HUD overlay / 字幕焼き込み / a11y / CWV / Drive 連携を pytest plugin として一体化済み、(2) `def test_xxx(page, ndf_role_admin): ...` を直接書く設計のため pytest fixture / marker と相性が良い、(3) merge-reports は `pytest_terminal_summary` hook で同等機能を提供.
+**結論**: Python `pytest-playwright` を採用。理由は (1) overlay (旧名 HUD) / 字幕焼き込み / accessibility / web_vitals / Drive 連携を pytest plugin として一体化済み、(2) `def test_xxx(page, pwk_role_admin): ...` を直接書く設計のため pytest fixture / marker と相性が良い、(3) merge-reports は `pytest_terminal_summary` hook で同等機能を提供.
 
 ## 参考文献
 

@@ -18,11 +18,11 @@ from unittest.mock import MagicMock, patch, call
 
 import pytest
 
-from scenario_test.fixtures.auth import (
+from playwright_kit.fixtures.auth import (
     _StorageStateCache,
     _login_and_get_storage_state,
 )
-from scenario_test.config import Login, Role
+from playwright_kit.config import Login, Role
 
 
 # ---------------------------------------------------------------------------

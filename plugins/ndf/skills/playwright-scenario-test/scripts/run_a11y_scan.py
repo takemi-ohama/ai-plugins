@@ -1,4 +1,4 @@
-"""axe-core で a11y 違反を検出する CLI (`scenario_test.a11y` モジュールの薄いラッパ)。
+"""axe-core で a11y 違反を検出する CLI (`playwright_kit.accessibility` モジュールの薄いラッパ)。
 
 docs/checklists/checklist-common.md C1 (a11y) の自動走査用。runner はテストケース
 内蔵で同 module を呼ぶため、本 CLI は外部 URL の単発スキャン専用。
@@ -19,12 +19,12 @@ from typing import Any
 
 from playwright.sync_api import sync_playwright
 
-# scenario_test 配下を import 可能にする (skill 直下から呼ばれる前提)
+# playwright_kit 配下を import 可能にする (skill 直下から呼ばれる前提)
 _SKILL_ROOT = Path(__file__).resolve().parent.parent
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from scenario_test.a11y import DEFAULT_TAGS, scan_page  # noqa: E402
+from playwright_kit.accessibility import DEFAULT_TAGS, scan_page  # noqa: E402
 
 
 def scan(

@@ -1,14 +1,15 @@
-"""a11y fixture: ``page_role`` marker に応じた axe-core 自動スキャン。
+"""accessibility fixture: ``page_role`` marker に応じた axe-core 自動スキャン。
 
+Web アクセシビリティ (WCAG 準拠) を ``axe-core`` で機械検査する fixture。
 ``@pytest.mark.page_role("form")`` 等が付与された test 関数の終了直前に
 axe-core を自動実行する。
 
 利用方法:
 - ``@pytest.mark.page_role("form")`` を test に付与すれば autouse 経由で
-  axe-core が走る (config.a11y.auto_roles に該当する場合のみ)
-- 違反があれば ``config.a11y.fail_on_violations`` (default True) に従い
+  axe-core が走る (config.accessibility.auto_roles に該当する場合のみ)
+- 違反があれば ``config.accessibility.fail_on_violations`` (default True) に従い
   ``pytest.fail`` する
-- 明示的に scan したい場合は ``ndf_a11y_scan`` fixture を直接呼ぶ
+- 明示的に scan したい場合は ``pwk_accessibility_scan`` fixture を直接呼ぶ
 """
 
 from __future__ import annotations
@@ -18,9 +19,9 @@ from typing import Iterator
 
 import pytest
 
-from scenario_test import a11y as a11y_mod
-from scenario_test.config import Config
-from scenario_test.fixtures.evidence import NdfEvidence
+from playwright_kit import accessibility as accessibility_mod
+from playwright_kit.config import Config
+from playwright_kit.fixtures.evidence import PwkEvidence
 
 
 def _page_roles_from_marker(item) -> list[str]:
@@ -36,14 +37,14 @@ def _page_roles_from_marker(item) -> list[str]:
 
 
 @pytest.fixture()
-def ndf_a11y_scan(page, ndf_evidence: NdfEvidence, _ndf_config_optional):
-    """明示呼び出し用: ``violations = ndf_a11y_scan()`` で 1 度スキャン。"""
-    config: Config | None = _ndf_config_optional
+def pwk_accessibility_scan(page, pwk_evidence: PwkEvidence, _pwk_config_optional):
+    """明示呼び出し用: ``violations = pwk_accessibility_scan()`` で 1 度スキャン。"""
+    config: Config | None = _pwk_config_optional
 
     def _scan(*, tags: tuple[str, ...] | None = None) -> list[dict]:
-        if not a11y_mod.is_available():
-            ndf_evidence.log_lines.append(
-                "[a11y] axe-playwright-python 未インストール — SKIP "
+        if not accessibility_mod.is_available():
+            pwk_evidence.log_lines.append(
+                "[accessibility] axe-playwright-python 未インストール — SKIP "
                 "(`uv sync --extra a11y` で有効化)"
             )
             return []
@@ -51,20 +52,20 @@ def ndf_a11y_scan(page, ndf_evidence: NdfEvidence, _ndf_config_optional):
             tuple(tags)
             if tags is not None
             else (
-                tuple(config.a11y.tags)
+                tuple(config.accessibility.tags)
                 if config is not None
-                else a11y_mod.DEFAULT_TAGS
+                else accessibility_mod.DEFAULT_TAGS
             )
         )
-        violations = a11y_mod.scan_page(page, tags=actual_tags)
-        ndf_evidence.axe_violations.extend(violations)
+        violations = accessibility_mod.scan_page(page, tags=actual_tags)
+        pwk_evidence.axe_violations.extend(violations)
         return violations
 
     return _scan
 
 
 @pytest.fixture(autouse=True)
-def _ndf_a11y_autouse(request) -> Iterator[None]:
+def _pwk_accessibility_autouse(request) -> Iterator[None]:
     """``page_role`` marker が付いた test の終了直前に axe-core を実行する。
 
     ``page`` fixture を **要求している test のみ** 対象。autouse fixture が
@@ -72,12 +73,12 @@ def _ndf_a11y_autouse(request) -> Iterator[None]:
     parametrize してしまうため、ここでは ``request.fixturenames`` を見て
     必要な test だけ取得する。
 
-    Issue #60 fix: 旧版の ``"ndf_evidence" not in request.fixturenames`` ガードを
-    廃止。test 引数に ``ndf_evidence`` を書いていなくても ``getfixturevalue``
-    経由で lazy 取得し、a11y autouse が走るようにする。
+    Issue #60 fix: 旧版の ``"pwk_evidence" not in request.fixturenames`` ガードを
+    廃止。test 引数に ``pwk_evidence`` を書いていなくても ``getfixturevalue``
+    経由で lazy 取得し、accessibility autouse が走るようにする。
 
     teardown order 対策 (Issue #61): pytest fixture の teardown は LIFO のため、
-    ``yield`` 後に ``getfixturevalue("ndf_evidence")`` を呼ぶと「既に解放済」
+    ``yield`` 後に ``getfixturevalue("pwk_evidence")`` を呼ぶと「既に解放済」
     AssertionError が発生する。setup phase で ``ev`` / ``page`` を取得して
     closure に保持し、teardown phase はその参照のみを使う。
     """
@@ -88,30 +89,30 @@ def _ndf_a11y_autouse(request) -> Iterator[None]:
         yield
         return
 
-    config: Config | None = request.getfixturevalue("_ndf_config_optional")
-    if config is None or not config.a11y.enabled:
+    config: Config | None = request.getfixturevalue("_pwk_config_optional")
+    if config is None or not config.accessibility.enabled:
         yield
         return
     page_roles = _page_roles_from_marker(request.node)
     if not page_roles:
         yield
         return
-    if not a11y_mod.should_auto_scan(
-        page_roles, auto_roles=frozenset(config.a11y.auto_roles)
+    if not accessibility_mod.should_auto_scan(
+        page_roles, auto_roles=frozenset(config.accessibility.auto_roles)
     ):
         yield
         return
 
     # setup phase: closure に必要なオブジェクトを束ねる。
-    ndf_evidence: NdfEvidence = request.getfixturevalue("ndf_evidence")
+    pwk_evidence: PwkEvidence = request.getfixturevalue("pwk_evidence")
     page = request.getfixturevalue("page")
 
     yield
 
     # teardown phase: closure に保持した ev / page のみを参照する。
-    if not a11y_mod.is_available():
-        ndf_evidence.log_lines.append(
-            "[a11y autouse] axe-playwright-python 未インストール — SKIP"
+    if not accessibility_mod.is_available():
+        pwk_evidence.log_lines.append(
+            "[accessibility autouse] axe-playwright-python 未インストール — SKIP"
         )
         return
 
@@ -121,20 +122,20 @@ def _ndf_a11y_autouse(request) -> Iterator[None]:
     except Exception:
         return
 
-    violations = a11y_mod.scan_page(page, tags=tuple(config.a11y.tags))
-    ndf_evidence.axe_violations.extend(violations)
+    violations = accessibility_mod.scan_page(page, tags=tuple(config.accessibility.tags))
+    pwk_evidence.axe_violations.extend(violations)
     if not violations:
         return
 
     impacts = Counter(v.get("impact") or "unknown" for v in violations)
     impact_summary = ", ".join(f"{k}={n}" for k, n in impacts.most_common())
-    ndf_evidence.log_lines.append(
-        f"[a11y autouse] {len(violations)} violations: {impact_summary}"
+    pwk_evidence.log_lines.append(
+        f"[accessibility autouse] {len(violations)} violations: {impact_summary}"
     )
 
-    if config.a11y.fail_on_violations:
+    if config.accessibility.fail_on_violations:
         pytest.fail(
-            f"[a11y] {len(violations)} 件の axe-core 違反 "
+            f"[accessibility] {len(violations)} 件の axe-core 違反 "
             f"[{impact_summary}]: "
             + ", ".join(
                 f"{v.get('id')}({v.get('impact', '?')})" for v in violations[:5]

@@ -4,7 +4,7 @@
   - `#__hud_cursor` — mousemove/down/up を追う赤丸（クリックで黄色リップル）
   - `#__hud_caption` — 画面上部の 2 行字幕（`直前 │ … / 次へ │ …`）
 
-HUD_INIT_SCRIPT は context.add_init_script() に渡す。
+OVERLAY_INIT_SCRIPT は context.add_init_script() に渡す。
 他の関数は Page を受け取り、HUD の状態を JS evaluate 越しに更新する。
 """
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 from playwright.sync_api import Page
 
 
-HUD_INIT_SCRIPT = r"""
+OVERLAY_INIT_SCRIPT = r"""
 (() => {
   if (window.__hudInited) return;
   window.__hudInited = true;

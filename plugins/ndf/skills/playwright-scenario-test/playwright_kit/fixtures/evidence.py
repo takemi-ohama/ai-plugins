@@ -4,11 +4,11 @@ pytest-playwright が提供する ``browser_context_args`` / ``context`` / ``pag
 fixture と組み合わせて、test 関数ごとに以下を自動収集する:
 
 - HAR: ``browser_context_args`` に ``record_har_path`` を inject
-- trace: ``context.tracing.start`` / ``stop`` (``--ndf-no-evidence`` で無効化)
+- trace: ``context.tracing.start`` / ``stop`` (``--pwk-no-evidence`` で無効化)
 - console.error / pageerror: page listener として attach
   (``tolerated_console_errors`` / ``tolerated_page_errors`` でフィルタ)
 
-artifact の出力先は ``--ndf-out-dir`` (default: ``./reports/<run-id>/``)。
+artifact の出力先は ``--pwk-out-dir`` (default: ``./reports/<run-id>/``)。
 test 関数 ID から sub-dir を作って 1 test = 1 dir で隔離する。
 """
 
@@ -24,7 +24,7 @@ from typing import Any, Iterator
 
 import pytest
 
-from scenario_test.config import Config, PlaywrightConfig
+from playwright_kit.config import Config, PlaywrightConfig
 
 
 # ---------------------------------------------------------------------------
@@ -33,37 +33,37 @@ from scenario_test.config import Config, PlaywrightConfig
 
 
 def _resolve_out_dir(pytestconfig) -> Path:
-    """``--ndf-out-dir`` が指定されればそれを、なければ ``reports/<run-id>/``。
+    """``--pwk-out-dir`` が指定されればそれを、なければ ``reports/<run-id>/``。
 
-    run_id は session 開始時に 1 度だけ決定し、``pytestconfig._ndf_out_dir`` に
-    キャッシュする。これにより ``ndf_out_dir`` fixture と
+    run_id は session 開始時に 1 度だけ決定し、``pytestconfig._pwk_out_dir`` に
+    キャッシュする。これにより ``pwk_out_dir`` fixture と
     ``pytest_terminal_summary`` が別々に ``datetime.now()`` を呼んで
     秒またぎでディレクトリがズレる問題を防ぐ (新規 Major 対応)。
 
-    ``--ndf-out-dir`` が明示指定されている場合はキャッシュ不要のため
+    ``--pwk-out-dir`` が明示指定されている場合はキャッシュ不要のため
     常にその値を返す（複数回呼ばれても同じ値）。
     """
-    raw: str | None = pytestconfig.getoption("ndf_out_dir", default=None)
+    raw: str | None = pytestconfig.getoption("pwk_out_dir", default=None)
     if raw:
         return Path(raw).resolve()
 
-    # --ndf-out-dir 未指定時のみキャッシュで run_id の秒またぎを防ぐ。
+    # --pwk-out-dir 未指定時のみキャッシュで run_id の秒またぎを防ぐ。
     # hasattr で厳密にチェックし、MagicMock 等が偽の属性を返さないようにする。
-    if "_ndf_out_dir" in vars(pytestconfig):
-        return pytestconfig._ndf_out_dir  # type: ignore[attr-defined]
+    if "_pwk_out_dir" in vars(pytestconfig):
+        return pytestconfig._pwk_out_dir  # type: ignore[attr-defined]
 
     run_id = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     out = (Path.cwd() / "reports" / run_id).resolve()
     # session-scoped キャッシュとして保存
-    pytestconfig._ndf_out_dir = out  # type: ignore[attr-defined]
+    pytestconfig._pwk_out_dir = out  # type: ignore[attr-defined]
     return out
 
 
 @pytest.fixture(scope="session")
-def ndf_out_dir(pytestconfig) -> Path:
+def pwk_out_dir(pytestconfig) -> Path:
     """session 全体で共有する成果物ルート。session 開始時に作成する。
 
-    ``_resolve_out_dir`` を通じて ``pytestconfig._ndf_out_dir`` にキャッシュし、
+    ``_resolve_out_dir`` を通じて ``pytestconfig._pwk_out_dir`` にキャッシュし、
     ``pytest_terminal_summary`` と同じ out_dir を参照する。
     """
     out = _resolve_out_dir(pytestconfig)
@@ -101,7 +101,7 @@ def _safe_case_slug(node: Any) -> str:
 
 
 @dataclass
-class NdfEvidence:
+class PwkEvidence:
     """1 test 関数分の証跡コレクタ。"""
 
     case_dir: Path
@@ -116,8 +116,8 @@ class NdfEvidence:
     console_errors: list[str] = field(default_factory=list)
     page_errors: list[str] = field(default_factory=list)
     axe_violations: list[dict[str, Any]] = field(default_factory=list)
-    cwv_metrics: dict[str, float] = field(default_factory=dict)
-    cwv_passed: bool = True
+    web_vitals_metrics: dict[str, float] = field(default_factory=dict)
+    web_vitals_passed: bool = True
     # PHP / SSR ページ本文エラー (body_check) 違反 (v0.4.0)。1 件 = 1 dict
     # ({url, category, pattern, snippet})。
     body_check_violations: list[dict[str, Any]] = field(default_factory=list)
@@ -221,39 +221,39 @@ class NdfEvidence:
 
 
 @pytest.fixture(scope="session")
-def _ndf_config_optional(pytestconfig) -> Config | None:
-    """``ndf_config`` を session に 1 度だけ load する (失敗時は None)。
+def _pwk_config_optional(pytestconfig) -> Config | None:
+    """``pwk_config`` を session に 1 度だけ load する (失敗時は None)。
 
-    evidence fixture は ndf_config が無くても動くように optional にしてある。
+    evidence fixture は pwk_config が無くても動くように optional にしてある。
     """
-    cached = getattr(pytestconfig, "_ndf_config", None)
+    cached = getattr(pytestconfig, "_pwk_config", None)
     if cached is not None:
         return cached  # type: ignore[no-any-return]
     return None
 
 
-def _resolve_har_mode(pytestconfig, ndf_config) -> str:
-    """``--ndf-har-mode`` CLI > ``playwright.har_mode`` config > ``PlaywrightConfig`` default。
+def _resolve_har_mode(pytestconfig, pwk_config) -> str:
+    """``--pwk-har-mode`` CLI > ``playwright.har_mode`` config > ``PlaywrightConfig`` default。
 
-    Issue #62 対策で default は ``minimal``。``--ndf-no-evidence`` が True の場合
+    Issue #62 対策で default は ``minimal``。``--pwk-no-evidence`` が True の場合
     呼び出し側で HAR を一切 inject しない (本関数の戻り値は使われない)。
 
     default 値は ``PlaywrightConfig().har_mode`` から引くことで dataclass 側との
     二重管理を防ぐ。
     """
-    cli = pytestconfig.getoption("ndf_har_mode", default=None)
+    cli = pytestconfig.getoption("pwk_har_mode", default=None)
     if cli:
         # ``pytest_plugin.py`` の argparse ``choices`` で値は担保済だが、
         # API 経由 (``--config`` 等) で大文字が来た場合に備える defensive normalize。
         return str(cli).lower()
-    if ndf_config is not None:
-        return str(ndf_config.playwright.har_mode).lower()
+    if pwk_config is not None:
+        return str(pwk_config.playwright.har_mode).lower()
     return PlaywrightConfig().har_mode
 
 
 @pytest.fixture()
 def browser_context_args(
-    browser_context_args, request, pytestconfig, ndf_out_dir, _ndf_config_optional
+    browser_context_args, request, pytestconfig, pwk_out_dir, _pwk_config_optional
 ) -> dict[str, Any]:
     """pytest-playwright の ``browser_context_args`` を function scope で override し、
     1 test = 1 HAR を実現する (Codex Major 1)。
@@ -261,25 +261,25 @@ def browser_context_args(
     - scope を function に変更し、``request.node`` ごとに ``case_dir/request.har``
       を ``record_har_path`` に inject する。
     - session 共通 HAR (``session.har``) は廃止。これにより
-      ``NdfEvidence.confirm_har()`` が常に None を返す不整合を解消。
-    - ``--ndf-no-evidence`` が True なら HAR 収集を OFF。
+      ``PwkEvidence.confirm_har()`` が常に None を返す不整合を解消。
+    - ``--pwk-no-evidence`` が True なら HAR 収集を OFF。
     - HAR mode (Issue #62):
-      - ``--ndf-har-mode none`` (または config ``playwright.har_mode: none``):
+      - ``--pwk-har-mode none`` (または config ``playwright.har_mode: none``):
         ``record_har_path`` を inject しない。
       - ``minimal`` (default): ``record_har_mode="minimal"`` でメタデータのみ
         記録。Basic 認証 + redirect 連続時の ``ERR_ABORTED`` race を回避する。
       - ``full``: Playwright 既定の full HAR (body + content) を記録。
     """
-    no_evidence = bool(pytestconfig.getoption("ndf_no_evidence", default=False))
+    no_evidence = bool(pytestconfig.getoption("pwk_no_evidence", default=False))
     args = dict(browser_context_args or {})
     if no_evidence:
         return args
 
-    har_mode = _resolve_har_mode(pytestconfig, _ndf_config_optional)
+    har_mode = _resolve_har_mode(pytestconfig, _pwk_config_optional)
     if har_mode == "none":
         return args
 
-    case_dir = ndf_out_dir / _safe_case_slug(request.node)
+    case_dir = pwk_out_dir / _safe_case_slug(request.node)
     case_dir.mkdir(parents=True, exist_ok=True)
     args.setdefault("record_har_path", str(case_dir / "request.har"))
     if har_mode == "minimal":
@@ -294,37 +294,37 @@ def browser_context_args(
 
 
 @pytest.fixture()
-def ndf_evidence(
+def pwk_evidence(
     request,
     pytestconfig,
-    ndf_out_dir: Path,
-    _ndf_config_optional,
+    pwk_out_dir: Path,
+    _pwk_config_optional,
     context,
     page,
-) -> Iterator[NdfEvidence]:
+) -> Iterator[PwkEvidence]:
     """1 test 関数分の evidence collector を返す。
 
-    - ``--ndf-no-evidence`` が True なら trace/HAR を OFF にし、listener のみ動かす
+    - ``--pwk-no-evidence`` が True なら trace/HAR を OFF にし、listener のみ動かす
     - ``page`` fixture から console / pageerror listener を attach
     - ``context.tracing.start/stop`` を裏で実行 (有効時)
-    - ``--ndf-hud`` 指定時は ``hud.HUD_INIT_SCRIPT`` を ``context.add_init_script``
+    - ``--pwk-overlay`` 指定時は ``overlay.OVERLAY_INIT_SCRIPT`` を ``context.add_init_script``
       で全 page に inject する
-    - ``pytest_runtest_makereport`` から FAIL 時に ``ndf_evidence`` の状態を確認可能
+    - ``pytest_runtest_makereport`` から FAIL 時に ``pwk_evidence`` の状態を確認可能
     """
-    enabled = not bool(pytestconfig.getoption("ndf_no_evidence", default=False))
-    hud_enabled = bool(pytestconfig.getoption("ndf_hud", default=False))
+    enabled = not bool(pytestconfig.getoption("pwk_no_evidence", default=False))
+    overlay_enabled = bool(pytestconfig.getoption("pwk_overlay", default=False))
     # _safe_case_slug で nodeid + xdist worker + sha1[:6] の衝突しない slug を使用 (Codex Major 2)
-    case_dir = ndf_out_dir / _safe_case_slug(request.node)
+    case_dir = pwk_out_dir / _safe_case_slug(request.node)
     case_dir.mkdir(parents=True, exist_ok=True)
 
     # HAR mode が "none" のときは ``request.har`` を期待しないようにする
     # (browser_context_args で record_har_path 自体を inject していない: Issue #62)。
-    har_mode = _resolve_har_mode(pytestconfig, _ndf_config_optional)
+    har_mode = _resolve_har_mode(pytestconfig, _pwk_config_optional)
     har_enabled = enabled and har_mode != "none"
 
-    ev = NdfEvidence(
+    ev = PwkEvidence(
         case_dir=case_dir,
-        config=_ndf_config_optional,
+        config=_pwk_config_optional,
         enabled=enabled,
         har_path=(case_dir / "request.har") if har_enabled else None,
         trace_path=(case_dir / "trace.zip") if enabled else None,
@@ -332,17 +332,17 @@ def ndf_evidence(
     ev.attach_listeners(page)
     ev.start_tracing(context)
 
-    # HUD overlay (赤丸カーソル + 字幕) を init_script で inject。
-    if hud_enabled:
+    # overlay (赤丸カーソル + 字幕、旧名 HUD) を init_script で inject。
+    if overlay_enabled:
         try:
-            from scenario_test.hud import HUD_INIT_SCRIPT
+            from playwright_kit.overlay import OVERLAY_INIT_SCRIPT
 
-            context.add_init_script(HUD_INIT_SCRIPT)
+            context.add_init_script(OVERLAY_INIT_SCRIPT)
         except Exception as exc:  # pragma: no cover
-            ev.log_lines.append(f"[hud] add_init_script 失敗: {exc}")
+            ev.log_lines.append(f"[overlay] add_init_script 失敗: {exc}")
 
     # request.node に ev を保持して makereport hook から参照可能にする
-    request.node._ndf_evidence = ev  # type: ignore[attr-defined]
+    request.node._pwk_evidence = ev  # type: ignore[attr-defined]
 
     try:
         yield ev

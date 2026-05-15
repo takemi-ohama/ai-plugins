@@ -485,10 +485,11 @@ wheels = [
 ]
 
 [[package]]
-name = "playwright-scenario-test"
-version = "0.4.0"
+name = "playwright-kit"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
+    { name = "axe-playwright-python" },
     { name = "imageio-ffmpeg" },
     { name = "playwright" },
     { name = "pytest" },
@@ -498,9 +499,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-a11y = [
-    { name = "axe-playwright-python" },
-]
 dev = [
     { name = "pytest" },
 ]
@@ -512,7 +510,7 @@ drive = [
 
 [package.metadata]
 requires-dist = [
-    { name = "axe-playwright-python", marker = "extra == 'a11y'", specifier = ">=0.1.4" },
+    { name = "axe-playwright-python", specifier = ">=0.1.4" },
     { name = "google-api-python-client", marker = "extra == 'drive'", specifier = ">=2.0" },
     { name = "google-auth", marker = "extra == 'drive'", specifier = ">=2.0" },
     { name = "google-auth-oauthlib", marker = "extra == 'drive'", specifier = ">=1.0" },
@@ -524,7 +522,7 @@ requires-dist = [
     { name = "pytest-xdist", specifier = ">=3.0" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
-provides-extras = ["drive", "a11y", "dev"]
+provides-extras = ["drive", "dev"]
 
 [[package]]
 name = "pluggy"
