@@ -53,6 +53,19 @@ PR #72 の実機テストで得た codex / gemini からの指摘および追加
     「現在の PR」は state.json の `current_pr` を内部で読む。
     旧実装は PR rotation 後にメイン側で `PR=$NEW_PR` に切り替えると state.json
     パスが見つからなくなる設計矛盾があった。
+- **tmp ディレクトリの gemini workspace 制約対応**:
+  - 全 scripts の tmp パスを `/tmp/` 直書きから `$CROSS_REVIEW_TMP_DIR` 経由に変更。
+    未設定なら `~/.gemini/tmp/<workspace-basename>/` を自動採用、最終フォールバックは `/tmp/`。
+    gemini CLI は `--yolo --skip-trust` でも workspace 外の `read_file` /
+    `write_file` がブロックされる (`Path not in workspace`) ため、gemini 公式の
+    project temp directory に揃えることで result.json / payload.json の書き出しを
+    成立させる。
+  - 共通ヘルパ `scripts/_tmpdir.sh` を追加 (bash) / `state.py` と `monitor.py` に
+    `_tmp_dir()` 関数を追加 (Python)。`state.py init` は採用した `TMP_DIR` を
+    state.json に記録し、stdout の `TMP_DIR=` で呼び出し側に通知。
+  - SKILL.md のテンプレートで `eval "$(state.py init ...)"` 後に
+    `export CROSS_REVIEW_TMP_DIR="$TMP_DIR"` を行い、後続スクリプトに env として
+    伝播させる手順を追加。
 - **`SKILL.md` / `docs/01,02`**:
   - bash テンプレートを `$STATE_PR` 固定で書き直し、rotation 後も同じ変数で
     全 scripts を呼ぶ手順に統一。

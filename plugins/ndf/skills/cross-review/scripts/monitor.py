@@ -90,6 +90,28 @@ EARLY_ERROR_BENIGN = [
 CODEX_SENTINEL = re.compile(r"^tokens used$", re.MULTILINE)
 
 
+def _tmp_dir() -> pathlib.Path:
+    """cross-review 用 tmp ディレクトリ。
+
+    state.py の `_tmp_dir()` と同じロジック。優先:
+      1. `CROSS_REVIEW_TMP_DIR` env
+      2. `~/.gemini/tmp/<cwd-basename>/` (`~/.gemini/tmp/` が存在するとき)
+      3. `/tmp/` (フォールバック)
+    """
+    env = os.environ.get("CROSS_REVIEW_TMP_DIR")
+    if env:
+        d = pathlib.Path(env)
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    base_name = pathlib.Path(os.getcwd()).name
+    gemini_root = pathlib.Path.home() / ".gemini" / "tmp"
+    if gemini_root.is_dir() and base_name:
+        d = gemini_root / base_name
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return pathlib.Path("/tmp")
+
+
 # ---------- データ型 ----------
 
 @dataclass
@@ -103,7 +125,7 @@ class AgentPaths:
 
     @classmethod
     def for_(cls, agent: str, pr: int) -> "AgentPaths":
-        base = f"/tmp/{agent}-review-pr{pr}"
+        base = _tmp_dir() / f"{agent}-review-pr{pr}"
         return cls(
             agent=agent, pr=pr,
             pidfile=pathlib.Path(f"{base}.pid"),

@@ -76,8 +76,8 @@ state.json の読み書きや AI launcher 起動・完了待ちは全て委譲�
 |---|---|---|
 | 1 | 自分の PR 判定（422 回避） | `gh api user` と `gh pr view --json author` を比較し `is_own_pr` / `event_downgrade` を state.json に書く |
 | 2 | worktree 分離 | `git worktree add /work/worktrees/pr<PR> <head>` を冪等実行 |
-| 3 | gemini trusted directory | `launch-gemini.sh` が `GEMINI_CLI_TRUST_WORKSPACE=true` + `--skip-trust` を必ず併用 |
-| 4 | 既存コメント差分 | `gh api .../comments --paginate` を `/tmp/cross-review-pr<PR>-existing-comments.txt` に保存し、launcher プロンプトに添付 |
+| 3 | gemini trusted directory | `launch-gemini.sh` が `GEMINI_CLI_TRUST_WORKSPACE=true` + `--skip-trust` を必ず併用。さらに **tmp dir は `~/.gemini/tmp/<workspace>/`** を採用し、gemini の workspace 制約 (workspace 外の `read_file` / `write_file` がブロックされる) を回避 |
+| 4 | 既存コメント差分 | `gh api .../comments --paginate` を `$TMP_DIR/cross-review-pr<PR>-existing-comments.txt` に保存し、gemini プロンプトには **内容をインライン埋め込み**、codex プロンプトには path を渡す |
 
 ### intent / posted_as の両保持（最重要）
 
@@ -145,6 +145,8 @@ STATE_PR=$INITIAL_PR
 eval "$("$SCRIPTS/state.py" init "$STATE_PR" \
           --max-rounds "$MAX_ROUNDS" --rotate-after "$ROTATE_AFTER" \
           ${ONLY:+--only "$ONLY"})"
+# eval で TMP_DIR がセットされる。後続スクリプトに env として伝播させる。
+export CROSS_REVIEW_TMP_DIR="$TMP_DIR"
 cd "$WORKTREE"
 
 while :; do

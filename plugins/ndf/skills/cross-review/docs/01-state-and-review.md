@@ -21,7 +21,7 @@
 
 ## 状態ファイル
 
-`/tmp/cross-review-pr<番号>-state.json`:
+`$TMP_DIR/cross-review-pr<番号>-state.json`:
 
 ```json
 {
@@ -95,7 +95,7 @@ cd "$WORKTREE"
 1. 既存 state.json があり `final == null` なら再開
 2. 自分の PR 判定（`gh api user` と `gh pr view --json author` を比較）
 3. worktree 作成（`/work/worktrees/pr<PR>`）
-4. 既存コメントスナップショット → `/tmp/cross-review-pr<PR>-existing-comments.txt`
+4. 既存コメントスナップショット → `$TMP_DIR/cross-review-pr<PR>-existing-comments.txt`
 5. state.json 書き出し
 
 **重要**: 以降の全ステップで `cd $WORKTREE` を強制。
@@ -114,7 +114,7 @@ eval "$("$SCRIPTS/state.py" start-round "$STATE_PR")"
 ## Step 2: codex / gemini 並列レビュー（AI 直接投稿）
 
 **要点**: メインは launcher を **並列バックグラウンド** で起動するだけ。
-各 AI が `gh api` で投稿し `/tmp/<agent>-review-pr<PR>-result.json` に
+各 AI が `gh api` で投稿し `$TMP_DIR/<agent>-review-pr<PR>-result.json` に
 サマリを書く。**ペイロード本体はメイン context に載せない**。
 
 ### 2.1 launcher 起動 + monitor
@@ -165,7 +165,7 @@ launcher が生成するプロンプトに以下を強制している:
 - **headRefOid (commit_id) を明示**: AI が自前で取得すると baseRefOid を誤って入れる事故が多発
 - **作業 worktree の絶対パス**: 「ファイル読み取りは必ず `/work/worktrees/pr<PR>/` 配下の絶対パスを使う」
 - **event ダウングレード警告**: `event_downgrade=true` のときは payload の `event` を `COMMENT` に
-- **既存コメント差分**: `/tmp/cross-review-pr<PR>-existing-comments.txt` を読んで重複指摘禁止
+- **既存コメント差分**: `$TMP_DIR/cross-review-pr<PR>-existing-comments.txt` を読んで重複指摘禁止
 - **review body 先頭 prefix**:
   ```
   ## 🤖 cross-review | round <N> | <agent> | <event(intent)>
@@ -179,8 +179,8 @@ launcher が生成するプロンプトに以下を強制している:
 
 | ファイル | 内容 |
 |---|---|
-| `/tmp/<agent>-review-pr<PR>-result.json` | `{event, posted_as, comments_count, review_url, by_severity}` のサマリ |
-| `/tmp/<agent>-review-pr<PR>-round<R>-payload.json` | `{comments: [{path, line, body, severity}, ...]}` 振動検知用 |
+| `$TMP_DIR/<agent>-review-pr<PR>-result.json` | `{event, posted_as, comments_count, review_url, by_severity}` のサマリ |
+| `$TMP_DIR/<agent>-review-pr<PR>-round<R>-payload.json` | `{comments: [{path, line, body, severity}, ...]}` 振動検知用 |
 
 `/ndf:review` の result.json 出力規約に `posted_as` フィールドを含むこと
 （自分PR ダウングレード時に GitHub に実際送った event。デフォルトは `event` と同値）。
@@ -226,7 +226,7 @@ elif [ $? -eq 4 ]; then
 fi
 ```
 
-各ラウンドの `/tmp/<agent>-review-pr<PR>-round<R>-payload.json` から
+各ラウンドの `$TMP_DIR/<agent>-review-pr<PR>-round<R>-payload.json` から
 `path:line` を抽出し、前ラウンドとの重複率を計算。**50% 以上重複で中断**。
 
 PR ローテーション直後 (`round_in_pr < 2`) はスキップ。

@@ -15,7 +15,12 @@ set -euo pipefail
 
 STATE_PR=${1:?STATE_PR required}
 
-STATE=/tmp/cross-review-pr$STATE_PR-state.json
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=_tmpdir.sh
+. "$SCRIPT_DIR/_tmpdir.sh"
+TMP_DIR=$(tmpdir)
+
+STATE=$TMP_DIR/cross-review-pr$STATE_PR-state.json
 [ -s "$STATE" ] || { echo "state.json not found: $STATE" >&2; exit 1; }
 
 WORKTREE=$(jq -r '.worktree_path' "$STATE")

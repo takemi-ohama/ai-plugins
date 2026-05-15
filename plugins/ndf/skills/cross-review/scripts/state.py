@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -35,16 +36,41 @@ from typing import Any
 
 # ---------------- helpers ----------------
 
+def _tmp_dir(workspace: str | None = None) -> pathlib.Path:
+    """cross-review 用 tmp ディレクトリを決定する。
+
+    優先順位:
+      1. 環境変数 `CROSS_REVIEW_TMP_DIR` (明示)
+      2. `~/.gemini/tmp/<workspace-basename>/` (gemini workspace 制約を回避するため、
+         `~/.gemini/tmp/` が存在するなら自動使用)
+      3. `/tmp/` (フォールバック)
+
+    `workspace` 未指定なら `os.getcwd()` の basename を使う。
+    """
+    env = os.environ.get("CROSS_REVIEW_TMP_DIR")
+    if env:
+        d = pathlib.Path(env)
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    base_name = pathlib.Path(workspace or os.getcwd()).name
+    gemini_root = pathlib.Path.home() / ".gemini" / "tmp"
+    if gemini_root.is_dir() and base_name:
+        d = gemini_root / base_name
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return pathlib.Path("/tmp")
+
+
 def _state_path(pr: int) -> pathlib.Path:
-    return pathlib.Path(f"/tmp/cross-review-pr{pr}-state.json")
+    return _tmp_dir() / f"cross-review-pr{pr}-state.json"
 
 
 def _payload_path(agent: str, pr: int, round_: int) -> pathlib.Path:
-    return pathlib.Path(f"/tmp/{agent}-review-pr{pr}-round{round_}-payload.json")
+    return _tmp_dir() / f"{agent}-review-pr{pr}-round{round_}-payload.json"
 
 
 def _existing_comments_path(pr: int) -> pathlib.Path:
-    return pathlib.Path(f"/tmp/cross-review-pr{pr}-existing-comments.txt")
+    return _tmp_dir() / f"cross-review-pr{pr}-existing-comments.txt"
 
 
 def _now() -> str:
@@ -86,7 +112,9 @@ def info(msg: str) -> None:
 def cmd_init(args: argparse.Namespace) -> None:
     """Step 0 — state 初期化 or 既存 state 引き継ぎ + プリチェック。"""
     pr = args.pr
-    state_file = _state_path(pr)
+    # tmp_dir は worktree 引数優先で決定し、後段で全 path に使う
+    tmp_dir = _tmp_dir(args.worktree)
+    state_file = tmp_dir / f"cross-review-pr{pr}-state.json"
 
     # 再開
     if state_file.exists():
@@ -96,6 +124,7 @@ def cmd_init(args: argparse.Namespace) -> None:
             info(f"↻ 前回中断 state から再開（round={len(st.get('rounds', []))}）")
             print(f"PR={st['current_pr']}")
             print(f"WORKTREE={wt}")
+            print(f"TMP_DIR={tmp_dir}")
             print(f"RESUMED=1")
             return
 
@@ -136,11 +165,12 @@ def cmd_init(args: argparse.Namespace) -> None:
         ["gh", "api", f"repos/{repo}/pulls/{pr}/comments", "--paginate", "--jq", jq_filter],
         capture_output=True, text=True,
     )
+    existing_path = tmp_dir / f"cross-review-pr{pr}-existing-comments.txt"
     if r.returncode == 0:
-        _existing_comments_path(pr).write_text(r.stdout)
+        existing_path.write_text(r.stdout)
     else:
         info(f"⚠ 既存コメント取得失敗: {r.stderr.strip()[:200]}")
-        _existing_comments_path(pr).write_text("")
+        existing_path.write_text("")
 
     state = {
         "started_at": _now(),
@@ -149,6 +179,7 @@ def cmd_init(args: argparse.Namespace) -> None:
         "only": args.only,
         "current_pr": pr,
         "worktree_path": worktree,
+        "tmp_dir": str(tmp_dir),
         "repo": repo,
         "head_branch": head_branch,
         "base_branch": base_branch,
@@ -160,10 +191,11 @@ def cmd_init(args: argparse.Namespace) -> None:
         "deferred_nits": [],
         "final": None,
     }
-    _save(pr, state)
+    state_file.write_text(json.dumps(state, indent=2, ensure_ascii=False))
     info(f"✅ state 初期化: {state_file}")
     print(f"PR={pr}")
     print(f"WORKTREE={worktree}")
+    print(f"TMP_DIR={tmp_dir}")
     print(f"REPO={repo}")
     print(f"HEAD_BRANCH={head_branch}")
     print(f"BASE_BRANCH={base_branch}")
@@ -207,7 +239,7 @@ def cmd_read_result(args: argparse.Namespace) -> None:
     """Step 2.5 — codex/gemini の result.json を state にマージ。"""
     agent = args.agent
     pr = args.pr
-    rfile = pathlib.Path(args.file or f"/tmp/{agent}-review-pr{pr}-result.json")
+    rfile = pathlib.Path(args.file or _tmp_dir() / f"{agent}-review-pr{pr}-result.json")
     if not rfile.exists() or rfile.stat().st_size == 0:
         die(f"{agent}: result 未生成 ({rfile})")
 
@@ -327,7 +359,7 @@ def cmd_merge_fix(args: argparse.Namespace) -> None:
     Exit code: 0=continue, 3=ci-code-fail (final=error)
     """
     pr = args.pr
-    ffile = pathlib.Path(args.file or f"/tmp/fix-pr{pr}-result.json")
+    ffile = pathlib.Path(args.file or _tmp_dir() / f"fix-pr{pr}-result.json")
     if not ffile.exists() or ffile.stat().st_size == 0:
         die("fix サブエージェントが戻り値ファイルを生成しなかった", code=3)
 

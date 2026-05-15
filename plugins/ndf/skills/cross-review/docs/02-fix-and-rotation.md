@@ -22,7 +22,7 @@
 2. 修正テストの追加・実行
 3. 修正対象の thread に **reply 投稿** + **`resolveReviewThread` で Resolve**
 4. nit / 判断が割れる minor は **修正せず deferred 記録**（reply は `[deferred / nit]` ラベル付き、Resolve しない）
-5. 戻り値ファイル `/tmp/fix-pr<PR>-result.json` を必ず書き出す
+5. 戻り値ファイル `$TMP_DIR/fix-pr<PR>-result.json` を必ず書き出す
 
 ### サブエージェント起動例
 
@@ -49,7 +49,7 @@ worktree 外を触ると競合します。
     (intent={CODEX_INTENT}, posted_as={CODEX_POSTED_AS}, {CODEX_COMMENT_COUNT}件)
   - gemini review: {GEMINI_REVIEW_URL}
     (intent={GEMINI_INTENT}, posted_as={GEMINI_POSTED_AS}, {GEMINI_COMMENT_COUNT}件)
-- 既存コメントスナップショット: /tmp/cross-review-pr{PR}-existing-comments.txt
+- 既存コメントスナップショット: $TMP_DIR/cross-review-pr{PR}-existing-comments.txt
 
 ## ポリシー
 - critical / major / minor は自動修正
@@ -88,7 +88,7 @@ worktree 外を触ると競合します。
    - deferred / rejected の thread は **Resolve しない**
 10. 戻り値ファイル書き出し（下記フォーマット）
 
-## 戻り値ファイル /tmp/fix-pr{PR}-result.json
+## 戻り値ファイル $TMP_DIR/fix-pr{PR}-result.json
 
 ```json
 {{
@@ -126,7 +126,7 @@ fi
 
 `state.py merge-fix` が内部で行う処理:
 
-1. `/tmp/fix-pr<PR>-result.json` を読んで `state.rounds[-1].fix` にマージ
+1. `$TMP_DIR/fix-pr<PR>-result.json` を読んで `state.rounds[-1].fix` にマージ
 2. `deferred` を `state.deferred_nits` に追記
 3. **CI 失敗の分類**:
    - code-fail (`pint` / `larastan` / `phpstan` / `test` / `lint` / `type` / `build` / `ruff` / `eslint` / `tsc` / `mypy`): `final=error` で中断 (exit 3)
@@ -163,7 +163,7 @@ exit 0 を返す（rotate 要）。それ以外は exit 2（keep）。
 > (`$STATE_PR`)。rotation 後も全 scripts の **第 1 引数には常に `$STATE_PR`** を渡す。
 > 内部的に `state.json.current_pr` を読んで「現在の PR」を解決する設計。
 > `PR=$NEW_PR` 等で shell 変数の側を切り替えると、次ループの `state.py start-round`
-> が `/tmp/cross-review-pr<NEW_PR>-state.json` を探して `state.json not found` で
+> が `$TMP_DIR/cross-review-pr<NEW_PR>-state.json` を探して `state.json not found` で
 > 止まる。
 
 ## Step 7: 次ラウンドへ

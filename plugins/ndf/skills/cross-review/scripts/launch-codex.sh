@@ -7,16 +7,24 @@
 # rotation 後も state.json の場所は変わらないため、ここに渡すのは常に初期 PR。
 # gh コマンドに使う「現在のレビュー対象 PR」は state.json の `current_pr` を読む。
 #
-# 状態ファイル: /tmp/codex-review-pr<STATE_PR>-{result,err,stdout,pid}.json
-# (TMP は **STATE_PR ベース** で固定 — monitor.py / state.py が読み取る tmp パス
-#  と完全に一致させる。rotation で current_pr が変わってもパスは変えない。)
+# tmp ディレクトリは `_tmpdir.sh` の `tmpdir()` 関数で決定:
+#   CROSS_REVIEW_TMP_DIR env → ~/.gemini/tmp/<workspace>/ → /tmp/
+# gemini の workspace 制約を回避するため、`~/.gemini/tmp/...` を優先採用する。
+#
+# 状態ファイル: $TMP_DIR/codex-review-pr<STATE_PR>-{result,err,stdout,pid}.json
+# (パスは STATE_PR ベースで固定 — monitor.py / state.py と一致させる。)
 
 set -euo pipefail
 
 STATE_PR=${1:?STATE_PR required}
 ROUND=${2:?ROUND required}
 
-STATE=/tmp/cross-review-pr$STATE_PR-state.json
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=_tmpdir.sh
+. "$SCRIPT_DIR/_tmpdir.sh"
+TMP_DIR=$(tmpdir)
+
+STATE=$TMP_DIR/cross-review-pr$STATE_PR-state.json
 [ -s "$STATE" ] || { echo "state.json not found: $STATE" >&2; exit 1; }
 
 WORKTREE=$(jq -r '.worktree_path' "$STATE")
@@ -28,8 +36,8 @@ EVENT_DOWNGRADE=$(jq -r '.event_downgrade // false' "$STATE")
 PR=$(jq -r '.current_pr' "$STATE")
 SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
 
-PROMPT=/tmp/codex-review-pr$STATE_PR-prompt.md
-EXISTING=/tmp/cross-review-pr$STATE_PR-existing-comments.txt
+PROMPT=$TMP_DIR/codex-review-pr$STATE_PR-prompt.md
+EXISTING=$TMP_DIR/cross-review-pr$STATE_PR-existing-comments.txt
 
 cat > "$PROMPT" <<EOF
 # /ndf:review 実行 (cross-review codex / round $ROUND)
@@ -54,7 +62,7 @@ PR #$PR を **codex の観点でレビューし、gh api で直接 PR に投稿*
   例: \`## 🤖 cross-review | round $ROUND | codex | REQUEST_CHANGES\`
   - \`<event>\` は **本来の intent** (REQUEST_CHANGES / APPROVE / COMMENT)
 - インラインコメントは \`[major / 正確性]\` のように \`[重要度 / カテゴリ]\` プレフィックス
-- 投稿後、サマリを **/tmp/codex-review-pr$STATE_PR-result.json** に書く:
+- 投稿後、サマリを **$TMP_DIR/codex-review-pr$STATE_PR-result.json** に書く:
   \`\`\`json
   {
     "event": "REQUEST_CHANGES",
@@ -64,7 +72,7 @@ PR #$PR を **codex の観点でレビューし、gh api で直接 PR に投稿*
     "by_severity": {"critical": 0, "major": 3, "minor": 2, "nit": 0}
   }
   \`\`\`
-- payload（全コメント詳細）は **/tmp/codex-review-pr$STATE_PR-round$ROUND-payload.json** に保存
+- payload（全コメント詳細）は **$TMP_DIR/codex-review-pr$STATE_PR-round$ROUND-payload.json** に保存
   （振動検知用、\`{ "comments": [{path, line, body, severity}, ...] }\` 形式）
 
 ## 守るべきこと
@@ -77,8 +85,8 @@ cd "$WORKTREE"
 nohup codex exec --dangerously-bypass-approvals-and-sandbox \
   --config reasoning.effort=medium -C "$WORKTREE" \
   < "$PROMPT" \
-  > /tmp/codex-review-pr$STATE_PR-stdout.log \
-  2> /tmp/codex-review-pr$STATE_PR-err.log &
-echo $! > /tmp/codex-review-pr$STATE_PR.pid
+  > $TMP_DIR/codex-review-pr$STATE_PR-stdout.log \
+  2> $TMP_DIR/codex-review-pr$STATE_PR-err.log &
+echo $! > $TMP_DIR/codex-review-pr$STATE_PR.pid
 disown
-echo "🚀 codex launched (pid=$(cat /tmp/codex-review-pr$STATE_PR.pid))" >&2
+echo "🚀 codex launched (pid=$(cat $TMP_DIR/codex-review-pr$STATE_PR.pid))" >&2
