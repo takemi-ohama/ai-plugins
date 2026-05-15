@@ -113,8 +113,13 @@ def cmd_init(args: argparse.Namespace) -> None:
     worktree = args.worktree or f"/work/worktrees/pr{pr}"
     if not pathlib.Path(worktree).exists():
         _sh(["git", "fetch", "origin", head_branch])
-        _sh(["git", "worktree", "add", worktree, head_branch])
-        info(f"✅ worktree 作成: {worktree}")
+        # head branch が既に別の worktree (例: 現在の作業ディレクトリ) で checkout されている
+        # 場合、`git worktree add <path> <branch>` は
+        # `fatal: '<branch>' is already used by worktree at '<other>'`
+        # で落ちる。これを避けるため、`origin/<head_branch>` を **detached** で展開する。
+        # cross-review はファイル参照しかしないので detached HEAD で全く問題ない。
+        _sh(["git", "worktree", "add", "--detach", worktree, f"origin/{head_branch}"])
+        info(f"✅ worktree 作成 (detached @ origin/{head_branch}): {worktree}")
     else:
         info(f"↻ 既存 worktree 流用: {worktree}")
 

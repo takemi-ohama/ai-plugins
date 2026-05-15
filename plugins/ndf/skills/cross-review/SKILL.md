@@ -166,8 +166,9 @@ while :; do
   # Step 4: 振動検知 (4=oscillation)
   "$SCRIPTS/state.py" check-oscillation "$STATE_PR" || [ $? -eq 2 ] || exit 4
 
-  # Step 5: 修正サブエージェント起動 (Agent tool) → /tmp/fix-pr<current_pr>-result.json
+  # Step 5: 修正サブエージェント起動 (Agent tool) → /tmp/fix-pr<STATE_PR>-result.json
   #   - メインで Agent(subagent_type=general-purpose, ...) を呼ぶ。docs/02 参照
+  #   - tmp パスは launcher / monitor.py と同じく **STATE_PR ベース** で統一
   # Step 5 後段: fix 戻り値マージ + CI 分類 (3=code-fail で中断)
   "$SCRIPTS/state.py" merge-fix "$STATE_PR"
 

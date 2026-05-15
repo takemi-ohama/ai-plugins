@@ -22,11 +22,20 @@ STATE=/tmp/cross-review-pr$STATE_PR-state.json
 WORKTREE=$(jq -r '.worktree_path' "$STATE")
 REPO=$(jq -r '.repo' "$STATE")
 EVENT_DOWNGRADE=$(jq -r '.event_downgrade // false' "$STATE")
+# PR (=current_pr) は gh コマンドのレビュー対象 PR 番号として使う。
+# tmp パス側は STATE_PR で固定 (monitor.py / state.py との読み書き整合のため)。
 PR=$(jq -r '.current_pr' "$STATE")
 SHA=$(gh pr view "$PR" --json headRefOid -q .headRefOid)
 
-PROMPT=/tmp/gemini-review-pr$PR-prompt.md
-EXISTING=/tmp/cross-review-pr$PR-existing-comments.txt
+PROMPT=/tmp/gemini-review-pr$STATE_PR-prompt.md
+# 既存コメントは gemini の workspace 制約 (`/tmp/` は workspace 外) を回避するため、
+# ファイルパスではなく **プロンプトにインライン埋め込み** する。
+EXISTING_FILE=/tmp/cross-review-pr$STATE_PR-existing-comments.txt
+if [ -s "$EXISTING_FILE" ]; then
+  EXISTING_INLINE=$(cat "$EXISTING_FILE")
+else
+  EXISTING_INLINE="(なし)"
+fi
 
 cat > "$PROMPT" <<EOF
 # /ndf:review 実行 (cross-review gemini / round $ROUND)
@@ -41,7 +50,13 @@ PR #$PR を **gemini の観点でレビューし、gh api で直接 PR に投稿
 - event_downgrade: $EVENT_DOWNGRADE
   - true の場合: payload の \`event\` は \`COMMENT\` にすること。
     body 先頭 prefix の \`<event>\` は本来の intent を書く。
-- 既存コメントスナップショット: $EXISTING （重複指摘禁止）
+
+## 既存コメントスナップショット（重複指摘禁止）
+gemini の workspace 制約で /tmp/ は読めないため、以下にインライン展開する:
+
+\`\`\`
+$EXISTING_INLINE
+\`\`\`
 
 ## 出力契約
 - review body の **先頭行** に必ず以下を入れる:
@@ -49,8 +64,8 @@ PR #$PR を **gemini の観点でレビューし、gh api で直接 PR に投稿
   ## 🤖 cross-review | round $ROUND | gemini | <event(intent)>
   \`\`\`
 - インラインコメントは \`[重要度 / カテゴリ]\` プレフィックス
-- 投稿後、サマリを **/tmp/gemini-review-pr$PR-result.json** に書く（フォーマットは launch-codex.sh と同じ）
-- payload は **/tmp/gemini-review-pr$PR-round$ROUND-payload.json** に保存
+- 投稿後、サマリを **/tmp/gemini-review-pr$STATE_PR-result.json** に書く（フォーマットは launch-codex.sh と同じ）
+- payload は **/tmp/gemini-review-pr$STATE_PR-round$ROUND-payload.json** に保存
 
 ## 守るべきこと
 - **リポジトリ編集禁止**。gh api での投稿のみ許可
@@ -62,8 +77,8 @@ cd "$WORKTREE"
 # ⚠ --skip-trust と GEMINI_CLI_TRUST_WORKSPACE=true は両方必須
 GEMINI_CLI_TRUST_WORKSPACE=true nohup gemini --yolo --skip-trust --output-format text \
   -p "$(cat "$PROMPT")" \
-  > /tmp/gemini-review-pr$PR-stdout.log \
-  2> /tmp/gemini-review-pr$PR-err.log &
-echo $! > /tmp/gemini-review-pr$PR.pid
+  > /tmp/gemini-review-pr$STATE_PR-stdout.log \
+  2> /tmp/gemini-review-pr$STATE_PR-err.log &
+echo $! > /tmp/gemini-review-pr$STATE_PR.pid
 disown
-echo "🚀 gemini launched (pid=$(cat /tmp/gemini-review-pr$PR.pid))" >&2
+echo "🚀 gemini launched (pid=$(cat /tmp/gemini-review-pr$STATE_PR.pid))" >&2

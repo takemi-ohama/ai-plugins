@@ -276,6 +276,27 @@ def monitor_agent(
         if agent == "codex":
             status.sentinel_seen = _scan_codex_sentinel(paths.err_log)
 
+        # codex は `tokens used` sentinel を出した後もプロセスが exit せず常駐し続ける
+        # ケースがある (実機で観測)。result.json は正常に書かれているのに alive=True の
+        # まま stall_timeout に達して STALLED 化してしまう。sentinel + result.json が
+        # 揃った瞬間に対象プロセスを kill して OK 判定で返す。
+        if (
+            agent == "codex"
+            and alive
+            and status.sentinel_seen
+            and paths.result.exists()
+            and paths.result.stat().st_size > 0
+        ):
+            _kill_pid(pid)
+            status.result_exists = True
+            status.status = "OK"
+            status.exit_code = 0
+            status.detail = (
+                f"codex sentinel + result.json detected; killed lingering pid {pid}"
+            )
+            _emit_log(log_prefix, agent, status)
+            return status
+
         if alive and not cmdline_validated:
             # cmdline 検証は alive 確認後に 1 回だけ。生きていない瞬間に proc/<pid> を読むと
             # ファイル不在で None 扱いになり判定不能のため。
