@@ -41,7 +41,7 @@ PR を **codex / gemini 両方** にレビューさせ、両者が `APPROVE` を
 |---|---|---|
 | `[PR番号]` | 対象 PR（省略時は直前 PR / 現在ブランチ） | — |
 | `--max-rounds N` | 全体最大ラウンド数（PR ローテーションを含む通算） | `6` |
-| `--rotate-after K` | この round 数で未収束なら PR ローテーション | `2` |
+| `--rotate-after K` | この round 数で未収束なら PR ローテーション | `5` |
 | `--only codex` / `--only gemini` | 片方だけで回す（デバッグ用） | 両方 |
 
 例:

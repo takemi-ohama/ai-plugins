@@ -11,7 +11,7 @@
 {
   "started_at": "2026-05-12T...",
   "max_rounds": 6,
-  "rotate_after": 2,
+  "rotate_after": 5,
   "only": null,
   "current_pr": 123,
   "worktree_path": "/work/worktrees/pr123",
@@ -61,7 +61,7 @@
 ```bash
 PR=<引数 or 直前PR>
 MAX_ROUNDS=6
-ROTATE_AFTER=2
+ROTATE_AFTER=5
 ONLY=
 STATE=/tmp/cross-review-pr$PR-state.json
 
