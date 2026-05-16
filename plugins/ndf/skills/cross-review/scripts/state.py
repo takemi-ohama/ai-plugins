@@ -112,8 +112,15 @@ def info(msg: str) -> None:
 def cmd_init(args: argparse.Namespace) -> None:
     """Step 0 — state 初期化 or 既存 state 引き継ぎ + プリチェック。"""
     pr = args.pr
-    # tmp_dir は worktree 引数優先で決定し、後段で全 path に使う
-    tmp_dir = _tmp_dir(args.worktree)
+    # worktree path を先に解決してから tmp_dir を決定する。
+    # gemini の workspace 制約 (~/.gemini/tmp/<workspace_basename>) と
+    # 一致させるため、worktree basename ベースで tmp_dir を計算する必要がある。
+    # 旧実装は _tmp_dir(args.worktree) を args.worktree=None のまま呼び、
+    # os.getcwd() の basename (= 親リポジトリ名) を採用していたため、
+    # launch-gemini.sh で `cd $WORKTREE` した後の gemini が
+    # `~/.gemini/tmp/<repo>` への write をブロックして hard timeout していた。
+    worktree = args.worktree or f"/work/worktrees/pr{pr}"
+    tmp_dir = _tmp_dir(worktree)
     state_file = tmp_dir / f"cross-review-pr{pr}-state.json"
 
     # 再開
@@ -139,7 +146,6 @@ def cmd_init(args: argparse.Namespace) -> None:
     # worktree 分離
     head_branch = _sh(["gh", "pr", "view", str(pr), "--json", "headRefName", "--jq", ".headRefName"])
     base_branch = _sh(["gh", "pr", "view", str(pr), "--json", "baseRefName", "--jq", ".baseRefName"])
-    worktree = args.worktree or f"/work/worktrees/pr{pr}"
     if not pathlib.Path(worktree).exists():
         _sh(["git", "fetch", "origin", head_branch])
         # head branch が既に別の worktree (例: 現在の作業ディレクトリ) で checkout されている

@@ -1,5 +1,41 @@
 # NDF Plugin CHANGELOG
 
+### v4.6.2 (cross-review: state.py init の TMP_DIR 計算順序バグ修正 + AGENTS.md リネーム)
+
+`/ndf:cross-review` で gemini が **workspace 制約違反で payload を書けず
+hard timeout (420s) で常時失敗** していた不具合を修正する PATCH リリース。
+合わせて `claude plugin validate` の警告 (plugin root の `CLAUDE.md` は
+project context として読み込まれない) に従い `plugins/ndf/CLAUDE.md` を
+`plugins/ndf/AGENTS.md` にリネーム。
+
+- 修正 (`skills/cross-review/scripts/state.py` `cmd_init`):
+  - 旧実装は `_tmp_dir(args.worktree)` を `args.worktree=None` のまま呼び、
+    `os.getcwd()` の basename (= 親リポジトリ名) で `~/.gemini/tmp/<repo>/`
+    を採用していた。一方、`launch-gemini.sh` は `cd "$WORKTREE"` してから
+    gemini を起動するため、gemini は `~/.gemini/tmp/<worktree-basename>`
+    (= `~/.gemini/tmp/pr<PR>`) しか workspace 内として許可せず、
+    `write_file` が `Path not in workspace` で拒否されていた。
+  - 修正後は `worktree = args.worktree or f"/work/worktrees/pr{pr}"` を
+    先に解決してから `_tmp_dir(worktree)` に渡し、tmp_dir の basename を
+    worktree basename と一致させる。
+  - 副次効果: `state_file` の path も `~/.gemini/tmp/pr<PR>/` 配下に揃うため、
+    cross-review が PR ごとに完全に分離した tmp 空間で動く。
+- リネーム: `plugins/ndf/CLAUDE.md` → `plugins/ndf/AGENTS.md`。
+  Claude Code は plugin root の `CLAUDE.md` を project context として
+  読み込まないため、`claude plugin validate` が警告を出していた。
+  リポジトリ root の `AGENTS.md` (本体) + `CLAUDE.md` (Claude 固有) と
+  揃え、プラグイン側は `AGENTS.md` に一本化する。
+  - `plugins/ndf/README.md` のリンクも更新。
+  - `claude plugin validate` の警告 0 件を確認。
+
+#### 既存ユーザへの影響
+
+- 旧 tmp_dir (`~/.gemini/tmp/<repo>/`) に途中状態 (`state.json`) が残っている
+  場合、v4.6.2 以降は `~/.gemini/tmp/pr<PR>/` を参照するため state を見失う。
+  対応: `mv ~/.gemini/tmp/<repo>/cross-review-pr<PR>-* ~/.gemini/tmp/pr<PR>/`
+  で移行するか、`/ndf:cross-review <PR>` を再 init する。
+- cross-review は 1 PR 単位の短命ステートのため、影響は実行中ループのみ。
+
 ### v4.6.1 (cross-review skill 主要処理のスクリプト化)
 
 `cross-review` skill の主要 bash 処理を `scripts/` 配下に外出し、SKILL.md /
