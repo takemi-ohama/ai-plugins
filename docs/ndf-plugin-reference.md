@@ -4,7 +4,7 @@
 
 NDF プラグインは、Claude Code / Kiro CLI 向けのオールインワン開発支援プラグイン。エージェント、Skills、フックを統合して提供する。
 
-**現行バージョン**: **v4.1.0** — `/ndf:codex` skill + `corder` エージェント経由の Codex CLI 直接実行に一本化。Serena MCP は別プラグイン `mcp-serena` に分離済み。Playwright シナリオ E2E、Google Drive / Chat 連携 skill を追加し、`google-auth` を v0.2.0 (永続トークン + ライブラリ用法) に拡張。
+**現行バージョン**: **v4.7.0** — `/ndf:fix` の修正ポリシー刷新（minor/nit のうち performance/readability/duplication は積極修正、+30 行超は要問い合わせ）、CI 完了待ち廃止、PR範囲外 flaky テストも修正対象。`/ndf:cross-review` 内のサブエージェントプロンプトも同期。重要度ラベルは AI agent の付与を鵜呑みにせず独自再判定。完了報告には PR URL 必須。詳細は [CHANGELOG.md](../plugins/ndf/CHANGELOG.md)。`/ndf:codex` skill + `corder` エージェント経由の Codex CLI 直接実行に一本化、Serena MCP は別プラグイン `mcp-serena` に分離済み、Playwright シナリオ E2E、Google Drive / Chat 連携 skill を提供。
 
 ## ディレクトリ構造
 
