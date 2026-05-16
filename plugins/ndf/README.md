@@ -296,7 +296,7 @@ Claude Codeが自動的に適切なMCPツールを選択・利用します。
 - **単純なタスクは専門エージェントに直接委譲**
 - **directorはMain Agentに報告する** - メモリエラー防止のため直接呼び出しは行わない
 
-詳細はメインセッションに自動注入される `ndf-policies` skill および `plugins/ndf/CLAUDE.md` を参照してください。
+詳細はメインセッションに自動注入される `ndf-policies` skill および `plugins/ndf/AGENTS.md` を参照してください。
 
 #### `director` エージェント（指揮者）
 **専門領域:** タスク統括・設計立案・エージェント調整

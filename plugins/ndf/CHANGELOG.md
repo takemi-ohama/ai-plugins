@@ -1,9 +1,12 @@
 # NDF Plugin CHANGELOG
 
-### v4.6.2 (cross-review: state.py init の TMP_DIR 計算順序バグ修正)
+### v4.6.2 (cross-review: state.py init の TMP_DIR 計算順序バグ修正 + AGENTS.md リネーム)
 
 `/ndf:cross-review` で gemini が **workspace 制約違反で payload を書けず
 hard timeout (420s) で常時失敗** していた不具合を修正する PATCH リリース。
+合わせて `claude plugin validate` の警告 (plugin root の `CLAUDE.md` は
+project context として読み込まれない) に従い `plugins/ndf/CLAUDE.md` を
+`plugins/ndf/AGENTS.md` にリネーム。
 
 - 修正 (`skills/cross-review/scripts/state.py` `cmd_init`):
   - 旧実装は `_tmp_dir(args.worktree)` を `args.worktree=None` のまま呼び、
@@ -17,6 +20,13 @@ hard timeout (420s) で常時失敗** していた不具合を修正する PATCH
     worktree basename と一致させる。
   - 副次効果: `state_file` の path も `~/.gemini/tmp/pr<PR>/` 配下に揃うため、
     cross-review が PR ごとに完全に分離した tmp 空間で動く。
+- リネーム: `plugins/ndf/CLAUDE.md` → `plugins/ndf/AGENTS.md`。
+  Claude Code は plugin root の `CLAUDE.md` を project context として
+  読み込まないため、`claude plugin validate` が警告を出していた。
+  リポジトリ root の `AGENTS.md` (本体) + `CLAUDE.md` (Claude 固有) と
+  揃え、プラグイン側は `AGENTS.md` に一本化する。
+  - `plugins/ndf/README.md` のリンクも更新。
+  - `claude plugin validate` の警告 0 件を確認。
 
 #### 既存ユーザへの影響
 

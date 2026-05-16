@@ -81,7 +81,7 @@ plugins/ndf/
 │   # Anthropic公式連携
 │   ├── mcp-builder/             # Anthropic公式（Apache-2.0）
 │   └── official-skills-autoloader/  # 公式Skill自動ロード
-├── CLAUDE.md                    # このファイル（開発者向け）
+├── AGENTS.md                    # このファイル（開発者向け）
 └── README.md                    # プラグイン説明書
 ```
 
