@@ -191,25 +191,55 @@ done
 - Step 0〜4 — [docs/01-state-and-review.md](docs/01-state-and-review.md)
 - Step 5〜8 — [docs/02-fix-and-rotation.md](docs/02-fix-and-rotation.md)
 
-## レビュー body の必須 identifier prefix
+## レビュー出力の制約
 
-人間アカウントから AI が投稿するため、**GitHub UI 上では誰のレビューか分からない**。
-両 launcher のプロンプトで以下の prefix を **body の先頭に必ず付ける** よう強制する:
+**目的**: PR 上に Resolve 義務を伴うインラインコメントを増やさない。
+**修正アクションを伴わない記述は一切出さない** ことを両 launcher プロンプトで強制する。
+
+### 1. body 先頭 identifier prefix（必須）
+
+人間アカウントから AI が投稿するため、GitHub UI 上では誰のレビューか分からない。
+body 先頭に必ず以下を入れる:
 
 ```
 ## 🤖 cross-review | round 1 | codex | REQUEST_CHANGES
-
-(残り `## 総評` 以降は従来通り)
 ```
 
 書式: `## 🤖 cross-review | round <N> | <agent> | <event>`
 
 - `<agent>`: `codex` / `gemini` のいずれか
 - `<event>`: AI の本来の判定（`REQUEST_CHANGES` / `APPROVE` / `COMMENT`）
-  `posted_as` ではなく `intent` を書く（ユーザが「本当は REQ だった」を一目で読める）
+  `posted_as` ではなく `intent` を書く
 
-インラインコメント側は従来通り `[major / 正確性]` などの `[重要度 / カテゴリ]` を維持
-（個別指摘単位での agent/round 表示は冗長なので不要、レビュー単位の prefix で十分）。
+### 2. インラインコメントの最小化（最重要）
+
+インラインコメントは GitHub 上で **Resolve 操作が必須** になるため、本当に直すものだけ作る:
+
+| 重要度 | インライン化 | 説明 |
+|---|---|---|
+| `critical` / `major` | ✅ する | 修正必須 |
+| `minor` | ✅ する | 明らかな改善のみ。判断が割れるなら出さない |
+| `nit` | ❌ **出さない** | 好み・スタイルはコメント化禁止。気になっても無視する |
+
+**1 インラインコメント = 1 修正アクション** を厳守。
+コメント本文は `[重要度 / カテゴリ] 修正提案` の 1 文で完結させ、
+コード引用ブロック（``` ... ```）や現状説明だけのコメントは作らない。
+
+### 3. body（総評）に書かないこと
+
+- ❌ **「良い点」/「Strengths」/「Positives」/「評価できる点」セクション** — 一切書かない
+- ❌ 個別ファイル・関数の褒め言葉
+- ❌ 「特に問題ありません」「概ね良好です」等の評価文
+- ❌ 対応不要な観察コメント（「〜のようです」「〜と思われます」止まり）
+
+body に書くのは **設計レベル・PR 横断の修正提案** のみ。
+書くことが無ければ body は `## 🤖 cross-review ...` の prefix 行 + 1 行サマリのみで良い。
+
+### 4. event 判定
+
+- `APPROVE` — 修正必須の指摘なし（minor 以下しか無い場合も APPROVE で良い）
+- `REQUEST_CHANGES` — critical / major の指摘あり
+- `COMMENT` — **基本使わない**。雑感だけの投稿は禁止
 
 ## CI failure の分類（誤中断防止）
 
