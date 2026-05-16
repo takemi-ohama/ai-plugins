@@ -51,14 +51,23 @@ PR: <PR番号>
 
 ## 重要度ベースの自動修正ポリシー
 
-`[重要度 / カテゴリ]` プレフィックス（`/ndf:review` 出力規約）で分類:
+`[重要度 / カテゴリ]` プレフィックス（`/ndf:review` 出力規約）で分類。
+**ただし重要度ラベルを鵜呑みにしない** — 各指摘ごとにコード/仕様を独自に調査し、
+本来の重要度を判定し直してから下表の動作を適用する（bot のラベリングは参考値に過ぎない）。
 
 | 重要度 | 動作 | ユーザ問い合わせ |
 |---|---|---|
 | `critical` | **必ず自動修正** | なし |
 | `major` | **必ず自動修正** | なし |
-| `minor` | 自動修正（明らかな改善のみ）。判断が割れるなら `nit` として deferred 扱い | なし |
-| `nit` | `--defer-nit` 指定時は **修正せず deferred リスト** に追加。最後にまとめてユーザ問い合わせ | あり（最後に1回） |
+| `minor` / `nit` (パフォーマンス・可読性・重複コード排除) | **このPRで修正対応**。特にトータル行数が減る方向の修正は積極的に実施 | なし |
+| `minor` / `nit` (上記カテゴリ、修正範囲が +30 行を超えそう) | ユーザ問い合わせ | あり |
+| `minor` (その他) | 自動修正（明らかな改善のみ）。判断が割れるなら `nit` として deferred 扱い | なし |
+| `nit` (その他) | `--defer-nit` 指定時は **修正せず deferred リスト** に追加。最後にまとめてユーザ問い合わせ | あり（最後に1回） |
+
+**重要度の独自判定**:
+- AI agent (CodeRabbit / Copilot 等) が `nit` と付けていても、実体がパフォーマンス改善や重複排除なら **minor/nit カテゴリ修正対象** として扱う
+- 逆に AI agent が `critical` と付けていても、実害がないスタイル指摘なら `nit` 相当に格下げして deferred 化してよい
+- 重要度はカテゴリ（performance/readability/duplication/security/style/etc）と合わせて、コード本体を読んだ上で判定する
 
 **指摘の正否判断**:
 - ロジック・仕様逸脱・セキュリティ: コード/仕様を確認してから修正可否判断
@@ -73,32 +82,38 @@ PR: <PR番号>
 
 ## 手順
 
-1. review comment取得 + 重要度別に振り分け（`[critical/major/minor/nit]` プレフィックス）
-2. **CIエラー確認**（`gh pr checks <PR>` で失敗ジョブを検出）
-   - 実行中(PENDING/IN_PROGRESS)のチェックが残っている場合は次ステップに進まず完了を待つ
+1. review comment取得 + 重要度を**独自に再判定**（AI agent のラベルは参考値）
+2. **CIエラー確認**（`gh pr checks <PR>` で **現時点の** 失敗ジョブを検出）
+   - **完了待ちはしない**。実行中(PENDING/IN_PROGRESS)のチェックは無視して次ステップへ進む
+   - 直近で失敗(FAILURE)状態のジョブのみを修正対象に取り込む
 3. 修正対象を確定:
    - `critical` / `major` → 全件修正対象
-   - `minor` → 修正対象（明らかでないものは `deferred[]` へ）
-   - `nit` (`--defer-nit` 時) → `deferred[]` のみ、修正しない
-   - CIエラー → 全件修正対象
+   - `minor` / `nit` (パフォーマンス・可読性・重複排除) → 修正対象。+30行超なら **deferred + ユーザ問い合わせ**
+   - `minor` (その他) → 修正対象（明らかでないものは `deferred[]` へ）
+   - `nit` (その他、`--defer-nit` 時) → `deferred[]` のみ、修正しない
+   - CIエラー → 全件修正対象（PRテスト範囲外の **flaky テストも見つけ次第修正**）
 4. 問題点修正
+   - **コード行数が減る方向の修正は積極的に実施**（重複排除、不要分岐除去 等）
 5. **コミット前の再確認**（修正作業中に状況が変わっている可能性への対応）
    - **review comment再取得**: 作業中に新しいコメントが追加されていないか確認
-   - **CI状態再確認**: 実行中があれば完了を待つ。新しい失敗が出ていないか確認
+   - **CI状態再確認**: 現時点の状態だけ確認（完了待ちはしない）。新しい失敗が出ていれば対象に取り込む
    - 新しい指摘/失敗があれば手順3に戻る
 6. コミット・プッシュ
-7. **CI再実行結果の確認**（push後、CIが通るまで待機 or 失敗したら追加修正）
-8. PRにSummaryコメントを追加（対応した件数 + deferred 件数を明記）
-9. 対応したコードコメントに個別に返信
-10. **deferred スレッドには `[deferred / nit]` のラベル付き返信** を投稿（resolve はしない）
-11. reviewerに再レビューを依頼
-12. 対応完了したコードコメントを「Resolve Conversation」にする（`resolveReviewThread` mutation）
+7. PRにSummaryコメントを追加（対応した件数 + deferred 件数を明記）
+8. 対応したコードコメントに個別に返信
+9. **deferred スレッドには `[deferred / nit]` のラベル付き返信** を投稿（resolve はしない）
+10. reviewerに再レビューを依頼
+11. 対応完了したコードコメントを「Resolve Conversation」にする（`resolveReviewThread` mutation）
     - resolve した thread_id / comment_id / path / line を `resolved_threads[]` に記録
     - `deferred` / `rejected` の thread は Resolve しない（次ラウンドで再評価するため）
-13. **戻り値ファイルを書き出す**: `/tmp/fix-pr<番号>-result.json` （後述「戻り値フォーマット」参照）
+12. **戻り値ファイルを書き出す**: `/tmp/fix-pr<番号>-result.json` （後述「戻り値フォーマット」参照）
     - `ci_failed_checks` には `gh pr checks <PR> --json name,state` から `state=FAILURE` の name を抽出して列挙
+    - push 直後の CI 再実行結果は**待たない**ため、戻り値の `ci_status` は push 時点での既知失敗のみを反映する
 
-- 4〜6はgit、1〜2/5と8以降はgithub mcpまたはghを利用
+- 4〜6はgit、1〜2/5と7以降はgithub mcpまたはghを利用
+
+**flakyテストの扱い**: PR の変更範囲外で発生している flaky テストも、見つけ次第このPRで修正する。
+flaky を放置するとリポジトリ全体のコード品質が下がり、後続 PR の CI 信頼性も損なわれるため。
 
 ## CIエラーチェック
 
@@ -115,24 +130,18 @@ gh pr checks <PR番号> --json name,state,link,completedAt
 gh pr checks <PR番号> --json name,state | \
   python3 -c "import json,sys; [print(c['name']) for c in json.load(sys.stdin) if c['state']=='FAILURE']"
 
-# 実行中ジョブのみ抽出（完了待ちに使用）
+# 実行中ジョブのみ抽出（状態スナップショット用。完了は待たない）
 gh pr checks <PR番号> --json name,state | \
   python3 -c "import json,sys; [print(c['name']) for c in json.load(sys.stdin) if c['state'] in ('PENDING','IN_PROGRESS','QUEUED')]"
 ```
 
-### CI完了を待つ
+### CI完了待ちはしない
 
-`gh pr checks --watch` で全チェックの完了までブロック待機できる:
-
-```bash
-# 完了まで待機（全部PASSでexit 0、失敗があればexit 1）
-gh pr checks <PR番号> --watch
-
-# タイムアウト付きで待つ（例: 最大10分）
-timeout 600 gh pr checks <PR番号> --watch || echo "timed out or failed"
-```
-
-修正作業の途中や、コミット直前の再確認で活用する。
+このスキルでは **CI 完了待ちは行わない**（`gh pr checks --watch` 等は使わない）。
+- 各チェックポイントでは「現時点で FAILURE のジョブ」のみを取り込んで修正する
+- push 後の CI 再実行結果も待たない（待機中に context を消費しないため）
+- ただし `gh pr checks <PR> --json name,state` での **状態スナップショット取得は実施**
+  し、戻り値の `ci_status` / `ci_failed_checks` に反映する
 
 ### 失敗ログの取得
 
@@ -157,7 +166,7 @@ gh run view $RUN_ID --job <job-id> --log
 | **テスト失敗** | 失敗テストを読み、実装/テストどちらが正しいか判断してから修正。テスト側の問題なら仕様確認 |
 | **ビルドエラー** | 依存関係・構文・設定ファイルを確認 |
 | **依存脆弱性** | 可能ならバージョン更新、無理なら除外ルール追加（理由明記） |
-| **タイムアウト/flaky** | retry設定、テスト分割、リトライ追加 |
+| **タイムアウト/flaky** | retry設定、テスト分割、リトライ追加。**PR範囲外の flaky も見つけ次第修正**（放置でリポジトリ全体の品質劣化を招くため） |
 | **インフラ一時障害** | 再実行で解消することがあるため `gh run rerun $RUN_ID` を先に試す |
 
 ### review指摘との統合
@@ -269,17 +278,18 @@ gh api graphql -f query='
 
 - `ci_failed_checks` — `ci_status = FAILURE` のとき、失敗した check 名の配列。`/ndf:cross-review` 側で code-related (`pint/larastan/test/build/lint/type`) と meta-only (`check_pr_requirements/assignees/reviewers/labels`) を分類し、メタチェックのみ失敗ならループ継続する
 - `ci_note` — code-related ではない CI 失敗の補足。例: `"メタチェックのみ失敗: check_pr_requirements — Assignees 未設定"`
-- `resolved_threads` — 手順 12 で `resolveReviewThread` mutation を実行したスレッド一覧。`deferred` / `rejected` の thread は **Resolve しない**（再評価のため）
+- `resolved_threads` — 手順 11 で `resolveReviewThread` mutation を実行したスレッド一覧。`deferred` / `rejected` の thread は **Resolve しない**（再評価のため）
 
 サブエージェントとして起動された場合は、この JSON をメインに返すサマリの基礎とする。
 
 ## 作業完了報告（必須）
 
 メイン or PR への報告内容（戻り値ファイルから抽出）:
-- 対応した指摘の件数（重要度別: critical/major/minor）
+- 対応した指摘の件数（重要度別: critical/major/minor/nit）
 - **deferred 件数**（主に nit、最後にユーザ問い合わせ予定）
 - **rejected 件数**（bot 指摘が不適切で修正しなかった件、各々理由付き）
 - **対応したCIエラーの一覧**（ジョブ名、エラー内容、修正方法）
-- **CI再実行結果**（全チェックPASSの確認）
+- **対応した flaky テストの一覧**（PR範囲外も含む）
 - 修正コミット SHA / 修正ファイル一覧
 - 戻り値ファイルパス: `/tmp/fix-pr<番号>-result.json`
+- **PR URL を最後に必ず記載**（例: `https://github.com/<owner>/<repo>/pull/<番号>`）

@@ -27,7 +27,7 @@
 
 > ⚠ inline thread への reply + Resolve **だけでは不十分**。PR ページの
 > conversation タブに表示される **PR レベルコメント** がレビュアーへの
-> サマリ通知として必須（`/ndf:fix` SKILL.md の手順 8 で規定）。
+> サマリ通知として必須（`/ndf:fix` SKILL.md の手順 7 で規定）。
 > サブエージェント起動プロンプトでも明示的に指示すること。
 
 ### サブエージェント起動例
@@ -58,20 +58,24 @@ worktree 外を触ると競合します。
 - 既存コメントスナップショット: $TMP_DIR/cross-review-pr{PR}-existing-comments.txt
 
 ## ポリシー
-- critical / major / minor は自動修正
-- nit は deferred として記録のみ（修正しない、Resolve しない）
+- 重要度ラベルは **AI agent の付与を鵜呑みにせず**、コードを読んで独自に再判定する
+- critical / major は自動修正
+- minor / nit のうち **パフォーマンス・可読性・重複コード排除** に該当するものは修正
+  （特にトータル行数が減る方向は積極実施 / +30 行を超えそうなら deferred + ユーザ問い合わせ）
+- それ以外の nit は deferred として記録のみ（修正しない、Resolve しない）
 - bot 指摘が誤読していたら修正せず reply で説明（rejected として記録、Resolve しない）
 - **重複指摘（codex/gemini が同じ箇所を別 thread で指摘）は全 thread に reply + Resolve**
+- PR テスト範囲外の **flaky テストも見つけ次第このループで修正**（放置はリポジトリ品質を劣化させる）
 
 ## 必須実行手順（順序厳守）
 
 1. PR コメント取得: `gh api "repos/{OWNER_REPO}/pulls/{PR}/comments" --paginate`
-2. 重要度で分類（[critical/major/minor/nit] プレフィックス）
-3. CI 状態確認: `gh pr checks {PR}` （PENDING があれば完了まで待つ）
-4. critical/major/minor の修正コミット（worktree 内のみ）
+2. 重要度を独自再判定（AI agent のラベルは参考値）
+3. CI 状態スナップショット: `gh pr checks {PR} --json name,state` （**完了待ちはしない**、PENDING は無視して FAILURE のみ修正対象に取り込む）
+4. critical/major + 該当 minor/nit の修正コミット（worktree 内のみ）
 5. `./pint-changed.sh && ./larastan-changed.sh` 等の品質チェック
 6. push: `git push origin {HEAD_BRANCH}` （--force / --no-verify 禁止）
-7. CI 再実行待ち: `gh pr checks {PR} --watch` （最大 10 分）
+7. **CI 再実行は待たない**（push 後の `--watch` 等は行わない、`ci_status` は push 時点での既知失敗のみ反映）
 8. **各 thread に reply 投稿**:
    - 修正済み: 「対応しました — <ファイル>:<行> で〇〇 (commit <SHA>)」
    - deferred: 「[deferred / nit] 後続 PR で対応予定」

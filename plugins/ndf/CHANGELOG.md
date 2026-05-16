@@ -1,5 +1,54 @@
 # NDF Plugin CHANGELOG
 
+### v4.7.0 (fix / cross-review: 修正ポリシー刷新 + CI 完了待ち廃止)
+
+`/ndf:fix` と `/ndf:cross-review` の修正方針を見直し、PR の最終的なコード品質を
+上げる方向にシフトする MINOR リリース。`/ndf:fix` の自動実行範囲が広がるため、
+利用側スクリプトが `--severity-min nit` 相当の挙動を前提にしている場合は要確認。
+
+- **修正対象の拡張** (`skills/fix/SKILL.md`):
+  - minor / nit のうち **パフォーマンス・可読性・重複コード排除** に該当する指摘は
+    このPR内で対応する (旧: nit は基本 deferred)。
+  - 特にトータルのコード行数が減る方向の修正 (重複排除 / 不要分岐除去) は積極実施。
+  - ただし修正範囲が **+30 行を超えそうな場合は deferred + ユーザ問い合わせ**
+    （スコープ膨張による副作用とレビュー負担を抑える）。
+- **重要度ラベルの独自再判定**:
+  - AI agent (CodeRabbit / Copilot / codex / gemini) が付けた `[critical/major/minor/nit]`
+    ラベルを鵜呑みにせず、コード本体を読んだ上でカテゴリ
+    (performance/readability/duplication/security/style/...) と合わせて再判定する。
+  - 例: AI が `nit` と付けていても実体が重複排除なら修正対象。AI が `critical` と
+    付けていても実害がないスタイル指摘なら deferred 化してよい。
+- **CI 完了待ちを廃止**:
+  - `/ndf:fix` 内の `gh pr checks --watch` および "PENDING を完了まで待つ" 手順を削除。
+  - 各チェックポイントでは **その時点で FAILURE のジョブのみ** を修正対象に取り込み、
+    実行中チェックは無視して次ステップへ進む。
+  - 戻り値 `ci_status` / `ci_failed_checks` は push 時点での既知失敗のみを反映する
+    （メイン context の節約と、長時間ブロック回避が目的）。
+  - cross-review 側の judge ロジック (`state.py`) は変更不要 — `ci_status != FAILURE`
+    なら継続判定するため、PENDING も成功扱いになる。
+- **PR テスト範囲外の flaky テストも修正対象**:
+  - 放置するとリポジトリ全体の CI 信頼性が劣化し、後続 PR にも波及するため、
+    `/ndf:fix` 実行時に見つけ次第このループで修正する。
+- **作業完了報告に PR URL 必須**:
+  - `/ndf:fix` の最終報告末尾に `https://github.com/<owner>/<repo>/pull/<番号>` を
+    必ず記載する（メインからの追跡性向上）。
+- **`cross-review` 側の同期**:
+  - `skills/cross-review/docs/02-fix-and-rotation.md` のサブエージェント起動プロンプト
+    （ポリシーと「必須実行手順」）を上記方針に合わせて更新。
+  - 手順 3 を「CI 状態スナップショット (完了待ちしない)」、手順 7 を
+    「CI 再実行は待たない」に書き換え。SKILL.md の手順番号繰り上がり
+    (旧 8 → 新 7) も反映。
+
+#### 既存ユーザへの影響
+
+- `/ndf:fix` 単体実行: minor/nit カテゴリのうち performance/readability/duplication
+  に該当するものが自動修正されるため、これまで deferred だった指摘が修正コミットに
+  入る場合がある。+30 行を超える場合はユーザ問い合わせで止まる。
+- `/ndf:cross-review` 自動ループ: CI 完了を待たなくなった分、各 round の所要時間が
+  短縮される。一方で push 直後の CI 失敗は次 round の review 段階で再検出される。
+- `result.json` の `ci_status` が `PENDING` になる頻度が増える。下流で `ci_status`
+  を見ているスクリプトがある場合は確認推奨（state.py の judge は変更不要）。
+
 ### v4.6.2 (cross-review: state.py init の TMP_DIR 計算順序バグ修正 + AGENTS.md リネーム)
 
 `/ndf:cross-review` で gemini が **workspace 制約違反で payload を書けず
