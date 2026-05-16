@@ -1,6 +1,7 @@
 ---
 name: logging-guidelines
 description: "ログを追加・修正する際のガイドライン。ログレベルの選択基準、ループ内ログの制御、エラー蓄積パターン、機密情報の扱いを扱う。言語/FW非依存の原則。"
+when_to_use: "コードにログを追加・修正・整理するとき。Triggers: 'ログ追加', 'log追加', 'logger', 'logging', 'ログレベル', 'log level', 'デバッグログ', 'エラーログ', 'logger.info', 'logger.error', 'print文をログに'"
 ---
 
 # ログ運用ガイドライン
