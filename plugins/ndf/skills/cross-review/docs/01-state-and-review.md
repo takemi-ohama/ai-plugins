@@ -172,6 +172,11 @@ launcher が生成するプロンプトに以下を強制している:
   ```
   `<event>` は **本来の intent**（`posted_as` ではない）。
   例: 自分PR で REQUEST_CHANGES を COMMENT にダウングロードしても、prefix は `REQUEST_CHANGES` のまま。
+- **出力禁止事項**（SKILL.md「レビュー出力の制約」と一致）:
+  - 「良い点」「Strengths」などの褒めセクションを body に書かない
+  - 修正アクションを伴わないインラインコメントは作らない（nit はインライン化しない）
+  - コード引用のみで指摘内容が無いコメント禁止
+  - 雑感だけの `event=COMMENT` 投稿禁止（直すべき点が無ければ `APPROVE`）
 
 ### 2.3 AI が書き出すファイル契約
 

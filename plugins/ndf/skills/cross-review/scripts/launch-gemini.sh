@@ -69,7 +69,24 @@ $EXISTING_INLINE
   \`\`\`
   ## 🤖 cross-review | round $ROUND | gemini | <event(intent)>
   \`\`\`
-- インラインコメントは \`[重要度 / カテゴリ]\` プレフィックス
+  - \`<event>\` は **本来の intent** (REQUEST_CHANGES / APPROVE / COMMENT)
+
+### 出力に **含めてはいけないもの**（Resolve 負荷を増やすため）
+- ❌ **「良い点」/「Strengths」/「評価できる点」 section** — body にも書かない
+- ❌ **対応アクションが無いインラインコメント** — 観察・感想・現状説明だけは禁止
+- ❌ **nit / スタイル指摘のインライン化** — 好みの問題はコメント化しない (無視する)
+- ❌ **コード引用 (\`\`\` ... \`\`\`) だけで指摘内容が無いコメント**
+- ❌ **\`event=COMMENT\` での雑感投稿** — 直すべき点が無ければ \`APPROVE\` にする
+
+### インラインコメントの書式
+- \`[重要度 / カテゴリ]\` プレフィックス必須 (例: \`[major / 正確性]\`)
+- 重要度は \`critical\` / \`major\` / \`minor\` のみ使う (nit はインライン化しない)
+- 本文は **1 コメント = 1 修正アクション** で完結させる。1〜2 文で具体的な修正提案を書く
+
+### body (総評) の書き方
+- 設計レベル・PR 横断の **修正提案のみ** 書く
+- 書くことが無ければ prefix 行 + 1 行サマリだけで良い (褒め言葉や評価文は不要)
+
 - 投稿後、サマリを **$TMP_DIR/gemini-review-pr$STATE_PR-result.json** に書く（フォーマットは launch-codex.sh と同じ）
 - payload は **$TMP_DIR/gemini-review-pr$STATE_PR-round$ROUND-payload.json** に保存
 
